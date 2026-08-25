@@ -156,7 +156,7 @@ export const PublicPortal: React.FC<PublicPortalProps> = ({
 
         <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm flex items-center gap-3.5">
           <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center font-bold text-xl shrink-0">
-            18
+            34
           </div>
           <div>
             <span className="text-xs text-slate-500 font-medium">Cabang Lomba</span>
