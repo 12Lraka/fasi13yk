@@ -52,12 +52,12 @@ export const LiveScoreboard: React.FC<LiveScoreboardProps> = ({ participants }) 
                   LIVE SCOREBOARD RESMI
                 </span>
                 <h2 className="text-xl sm:text-2xl font-bold tracking-tight">
-                  Klasemen Medali FASI XIII Kota Yogyakarta
+                  Klasemen Kejuaraan
                 </h2>
               </div>
             </div>
             <p className="text-xs text-emerald-200">
-              Sistem kalkulasi poin otomatis: <strong>Emas = 5 Poin</strong>, <strong>Perak = 3 Poin</strong>, <strong>Perunggu = 1 Poin</strong>.
+              Sistem kalkulasi poin otomatis
             </p>
           </div>
 
@@ -89,15 +89,15 @@ export const LiveScoreboard: React.FC<LiveScoreboardProps> = ({ participants }) 
             </div>
             <div className="grid grid-cols-3 gap-2 text-center text-xs bg-slate-50 p-2 rounded-xl border border-slate-100">
               <div>
-                <span className="text-slate-400 block text-[10px]">Emas</span>
+                <span className="text-slate-400 block text-[10px]">Juara I</span>
                 <strong className="text-amber-600 font-bold text-sm">{top2.gold}</strong>
               </div>
               <div>
-                <span className="text-slate-400 block text-[10px]">Perak</span>
+                <span className="text-slate-400 block text-[10px]">Juara II</span>
                 <strong className="text-slate-600 font-bold text-sm">{top2.silver}</strong>
               </div>
               <div>
-                <span className="text-slate-400 block text-[10px]">Perunggu</span>
+                <span className="text-slate-400 block text-[10px]">Juara III</span>
                 <strong className="text-amber-800 font-bold text-sm">{top2.bronze}</strong>
               </div>
             </div>
@@ -126,15 +126,15 @@ export const LiveScoreboard: React.FC<LiveScoreboardProps> = ({ participants }) 
             </div>
             <div className="grid grid-cols-3 gap-2 text-center text-xs bg-amber-100/60 p-2.5 rounded-xl border border-amber-200">
               <div>
-                <span className="text-amber-800 block text-[10px] font-semibold">Emas (5pt)</span>
+                <span className="text-amber-800 block text-[10px] font-semibold">Juara I</span>
                 <strong className="text-amber-700 font-black text-base">{top1.gold}</strong>
               </div>
               <div>
-                <span className="text-slate-600 block text-[10px] font-semibold">Perak (3pt)</span>
+                <span className="text-slate-600 block text-[10px] font-semibold">Juara II</span>
                 <strong className="text-slate-700 font-black text-base">{top1.silver}</strong>
               </div>
               <div>
-                <span className="text-amber-900 block text-[10px] font-semibold">Perunggu (1pt)</span>
+                <span className="text-amber-900 block text-[10px] font-semibold">Juara III</span>
                 <strong className="text-amber-900 font-black text-base">{top1.bronze}</strong>
               </div>
             </div>
@@ -160,15 +160,15 @@ export const LiveScoreboard: React.FC<LiveScoreboardProps> = ({ participants }) 
             </div>
             <div className="grid grid-cols-3 gap-2 text-center text-xs bg-slate-50 p-2 rounded-xl border border-slate-100">
               <div>
-                <span className="text-slate-400 block text-[10px]">Emas</span>
+                <span className="text-slate-400 block text-[10px]">Juara I</span>
                 <strong className="text-amber-600 font-bold text-sm">{top3.gold}</strong>
               </div>
               <div>
-                <span className="text-slate-400 block text-[10px]">Perak</span>
+                <span className="text-slate-400 block text-[10px]">Juara II</span>
                 <strong className="text-slate-600 font-bold text-sm">{top3.silver}</strong>
               </div>
               <div>
-                <span className="text-slate-400 block text-[10px]">Perunggu</span>
+                <span className="text-slate-400 block text-[10px]">Juara III</span>
                 <strong className="text-amber-800 font-bold text-sm">{top3.bronze}</strong>
               </div>
             </div>
@@ -188,9 +188,9 @@ export const LiveScoreboard: React.FC<LiveScoreboardProps> = ({ participants }) 
               <tr className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
                 <th className="py-3 px-4 w-14 text-center">Rank</th>
                 <th className="py-3 px-4">Kontingen Kemantren</th>
-                <th className="py-3 px-4 text-center bg-amber-50/60 text-amber-900 font-bold w-20">🥇 Emas</th>
-                <th className="py-3 px-4 text-center bg-slate-100/60 text-slate-800 font-bold w-20">🥈 Perak</th>
-                <th className="py-3 px-4 text-center bg-orange-50/60 text-orange-900 font-bold w-20">🥉 Perunggu</th>
+                <th className="py-3 px-4 text-center bg-amber-50/60 text-amber-900 font-bold w-20">Juara I</th>
+                <th className="py-3 px-4 text-center bg-slate-100/60 text-slate-800 font-bold w-20">Juara II</th>
+                <th className="py-3 px-4 text-center bg-orange-50/60 text-orange-900 font-bold w-20">Juara III</th>
                 <th className="py-3 px-4 text-center w-24">Harapan 1/2/3</th>
                 <th className="py-3 px-4 text-center font-black bg-emerald-50 text-emerald-950 w-24">Total Poin</th>
               </tr>
