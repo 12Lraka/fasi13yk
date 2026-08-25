@@ -1,0 +1,6 @@
+{
+  "name": "Sistem Informasi FASI XIII Kota Yogyakarta",
+  "description": "Sistem Informasi Manajemen, Validasi Usia Santri, Pendaftaran, Undian Tampil & Live Score FASI XIII Kota Yogyakarta - BADKO TKA-TPA Kota Yogyakarta",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

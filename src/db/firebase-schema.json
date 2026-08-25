@@ -1,0 +1,91 @@
+{
+  "description": "Struktur Koleksi & Dokumen Database NoSQL Firebase Firestore FASI XIII Kota Yogyakarta 2026",
+  "collections": {
+    "kemantren": {
+      "document_id": "string (e.g. kem-1, kem-6)",
+      "fields": {
+        "code": "string (e.g. KG, DN, GK)",
+        "name": "string (e.g. Kotagede, Danurejan)",
+        "adminName": "string (e.g. Ust. Hasan Basri)",
+        "contactPerson": "string (e.g. 081234567806)",
+        "password": "string (e.g. kotagede123)",
+        "driveFolderUrl": "string (Google Drive URL)",
+        "createdAt": "timestamp",
+        "updatedAt": "timestamp"
+      }
+    },
+    "categories": {
+      "document_id": "string (e.g. cat-tka-1, cat-tpa-tartil-l)",
+      "fields": {
+        "code": "string (e.g. TKA-01, TPA-03)",
+        "level": "string enum (TKA | TPA | TQA)",
+        "name": "string (e.g. Tartil Al-Qur'an)",
+        "genderRequirement": "string enum (L | P | ALL)",
+        "isGroup": "boolean",
+        "groupMemberCount": "number (default 1)",
+        "maxParticipantsPerKemantren": "number (default 1)",
+        "description": "string (Materi lomba, batasan usia, syarat teknis)",
+        "createdAt": "timestamp"
+      }
+    },
+    "participants": {
+      "document_id": "string UUID",
+      "fields": {
+        "registrationNumber": "string unique (e.g. FASI13-YK-TPA-001)",
+        "fullName": "string",
+        "gender": "string enum (L | P)",
+        "birthDate": "string YYYY-MM-DD",
+        "ageOnCutoff": {
+          "years": "number",
+          "months": "number",
+          "days": "number"
+        },
+        "kemantrenId": "string reference to kemantren",
+        "categoryId": "string reference to categories",
+        "tpaUnitName": "string",
+        "pjName": "string",
+        "whatsappNumber": "string",
+        "photoUrl": "string or null",
+        "documentUrl": "string or null",
+        "lotteryNumber": "number or null",
+        "lotteryDrawnAt": "timestamp or null",
+        "lotteryDrawnBy": "string or null",
+        "status": "string enum (draft | verified | rejected)",
+        "attendance": "string enum (belum_tampil | siap_tampil | sudah_tampil)",
+        "scoreJury1": "number or null",
+        "scoreJury2": "number or null",
+        "scoreJury3": "number or null",
+        "averageScore": "number or null",
+        "rank": "number or null",
+        "pointsAwarded": "number (default 0)",
+        "notes": "string or null",
+        "createdAt": "timestamp",
+        "updatedAt": "timestamp"
+      }
+    },
+    "settings": {
+      "document_id": "general",
+      "fields": {
+        "eventName": "string",
+        "eventSubtitle": "string",
+        "tagline": "string",
+        "eventDate": "string",
+        "eventLocation": "string",
+        "themeColor": "string (emerald | teal | sapphire | violet | amber)",
+        "superadminPassword": "string",
+        "updatedAt": "timestamp"
+      }
+    },
+    "audit_logs": {
+      "document_id": "string UUID",
+      "fields": {
+        "timestamp": "timestamp",
+        "user": "string",
+        "action": "string",
+        "details": "string",
+        "status": "string enum (SUCCESS | BLOCKED_BOT | FLAGGED)",
+        "ipMock": "string or null"
+      }
+    }
+  }
+}
