@@ -74,7 +74,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </span>
               </div>
               <p className="text-xs text-emerald-300 font-normal">
-                Sistem Pendaftaran, Validasi Usia & Live Score
+                Pendaftaran, Validasi Usia & Live Score
               </p>
             </div>
           </div>
