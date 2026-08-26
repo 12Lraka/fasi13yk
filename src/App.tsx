@@ -32,16 +32,20 @@ import {
   saveSession,
   clearSession,
   logAuditEvent,
+  getStoredSettings,
 } from './utils/storage';
 import { isSupabaseConfigured, fetchParticipantsFromSupabase } from './lib/supabase';
 import { showToast, showConfirmDialog } from './utils/sweetalert';
 import { AppRoute, getCurrentRouteFromURL, navigateToRoute } from './utils/router';
+import { getThemeConfig } from './utils/theme';
+import { AppSettings } from './types/fasi';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<AppRoute>('beranda');
 
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [session, setSession] = useState<UserSession | null>(null);
+  const [settings, setSettings] = useState<AppSettings>(getStoredSettings());
 
   // Modals
   const [isAgeCalcOpen, setIsAgeCalcOpen] = useState<boolean>(false);
@@ -132,6 +136,26 @@ export default function App() {
     setParticipants(localData);
     const storedSession = getStoredSession();
     setSession(storedSession);
+    const storedSettings = getStoredSettings();
+    setSettings(storedSettings);
+
+    // Listener jika pengaturan (tema/nama event) diubah dari Backoffice
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'fasi_settings') {
+        setSettings(getStoredSettings());
+      }
+      if (e.key === 'fasi_participants') {
+        setParticipants(getStoredParticipants());
+      }
+    };
+
+    // Custom window event listener untuk sinkronisasi seketika dalam satu tab
+    const handleLocalSettingsUpdate = () => {
+      setSettings(getStoredSettings());
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('fasi_settings_updated', handleLocalSettingsUpdate);
 
     // Jika Supabase aktif, lakukan sinkronisasi awal
     if (isSupabaseConfigured()) {
@@ -157,6 +181,8 @@ export default function App() {
     window.addEventListener('hashchange', handlePopState);
 
     return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('fasi_settings_updated', handleLocalSettingsUpdate);
       window.removeEventListener('popstate', handlePopState);
       window.removeEventListener('hashchange', handlePopState);
     };
@@ -265,13 +291,16 @@ export default function App() {
     handleNavigate('cetak');
   };
 
+  const theme = getThemeConfig(settings?.themeColor);
+
   return (
-    <div className="min-h-screen flex flex-col bg-slate-100 text-slate-900 font-sans antialiased selection:bg-emerald-200 selection:text-emerald-900">
+    <div className={`min-h-screen flex flex-col bg-slate-100 text-slate-900 font-sans antialiased ${theme.selectionClass}`}>
       {/* Top Navigation */}
       <Navbar
         activeTab={activeTab}
         setActiveTab={(tab) => handleNavigate(tab)}
         session={session}
+        settings={settings}
         onOpenLogin={() => handleNavigate('login')}
         onLogout={handleLogout}
         onOpenAgeCalc={() => handleNavigate('kalkulator')}
@@ -282,6 +311,7 @@ export default function App() {
         {activeTab === 'beranda' && (
           <PublicPortal
             participants={participants}
+            settings={settings}
             onOpenAgeCalc={() => handleNavigate('kalkulator')}
             onNavigateTab={(tab) => handleNavigate(tab as AppRoute)}
           />

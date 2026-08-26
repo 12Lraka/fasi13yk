@@ -54,6 +54,9 @@ export function getStoredSettings(): AppSettings {
 export function saveSettings(settings: AppSettings): void {
   try {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('fasi_settings_updated', { detail: settings }));
+    }
   } catch (err) {
     console.error('Gagal menyimpan pengaturan:', err);
   }

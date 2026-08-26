@@ -8,13 +8,15 @@
 
 import React from 'react';
 import { Award, Calculator, Calendar, MapPin, Users, ShieldCheck, LogIn, LogOut, LayoutDashboard, Printer } from 'lucide-react';
-import { UserSession } from '../../types/fasi';
+import { UserSession, AppSettings } from '../../types/fasi';
 import { AppRoute } from '../../utils/router';
+import { getThemeConfig } from '../../utils/theme';
 
 interface NavbarProps {
   activeTab: AppRoute;
   setActiveTab: (tab: AppRoute) => void;
   session: UserSession | null;
+  settings?: AppSettings;
   onOpenLogin: () => void;
   onLogout: () => void;
   onOpenAgeCalc: () => void;
@@ -24,29 +26,32 @@ export const Navbar: React.FC<NavbarProps> = ({
   activeTab,
   setActiveTab,
   session,
+  settings,
   onOpenLogin,
   onLogout,
   onOpenAgeCalc,
 }) => {
+  const theme = getThemeConfig(settings?.themeColor);
+
   return (
-    <header className="sticky top-0 z-40 bg-emerald-900 text-white shadow-md border-b border-emerald-800">
+    <header className={`sticky top-0 z-40 text-white shadow-md border-b ${theme.navbarBg} ${theme.navbarBorder}`}>
       {/* Top Banner Penyelenggara */}
-      <div className="bg-emerald-950 px-4 py-1.5 text-xs text-emerald-200 border-b border-emerald-900/60">
+      <div className={`${theme.headerGradient} px-4 py-1.5 text-xs border-b ${theme.headerBorder}`}>
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span className="font-semibold tracking-wide uppercase">BADKO TKA-TPA Kota Yogyakarta</span>
-            <span className="hidden sm:inline text-emerald-400">•</span>
-            <span className="hidden sm:inline">FASI XIII Kota Yogyakarta 2026</span>
+            <span className="inline-block w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+            <span className="font-semibold tracking-wide uppercase">{settings?.eventOrganizer || 'BADKO TKA-TPA Kota Yogyakarta'}</span>
+            <span className="hidden sm:inline text-amber-400">•</span>
+            <span className="hidden sm:inline">{settings?.eventTitle || 'FASI XIII Kota Yogyakarta'} {settings?.eventYear || '2026'}</span>
           </div>
-          <div className="flex items-center gap-4 text-emerald-300">
+          <div className="flex items-center gap-4 text-slate-200">
             <span className="flex items-center gap-1">
               <Calendar className="w-3.5 h-3.5 text-amber-400" />
-              <span>Ahad, 11 Oktober 2026</span>
+              <span>{settings?.eventDate || 'Ahad, 11 Oktober 2026'}</span>
             </span>
             <span className="hidden md:flex items-center gap-1">
               <MapPin className="w-3.5 h-3.5 text-amber-400" />
-              <span>SMP Negeri 1 Yogyakarta</span>
+              <span>{settings?.eventVenue || 'SMP Negeri 1 Yogyakarta'}</span>
             </span>
           </div>
         </div>
@@ -61,20 +66,24 @@ export const Navbar: React.FC<NavbarProps> = ({
             onClick={() => setActiveTab('beranda')}
             className="flex items-center gap-3 cursor-pointer group"
           >
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-600 to-emerald-800 border border-amber-400/40 flex items-center justify-center shadow-inner text-amber-300 font-serif font-black text-xl">
-              F13
+            <div className={`w-10 h-10 rounded-lg ${theme.logoBg} border ${theme.logoBorder} flex items-center justify-center shadow-inner text-amber-300 font-serif font-black text-xl overflow-hidden`}>
+              {settings?.eventLogoUrl ? (
+                <img src={settings.eventLogoUrl} alt="Logo" className="w-full h-full object-contain p-1" />
+              ) : (
+                'F13'
+              )}
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="font-bold text-base sm:text-lg tracking-tight leading-tight text-white group-hover:text-amber-300 transition-colors">
-                  FASI XIII KOTA YOGYAKARTA
+                  {settings?.eventTitle || 'FASI XIII KOTA YOGYAKARTA'}
                 </h1>
-                <span className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                <span className={`hidden sm:inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${theme.badgeBg} ${theme.badgeText} border ${theme.badgeBorder}`}>
                   RESMI
                 </span>
               </div>
-              <p className="text-xs text-emerald-300 font-normal">
-                Sistem Pendaftaran, Validasi Usia & Live Score
+              <p className={`text-xs ${theme.headerSubtext} font-normal`}>
+                {settings?.eventSubtitle || 'Sistem Pendaftaran, Validasi Usia & Live Score'}
               </p>
             </div>
           </div>
@@ -86,8 +95,8 @@ export const Navbar: React.FC<NavbarProps> = ({
               onClick={() => setActiveTab('beranda')}
               className={`px-3 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors ${
                 activeTab === 'beranda'
-                  ? 'bg-emerald-800 text-white shadow-sm'
-                  : 'text-emerald-100 hover:bg-emerald-800/60 hover:text-white'
+                  ? `${theme.navActiveBtn}`
+                  : `${theme.navInactiveText}`
               }`}
             >
               Beranda
@@ -105,8 +114,8 @@ export const Navbar: React.FC<NavbarProps> = ({
               onClick={() => setActiveTab('peserta')}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors ${
                 activeTab === 'peserta'
-                  ? 'bg-emerald-800 text-white shadow-sm'
-                  : 'text-emerald-100 hover:bg-emerald-800/60 hover:text-white'
+                  ? `${theme.navActiveBtn}`
+                  : `${theme.navInactiveText}`
               }`}
             >
               <Users className="w-4 h-4" />
@@ -117,8 +126,8 @@ export const Navbar: React.FC<NavbarProps> = ({
               onClick={() => setActiveTab('klasemen')}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors ${
                 activeTab === 'klasemen'
-                  ? 'bg-emerald-800 text-white shadow-sm'
-                  : 'text-emerald-100 hover:bg-emerald-800/60 hover:text-white'
+                  ? `${theme.navActiveBtn}`
+                  : `${theme.navInactiveText}`
               }`}
             >
               <Award className="w-4 h-4 text-amber-400" />
@@ -129,8 +138,8 @@ export const Navbar: React.FC<NavbarProps> = ({
               onClick={() => setActiveTab('lokasi')}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors ${
                 activeTab === 'lokasi'
-                  ? 'bg-emerald-800 text-white shadow-sm'
-                  : 'text-emerald-100 hover:bg-emerald-800/60 hover:text-white'
+                  ? `${theme.navActiveBtn}`
+                  : `${theme.navInactiveText}`
               }`}
             >
               <MapPin className="w-4 h-4" />
@@ -146,9 +155,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                   id="nav-btn-dashboard"
                   onClick={() => setActiveTab('admin')}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold ${
-                    activeTab === 'admin'
-                      ? 'bg-amber-500 text-emerald-950'
-                      : 'bg-emerald-700 hover:bg-emerald-600 text-white'
+                    activeTab.startsWith('admin') || activeTab === 'pengaturan' || activeTab === 'log'
+                      ? 'bg-amber-500 text-slate-950 shadow'
+                      : 'bg-white/10 hover:bg-white/20 text-white'
                   }`}
                 >
                   <LayoutDashboard className="w-3.5 h-3.5" />
@@ -159,7 +168,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   id="nav-btn-logout"
                   onClick={onLogout}
                   title="Keluar / Logout"
-                  className="p-1.5 text-emerald-300 hover:text-white hover:bg-emerald-800 rounded-md transition-colors"
+                  className="p-1.5 text-slate-300 hover:text-white hover:bg-white/10 rounded-md transition-colors"
                 >
                   <LogOut className="w-4 h-4" />
                 </button>
@@ -168,7 +177,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button
                 id="nav-btn-login"
                 onClick={onOpenLogin}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-emerald-950 shadow-sm transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-sm transition-colors"
               >
                 <LogIn className="w-3.5 h-3.5" />
                 <span>Masuk Admin</span>
@@ -178,11 +187,11 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         {/* Mobile Sub Navigation */}
-        <div className="flex lg:hidden overflow-x-auto py-2 border-t border-emerald-800 gap-1 text-xs no-scrollbar">
+        <div className={`flex lg:hidden overflow-x-auto py-2 border-t ${theme.navbarBorder} gap-1 text-xs no-scrollbar`}>
           <button
             onClick={() => setActiveTab('beranda')}
             className={`px-2.5 py-1.5 rounded whitespace-nowrap ${
-              activeTab === 'beranda' ? 'bg-emerald-800 text-white font-semibold' : 'text-emerald-200'
+              activeTab === 'beranda' ? `${theme.navActiveBtn} font-semibold` : 'text-slate-200'
             }`}
           >
             Beranda
@@ -197,7 +206,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             onClick={() => setActiveTab('peserta')}
             className={`px-2.5 py-1.5 rounded whitespace-nowrap ${
-              activeTab === 'peserta' ? 'bg-emerald-800 text-white font-semibold' : 'text-emerald-200'
+              activeTab === 'peserta' ? `${theme.navActiveBtn} font-semibold` : 'text-slate-200'
             }`}
           >
             Direktori Peserta
@@ -205,7 +214,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             onClick={() => setActiveTab('klasemen')}
             className={`px-2.5 py-1.5 rounded whitespace-nowrap ${
-              activeTab === 'klasemen' ? 'bg-emerald-800 text-white font-semibold' : 'text-emerald-200'
+              activeTab === 'klasemen' ? `${theme.navActiveBtn} font-semibold` : 'text-slate-200'
             }`}
           >
             Live Score
@@ -213,16 +222,16 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             onClick={() => setActiveTab('lokasi')}
             className={`px-2.5 py-1.5 rounded whitespace-nowrap ${
-              activeTab === 'lokasi' ? 'bg-emerald-800 text-white font-semibold' : 'text-emerald-200'
+              activeTab === 'lokasi' ? `${theme.navActiveBtn} font-semibold` : 'text-slate-200'
             }`}
           >
-            Lokasi SMPN 1
+            Lokasi Lomba
           </button>
           {session && (
             <button
               onClick={() => setActiveTab('admin')}
               className={`px-2.5 py-1.5 rounded whitespace-nowrap ${
-                activeTab === 'admin' ? 'bg-amber-500 text-emerald-950 font-semibold' : 'bg-emerald-700 text-white'
+                activeTab.startsWith('admin') || activeTab === 'pengaturan' || activeTab === 'log' ? 'bg-amber-500 text-slate-950 font-semibold' : 'bg-white/20 text-white'
               }`}
             >
               Backoffice
@@ -233,3 +242,4 @@ export const Navbar: React.FC<NavbarProps> = ({
     </header>
   );
 };
+

@@ -1,1 +1,33 @@
 @import "tailwindcss";
+
+@layer base {
+  body {
+    @apply bg-slate-100 text-slate-900 antialiased;
+  }
+}
+
+/* Custom Typography Families */
+.font-jakarta {
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.font-poppins {
+  font-family: 'Poppins', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.font-inter {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.font-scheherazade {
+  font-family: 'Amiri', 'Scheherazade New', 'Traditional Arabic', serif;
+}
+
+/* Custom scrollbars */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
