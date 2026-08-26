@@ -1,20 +1,18 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# Sistem Informasi FASI XIII Kota Yogyakarta
+Badko TKA-TPA Kota Yogyakarta
 
-# Run and deploy your AI Studio app
+Aplikasi manajemen dan administrasi Festival Anak Sholeh Indonesia (FASI) XIII Tingkat Kota Yogyakarta.
 
-This contains everything you need to run your app locally.
+## Fitur Utama
+- **Pendaftaran & Rekap Peserta:** Manajemen data santri utusan 14 Kemantren se-Kota Yogyakarta.
+- **Validasi Usia Otomatis:** Perhitungan usia otomatis berdasarkan tanggal cutoff FASI.
+- **Undian Nomor Tampil:** Pengacakan nomor urut tampil transparan (Kategori Individu & Beregu/Grup).
+- **Cetak ID Card Standar:** Generator ID Card Peserta, Official, dan Panitia format A4 (9 kartu per lembar) siap cetak dan ekspor PDF.
+- **Presensi QR Code:** Pemindaian QR Code peserta dengan integrasi status kehadiran langsung ke Supabase.
+- **Ekspor Excel & Laporan:** Unduh rekapitulasi data peserta lengkap per cabang lomba dan kemantren.
 
-View your app in AI Studio: https://ai.studio/apps/0209f479-818a-457d-8f1a-36bdebefc941
-
-## Run Locally
-
-**Prerequisites:**  Node.js
-
-
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## Tech Stack
+- **Frontend:** React, TypeScript, Tailwind CSS, Lucide Icons
+- **Backend & Database:** Supabase (PostgreSQL, Storage, Realtime)
+- **PDF & Export Engine:** jsPDF, html2canvas, SheetJS (XLSX)
+- **Deployment:** Vercel
