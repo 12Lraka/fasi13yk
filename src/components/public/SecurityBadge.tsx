@@ -31,7 +31,7 @@ export const SecurityBadge: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-2 text-[11px] w-full sm:w-auto">
+        <div className="grid grid-cols-2 gap-2 text-[11px] w-full sm:w-auto">
           <div className="bg-slate-800/80 px-2.5 py-1.5 rounded-md border border-slate-700/60 flex items-center gap-1.5">
             <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
             <span>Honeypot Trap</span>
@@ -39,10 +39,6 @@ export const SecurityBadge: React.FC = () => {
           <div className="bg-slate-800/80 px-2.5 py-1.5 rounded-md border border-slate-700/60 flex items-center gap-1.5">
             <Cpu className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
             <span>Math Challenge</span>
-          </div>
-          <div className="bg-slate-800/80 px-2.5 py-1.5 rounded-md border border-slate-700/60 flex items-center gap-1.5">
-            <CheckCircle className="w-3.5 h-3.5 text-sky-400 shrink-0" />
-            <span>NIK 16-Digit</span>
           </div>
         </div>
       </div>

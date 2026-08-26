@@ -379,11 +379,17 @@ export function getStoredAuditLogs(): AuditLog[] {
   }
 }
 
-export function logAuditEvent(user: string, action: string, details: string, status: 'SUCCESS' | 'BLOCKED_BOT' | 'FLAGGED' = 'SUCCESS'): void {
+export function logAuditEvent(
+  user: string,
+  action: string,
+  details: string,
+  status: 'SUCCESS' | 'BLOCKED_BOT' | 'FLAGGED' | 'ERROR' = 'SUCCESS',
+  stack?: string
+): void {
   try {
     const logs = getStoredAuditLogs();
-    const newLog = createAuditLog(user, action, details, status);
-    const updated = [newLog, ...logs].slice(0, 100); // Maks 100 log
+    const newLog = createAuditLog(user, action, details, status, stack);
+    const updated = [newLog, ...logs].slice(0, 150); // Maks 150 log
     localStorage.setItem(AUDIT_LOGS_KEY, JSON.stringify(updated));
 
     if (isSupabaseConfigured()) {
@@ -394,6 +400,15 @@ export function logAuditEvent(user: string, action: string, details: string, sta
   } catch (err) {
     console.error('Gagal mencatat audit log:', err);
   }
+}
+
+/**
+ * Catat Error Sistem Otomatis ke Audit Log
+ */
+export function logErrorEvent(user: string, context: string, error: unknown): void {
+  const errMsg = error instanceof Error ? error.message : typeof error === 'string' ? error : 'Unknown error';
+  const errStack = error instanceof Error ? error.stack : undefined;
+  logAuditEvent(user || 'SISTEM', 'SYSTEM_ERROR', `[${context}] ${errMsg}`, 'ERROR', errStack);
 }
 
 export function clearAuditLogs(): void {

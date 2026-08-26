@@ -132,7 +132,8 @@ export interface AuditLog {
   action: string;
   details: string;
   ipMock: string;
-  status: 'SUCCESS' | 'BLOCKED_BOT' | 'FLAGGED';
+  status: 'SUCCESS' | 'BLOCKED_BOT' | 'FLAGGED' | 'ERROR';
+  stack?: string;
 }
 
 export interface SecurityChallenge {

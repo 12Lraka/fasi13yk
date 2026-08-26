@@ -142,7 +142,8 @@ export function createAuditLog(
   user: string,
   action: string,
   details: string,
-  status: 'SUCCESS' | 'BLOCKED_BOT' | 'FLAGGED' = 'SUCCESS'
+  status: 'SUCCESS' | 'BLOCKED_BOT' | 'FLAGGED' | 'ERROR' = 'SUCCESS',
+  stack?: string
 ): AuditLog {
   return {
     id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
@@ -152,5 +153,6 @@ export function createAuditLog(
     details,
     ipMock: '182.253.' + Math.floor(Math.random() * 250) + '.' + Math.floor(Math.random() * 250),
     status,
+    stack,
   };
 }

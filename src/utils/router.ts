@@ -14,6 +14,9 @@ export type AppRoute =
   | 'kalkulator'
   | 'login'
   | 'admin'
+  | 'admin-data-peserta'
+  | 'admin-rekap-peserta'
+  | 'admin-rekapcbg-lomba'
   | 'superadmin'
   | 'adminkecamatan'
   | 'undian'
@@ -35,28 +38,39 @@ export const ROUTE_PATH_MAP: Record<string, AppRoute> = {
   '/lokasi': 'lokasi',
   '/kalkulator': 'kalkulator',
   '/login': 'login',
-  // Admin Base & Sub-Routes
-  '/admin': 'admin',
-  '/admin/admindashboard': 'admin',
-  '/admin/dashboard': 'admin',
-  '/admin/peserta': 'admin',
+
+  // Admin Routes
+  '/admin': 'admin-data-peserta',
+  '/admin/admindashboard': 'admin-data-peserta',
+  '/admin/dashboard': 'admin-data-peserta',
+  '/admin/data-peserta': 'admin-data-peserta',
+  '/admin/peserta': 'admin-data-peserta',
+  '/admin/rekap-peserta': 'admin-rekap-peserta',
+  '/admin/rekapcbg-lomba': 'admin-rekapcbg-lomba',
+  '/admin/rekap-cabang': 'admin-rekapcbg-lomba',
   '/admin/undian': 'undian',
+  '/admin/checkin': 'presensi',
+  '/admin/presensi': 'presensi',
+  '/admin/scan': 'presensi',
   '/admin/cetak-kartu': 'cetak',
   '/admin/cetak': 'cetak',
   '/admin/idcard': 'cetak',
-  '/admin/rekap': 'rekapitulasi',
   '/admin/rekapitulasi': 'rekapitulasi',
+  '/admin/rekap': 'rekapitulasi',
   '/admin/pengaturan': 'pengaturan',
   '/admin/settings': 'pengaturan',
+  '/admin/log-audit': 'log',
   '/admin/log': 'log',
-  '/admin/presensi': 'presensi',
+  '/admin/audit': 'log',
   '/admin/penjurian': 'penjurian',
+
   // Shortcuts
-  '/superadmin': 'superadmin',
-  '/adminkecamatan': 'adminkecamatan',
+  '/superadmin': 'admin-data-peserta',
+  '/adminkecamatan': 'admin-data-peserta',
   '/undian': 'undian',
   '/lottery': 'undian',
   '/presensi': 'presensi',
+  '/checkin': 'presensi',
   '/scan': 'presensi',
   '/penjurian': 'penjurian',
   '/juri': 'penjurian',
@@ -67,6 +81,7 @@ export const ROUTE_PATH_MAP: Record<string, AppRoute> = {
   '/pengaturan': 'pengaturan',
   '/settings': 'pengaturan',
   '/log': 'log',
+  '/log-audit': 'log',
   '/audit': 'log',
 };
 
@@ -78,16 +93,19 @@ export const CANONICAL_PATH_MAP: Record<AppRoute, string> = {
   lokasi: '/lokasi',
   kalkulator: '/kalkulator',
   login: '/login',
-  admin: '/admin',
-  superadmin: '/admin',
-  adminkecamatan: '/admin',
+  admin: '/admin/data-peserta',
+  'admin-data-peserta': '/admin/data-peserta',
+  'admin-rekap-peserta': '/admin/rekap-peserta',
+  'admin-rekapcbg-lomba': '/admin/rekapcbg-lomba',
+  superadmin: '/admin/data-peserta',
+  adminkecamatan: '/admin/data-peserta',
   undian: '/admin/undian',
-  presensi: '/admin/presensi',
+  presensi: '/admin/checkin',
   penjurian: '/admin/penjurian',
   rekapitulasi: '/admin/rekapitulasi',
   cetak: '/admin/cetak-kartu',
   pengaturan: '/admin/pengaturan',
-  log: '/admin/log',
+  log: '/admin/log-audit',
 };
 
 /**
@@ -111,14 +129,17 @@ export function getCurrentRouteFromURL(): AppRoute {
   // Prefix matching for any nested admin route
   if (pathname.startsWith('/admin/')) {
     const sub = pathname.replace(/^\/admin\//, '');
+    if (sub.includes('rekap-peserta')) return 'admin-rekap-peserta';
+    if (sub.includes('rekapcbg') || sub.includes('rekap-cabang')) return 'admin-rekapcbg-lomba';
+    if (sub.includes('rekap') || sub.includes('rekapitulasi')) return 'rekapitulasi';
     if (sub.includes('undian')) return 'undian';
     if (sub.includes('cetak') || sub.includes('idcard')) return 'cetak';
-    if (sub.includes('rekap')) return 'rekapitulasi';
-    if (sub.includes('presensi') || sub.includes('scan')) return 'presensi';
+    if (sub.includes('checkin') || sub.includes('presensi') || sub.includes('scan')) return 'presensi';
     if (sub.includes('juri') || sub.includes('penjurian')) return 'penjurian';
     if (sub.includes('pengaturan') || sub.includes('setting')) return 'pengaturan';
     if (sub.includes('log') || sub.includes('audit')) return 'log';
-    return 'admin';
+    if (sub.includes('peserta') || sub.includes('data')) return 'admin-data-peserta';
+    return 'admin-data-peserta';
   }
 
   return 'beranda';

@@ -87,7 +87,7 @@ export default function App() {
     if (route === 'presensi') {
       if (session) {
         setIsQrScannerOpen(true);
-        setActiveTab('admin');
+        setActiveTab('admin-data-peserta');
       } else {
         setIsLoginOpen(true);
         setActiveTab('beranda');
@@ -95,29 +95,32 @@ export default function App() {
       return;
     }
 
-    if (route === 'log') {
-      if (session) {
-        setIsAuditLogOpen(true);
-        setActiveTab('admin');
-      } else {
-        setIsLoginOpen(true);
-        setActiveTab('beranda');
-      }
-      return;
-    }
-
-    if (route === 'admin' || route === 'superadmin' || route === 'adminkecamatan' || route === 'pengaturan') {
+    if (
+      route === 'admin' ||
+      route === 'admin-data-peserta' ||
+      route === 'admin-rekap-peserta' ||
+      route === 'admin-rekapcbg-lomba' ||
+      route === 'pengaturan' ||
+      route === 'log' ||
+      route === 'superadmin' ||
+      route === 'adminkecamatan'
+    ) {
       if (!session) {
         setIsLoginOpen(true);
         setActiveTab('beranda');
       } else {
-        setActiveTab('admin');
+        setActiveTab(route === 'admin' || route === 'superadmin' || route === 'adminkecamatan' ? 'admin-data-peserta' : route);
       }
       return;
     }
 
     if (route === 'rekapitulasi') {
-      setActiveTab('rekapitulasi');
+      if (session) {
+        setActiveTab('rekapitulasi');
+      } else {
+        setIsLoginOpen(true);
+        setActiveTab('beranda');
+      }
       return;
     }
 
@@ -295,22 +298,30 @@ export default function App() {
 
         {activeTab === 'lokasi' && <LocationMap />}
 
-        {activeTab === 'admin' && session && (
-          <AdminDashboard
-            session={session}
-            participants={participants}
-            onUpdateParticipants={handleUpdateParticipants}
-            onOpenAddModal={handleOpenAdd}
-            onOpenEditModal={handleOpenEdit}
-            onOpenLotteryModal={() => handleNavigate('undian')}
-            onOpenJudgingModal={handleOpenJudging}
-            onOpenQrScanner={() => setIsQrScannerOpen(true)}
-            onOpenAuditLog={() => setIsAuditLogOpen(true)}
-            onOpenPrintCards={handlePrintAllCards}
-            onOpenPrintRecap={() => handleNavigate('rekapitulasi')}
-            onViewSingleCard={handleViewSingleCard}
-          />
-        )}
+        {(activeTab === 'admin' ||
+          activeTab === 'admin-data-peserta' ||
+          activeTab === 'admin-rekap-peserta' ||
+          activeTab === 'admin-rekapcbg-lomba' ||
+          activeTab === 'pengaturan' ||
+          activeTab === 'log') &&
+          session && (
+            <AdminDashboard
+              session={session}
+              participants={participants}
+              onUpdateParticipants={handleUpdateParticipants}
+              onOpenAddModal={handleOpenAdd}
+              onOpenEditModal={handleOpenEdit}
+              onOpenLotteryModal={() => handleNavigate('undian')}
+              onOpenJudgingModal={handleOpenJudging}
+              onOpenQrScanner={() => setIsQrScannerOpen(true)}
+              onOpenAuditLog={() => setIsAuditLogOpen(true)}
+              onOpenPrintCards={handlePrintAllCards}
+              onOpenPrintRecap={() => handleNavigate('rekapitulasi')}
+              onViewSingleCard={handleViewSingleCard}
+              activeRoute={activeTab}
+              onNavigateRoute={(r) => handleNavigate(r)}
+            />
+          )}
 
         {activeTab === 'undian' && session && session.role === 'super_admin' && (
           <div className="space-y-4">

@@ -57,7 +57,7 @@ export const Footer: React.FC = () => {
                 <span className="font-semibold text-[11px]">Anti-Bot Shield Aktif</span>
               </div>
               <p className="text-[11px] text-slate-400 leading-tight">
-                Dilengkapi enkripsi data lokal, honeypot bot trap, filter XSS, dan validasi NIK 16 digit.
+                Dilengkapi enkripsi data lokal, honeypot bot trap, filter XSS, Proteksi &amp; Integritas.
               </p>
               <div className="flex items-center gap-1 text-[10px] text-slate-300">
                 <CheckCircle2 className="w-3 h-3 text-emerald-500" />
@@ -68,9 +68,8 @@ export const Footer: React.FC = () => {
         </div>
 
         {/* Baris Bawah */}
-        <div className="pt-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-slate-400 text-[11px]">
-          <p>© 2026 BADKO TKA-TPA Kota Yogyakarta. Hak Cipta Dilindungi Undang-Undang.</p>
-          <p className="text-slate-300">Versi 1.0 (Produksi Juknis Resmi)</p>
+        <div className="pt-4 flex items-center justify-center text-slate-400 text-xs text-center">
+          <p>© 2026 BADKO TKA-TPA Kota Yogyakarta</p>
         </div>
       </div>
     </footer>

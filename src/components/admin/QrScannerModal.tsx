@@ -3,14 +3,30 @@
  * SPDX-License-Identifier: Apache-2.0
  * 
  * Sistem Informasi FASI XIII Kota Yogyakarta
- * Check-in QR Scanner di Lokasi Lomba (Panggung & Registrasi Ulang)
+ * Check-in QR Scanner Real-time di Lokasi Lomba (Panggung & Registrasi Ulang)
+ * Didukung Pemindaian Kamera Aktif (Html5Qrcode), Scan File Foto, dan Input Manual
  */
 
-import React, { useState } from 'react';
-import { X, QrCode, Camera, CheckCircle2, AlertCircle, Sparkles, UserCheck, Search } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  X,
+  QrCode,
+  Camera,
+  CameraOff,
+  SwitchCamera,
+  CheckCircle2,
+  AlertCircle,
+  Sparkles,
+  UserCheck,
+  Search,
+  Upload,
+  RefreshCw,
+  Info,
+} from 'lucide-react';
+import { Html5Qrcode } from 'html5-qrcode';
 import { Participant, UserSession } from '../../types/fasi';
 import { CATEGORIES_LIST, KEMANTREN_LIST } from '../../data/fasiMasterData';
-import { logAuditEvent } from '../../utils/storage';
+import { logAuditEvent, logErrorEvent } from '../../utils/storage';
 import { showToast } from '../../utils/sweetalert';
 
 interface QrScannerModalProps {
@@ -32,8 +48,122 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
   const [scannedResult, setScannedResult] = useState<Participant | null>(null);
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [successStatus, setSuccessStatus] = useState<string>('');
+  const [isCameraActive, setIsCameraActive] = useState<boolean>(false);
+  const [cameraFacingMode, setCameraFacingMode] = useState<'environment' | 'user'>('environment');
+  const [cameraPermissionError, setCameraPermissionError] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
-  if (!isOpen) return null;
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const qrRegionId = 'html5qr-code-full-region';
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Stop camera helper
+  const stopCamera = async () => {
+    if (scannerRef.current) {
+      try {
+        if (scannerRef.current.isScanning) {
+          await scannerRef.current.stop();
+        }
+        await scannerRef.current.clear();
+      } catch (err) {
+        console.warn('Error stopping scanner:', err);
+      }
+      scannerRef.current = null;
+    }
+    setIsCameraActive(false);
+  };
+
+  // Start camera helper
+  const startCamera = async (facing: 'environment' | 'user') => {
+    setCameraPermissionError(null);
+    setErrorMessage('');
+
+    try {
+      await stopCamera();
+
+      // Tunggu DOM elemen siap
+      const element = document.getElementById(qrRegionId);
+      if (!element) return;
+
+      const html5QrCode = new Html5Qrcode(qrRegionId);
+      scannerRef.current = html5QrCode;
+
+      const config = {
+        fps: 10,
+        qrbox: { width: 220, height: 220 },
+        aspectRatio: 1.0,
+      };
+
+      await html5QrCode.start(
+        { facingMode: facing },
+        config,
+        (decodedText) => {
+          handleProcessCode(decodedText);
+        },
+        () => {
+          // Ignored per-frame scan errors
+        }
+      );
+
+      setIsCameraActive(true);
+    } catch (err: any) {
+      console.error('Gagal mengakses kamera:', err);
+      const msg =
+        err?.name === 'NotAllowedError' || err?.message?.includes('Permission')
+          ? 'Izin kamera belum diberikan. Harap izinkan akses kamera di browser Anda.'
+          : err?.name === 'NotFoundError' || err?.message?.includes('DevicesNotFoundError')
+          ? 'Kamera tidak ditemukan pada perangkat Anda.'
+          : `Tidak dapat mengaktifkan kamera: ${err?.message || err}`;
+      setCameraPermissionError(msg);
+      setIsCameraActive(false);
+      logErrorEvent(session?.name || 'ADMIN_SCANNER', 'CAMERA_SCAN_START', err);
+    }
+  };
+
+  // Switch between back/front camera
+  const toggleCameraFacing = async () => {
+    const nextFacing = cameraFacingMode === 'environment' ? 'user' : 'environment';
+    setCameraFacingMode(nextFacing);
+    if (isCameraActive) {
+      await startCamera(nextFacing);
+    }
+  };
+
+  // Trigger file upload scan
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsProcessing(true);
+      setErrorMessage('');
+      const html5QrCode = scannerRef.current || new Html5Qrcode(qrRegionId);
+      const decodedText = await html5QrCode.scanFile(file, true);
+      handleProcessCode(decodedText);
+      showToast('success', 'QR Code berhasil dipindai dari file foto!');
+    } catch (err) {
+      setErrorMessage('Tidak menemukan QR Code yang jelas pada foto tersebut.');
+    } finally {
+      setIsProcessing(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  // Effect saat modal dibuka/tutup
+  useEffect(() => {
+    if (isOpen) {
+      // Buka kamera otomatis saat modal muncul
+      const timer = setTimeout(() => {
+        startCamera(cameraFacingMode);
+      }, 300);
+      return () => {
+        clearTimeout(timer);
+        stopCamera();
+      };
+    } else {
+      stopCamera();
+    }
+  }, [isOpen]);
 
   const handleProcessCode = (code: string) => {
     setErrorMessage('');
@@ -43,7 +173,7 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
     const clean = code.trim();
     if (!clean) return;
 
-    // Cari berdasarkan Registration Number, Nama, atau ID
+    // Cari berdasarkan Registration Number, ID, atau nama
     const found = participants.find(
       (p) =>
         p.registrationNumber.toLowerCase() === clean.toLowerCase() ||
@@ -53,7 +183,7 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
     );
 
     if (!found) {
-      setErrorMessage(`Data santri dengan kode "${clean}" tidak ditemukan dalam direktori FASI XIII.`);
+      setErrorMessage(`Data santri dengan kode "${clean}" tidak ditemukan dalam sistem FASI XIII.`);
       return;
     }
 
@@ -92,11 +222,13 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
     );
   };
 
+  if (!isOpen) return null;
+
   const getCat = (catId: string) => CATEGORIES_LIST.find((c) => c.id === catId);
   const getKem = (kemId: string) => KEMANTREN_LIST.find((k) => k.id === kemId);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
       <div className="bg-white rounded-2xl shadow-2xl max-w-xl w-full border border-slate-200 overflow-hidden my-6 animate-in fade-in zoom-in duration-200">
         {/* Header */}
         <div className="bg-gradient-to-r from-emerald-900 to-emerald-950 px-6 py-4 text-white flex items-center justify-between">
@@ -110,25 +242,97 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
             </div>
           </div>
           <button
-            onClick={onClose}
-            className="p-1 rounded-lg text-emerald-300 hover:text-white hover:bg-emerald-800 transition-colors"
+            onClick={() => {
+              stopCamera();
+              onClose();
+            }}
+            className="p-1.5 rounded-lg text-emerald-300 hover:text-white hover:bg-emerald-800 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-5">
-          {/* Scanner Simulation Viewport */}
-          <div className="relative rounded-2xl bg-slate-900 border-2 border-emerald-500/40 p-6 text-center text-white overflow-hidden">
-            <div className="w-44 h-44 mx-auto border-2 border-dashed border-amber-400/80 rounded-2xl flex flex-col items-center justify-center relative bg-slate-800/40">
-              <Camera className="w-10 h-10 text-emerald-400 animate-pulse mb-2" />
-              <span className="text-[11px] font-mono text-emerald-200">ARAHKAN KE QR CODE</span>
-              <div className="absolute inset-x-2 top-1/2 h-0.5 bg-amber-400 shadow-[0_0_8px_#f59e0b] animate-bounce"></div>
+        <div className="p-6 space-y-4">
+          {/* Scanner Viewport */}
+          <div className="relative rounded-2xl bg-slate-900 border-2 border-emerald-500/40 p-3 text-center text-white overflow-hidden">
+            {/* HTML5 QR Code Container */}
+            <div
+              id={qrRegionId}
+              className="w-full max-w-[320px] mx-auto min-h-[240px] bg-slate-950 rounded-xl overflow-hidden flex items-center justify-center relative"
+            >
+              {!isCameraActive && (
+                <div className="p-6 text-center space-y-3">
+                  <CameraOff className="w-10 h-10 text-slate-500 mx-auto" />
+                  <p className="text-xs text-slate-400">
+                    {cameraPermissionError || 'Kamera sedang non-aktif.'}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => startCamera(cameraFacingMode)}
+                    className="px-4 py-2 bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-xs rounded-xl shadow-xs inline-flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Camera className="w-4 h-4" />
+                    <span>Aktifkan Kamera</span>
+                  </button>
+                </div>
+              )}
             </div>
-            <p className="text-xs text-slate-300 mt-3 font-medium">
-              Kamera siap memindai QR Code pada Kartu Peserta (ID Card) Santri
-            </p>
+
+            {/* Control buttons under camera */}
+            <div className="flex items-center justify-between gap-2 mt-3 pt-2 border-t border-slate-800 text-xs">
+              <div className="flex items-center gap-2">
+                {isCameraActive ? (
+                  <button
+                    type="button"
+                    onClick={stopCamera}
+                    className="px-2.5 py-1.5 bg-rose-900/60 hover:bg-rose-800 text-rose-200 rounded-lg text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
+                  >
+                    <CameraOff className="w-3.5 h-3.5" />
+                    <span>Matikan Kamera</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => startCamera(cameraFacingMode)}
+                    className="px-2.5 py-1.5 bg-emerald-800/80 hover:bg-emerald-700 text-emerald-200 rounded-lg text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
+                  >
+                    <Camera className="w-3.5 h-3.5" />
+                    <span>Mulai Kamera</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={toggleCameraFacing}
+                  className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
+                  title="Ganti Kamera Depan / Belakang"
+                >
+                  <SwitchCamera className="w-3.5 h-3.5" />
+                  <span>{cameraFacingMode === 'environment' ? 'Kamera Belakang' : 'Kamera Depan'}</span>
+                </button>
+              </div>
+
+              {/* Upload Foto QR Code */}
+              <div>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileUpload}
+                  accept="image/*"
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isProcessing}
+                  className="px-2.5 py-1.5 bg-amber-500/20 border border-amber-400/40 text-amber-300 hover:bg-amber-500/30 rounded-lg text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Upload Foto QR</span>
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Quick Input Bar */}
@@ -144,13 +348,13 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') handleProcessCode(manualCode);
                 }}
-                placeholder="Contoh: KG-TPA-01-01 atau NIK santri..."
+                placeholder="Contoh: KG-TPA-01-01 atau nama santri..."
                 className="flex-1 px-3.5 py-2 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:bg-white font-mono"
               />
               <button
                 type="button"
                 onClick={() => handleProcessCode(manualCode)}
-                className="px-4 py-2 bg-emerald-800 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-sm transition-colors"
+                className="px-4 py-2 bg-emerald-800 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
               >
                 <Search className="w-4 h-4" />
                 <span>Validasi</span>
@@ -168,7 +372,7 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
                     setManualCode(p.registrationNumber);
                     handleProcessCode(p.registrationNumber);
                   }}
-                  className="px-2 py-0.5 text-[11px] font-mono bg-slate-100 text-slate-700 hover:bg-slate-200 rounded border border-slate-200"
+                  className="px-2 py-0.5 text-[11px] font-mono bg-slate-100 text-slate-700 hover:bg-slate-200 rounded border border-slate-200 cursor-pointer"
                 >
                   {p.registrationNumber}
                 </button>
@@ -254,10 +458,17 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="bg-slate-50 px-6 py-3.5 border-t border-slate-200 flex items-center justify-end">
+        <div className="bg-slate-50 px-6 py-3.5 border-t border-slate-200 flex items-center justify-between">
+          <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
+            <Info className="w-3.5 h-3.5 text-emerald-700" />
+            <span>Arahkan kamera ke QR Code pada ID Card santri</span>
+          </div>
           <button
-            onClick={onClose}
-            className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg text-xs font-semibold"
+            onClick={() => {
+              stopCamera();
+              onClose();
+            }}
+            className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg text-xs font-semibold cursor-pointer"
           >
             Tutup Scanner
           </button>

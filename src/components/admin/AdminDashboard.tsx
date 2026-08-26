@@ -6,7 +6,7 @@
  * Panel Kontrol Admin dengan Sidebar Navigation & Pagination
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Users,
   UserPlus,
@@ -50,6 +50,7 @@ import { RekapPesertaAdmin } from './RekapPesertaAdmin';
 import { RekapCabangLombaAdmin } from './RekapCabangLombaAdmin';
 import { PengaturanAdmin } from './PengaturanAdmin';
 import { LogAktivitasAdmin } from './LogAktivitasAdmin';
+import { AppRoute } from '../../utils/router';
 
 interface AdminDashboardProps {
   session: UserSession;
@@ -65,6 +66,8 @@ interface AdminDashboardProps {
   onOpenPrintRecap: () => void;
   onViewSingleCard: (p: Participant) => void;
   onLogout?: () => void;
+  activeRoute?: AppRoute;
+  onNavigateRoute?: (route: AppRoute) => void;
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
@@ -81,8 +84,37 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onOpenPrintRecap,
   onViewSingleCard,
   onLogout,
+  activeRoute = 'admin-data-peserta',
+  onNavigateRoute,
 }) => {
-  const [activeAdminTab, setActiveAdminTab] = useState<'peserta' | 'rekap-peserta' | 'rekap-cabang' | 'pengaturan' | 'log'>('peserta');
+  const getInitialTab = (): 'peserta' | 'rekap-peserta' | 'rekap-cabang' | 'pengaturan' | 'log' => {
+    if (activeRoute === 'admin-rekap-peserta') return 'rekap-peserta';
+    if (activeRoute === 'admin-rekapcbg-lomba') return 'rekap-cabang';
+    if (activeRoute === 'pengaturan') return 'pengaturan';
+    if (activeRoute === 'log') return 'log';
+    return 'peserta';
+  };
+
+  const [activeAdminTab, setActiveAdminTab] = useState<'peserta' | 'rekap-peserta' | 'rekap-cabang' | 'pengaturan' | 'log'>(getInitialTab);
+
+  useEffect(() => {
+    if (activeRoute === 'admin-rekap-peserta') setActiveAdminTab('rekap-peserta');
+    else if (activeRoute === 'admin-rekapcbg-lomba') setActiveAdminTab('rekap-cabang');
+    else if (activeRoute === 'pengaturan') setActiveAdminTab('pengaturan');
+    else if (activeRoute === 'log') setActiveAdminTab('log');
+    else if (activeRoute === 'admin-data-peserta' || activeRoute === 'admin') setActiveAdminTab('peserta');
+  }, [activeRoute]);
+
+  const handleTabChange = (tab: 'peserta' | 'rekap-peserta' | 'rekap-cabang' | 'pengaturan' | 'log') => {
+    setActiveAdminTab(tab);
+    if (onNavigateRoute) {
+      if (tab === 'peserta') onNavigateRoute('admin-data-peserta');
+      else if (tab === 'rekap-peserta') onNavigateRoute('admin-rekap-peserta');
+      else if (tab === 'rekap-cabang') onNavigateRoute('admin-rekapcbg-lomba');
+      else if (tab === 'pengaturan') onNavigateRoute('pengaturan');
+      else if (tab === 'log') onNavigateRoute('log');
+    }
+  };
 
   const kemantrenList = getStoredKemantren();
   const categoriesList = getStoredCategories();
@@ -219,7 +251,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
           {/* Data Peserta Tab */}
           <button
-            onClick={() => setActiveAdminTab('peserta')}
+            onClick={() => handleTabChange('peserta')}
             className={`w-full px-3 py-2 font-bold rounded-xl flex items-center justify-between transition-all cursor-pointer text-left ${
               activeAdminTab === 'peserta'
                 ? 'bg-emerald-800 text-white shadow-xs'
@@ -243,7 +275,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
           {/* Rekap Peserta Tab */}
           <button
-            onClick={() => setActiveAdminTab('rekap-peserta')}
+            onClick={() => handleTabChange('rekap-peserta')}
             className={`w-full px-3 py-2 font-bold rounded-xl flex items-center justify-between transition-all cursor-pointer text-left ${
               activeAdminTab === 'rekap-peserta'
                 ? 'bg-emerald-800 text-white shadow-xs'
@@ -267,7 +299,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
           {/* Rekap Cabang Lomba Tab */}
           <button
-            onClick={() => setActiveAdminTab('rekap-cabang')}
+            onClick={() => handleTabChange('rekap-cabang')}
             className={`w-full px-3 py-2 font-bold rounded-xl flex items-center justify-between transition-all cursor-pointer text-left ${
               activeAdminTab === 'rekap-cabang'
                 ? 'bg-emerald-800 text-white shadow-xs'
@@ -365,7 +397,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
               {/* Pengaturan Tab (Superadmin Only) */}
               <button
-                onClick={() => setActiveAdminTab('pengaturan')}
+                onClick={() => handleTabChange('pengaturan')}
                 className={`w-full px-3 py-2 font-bold rounded-xl flex items-center justify-between transition-all cursor-pointer text-left ${
                   activeAdminTab === 'pengaturan'
                     ? 'bg-emerald-800 text-white shadow-xs'
@@ -383,7 +415,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
               {/* Log Tab (Superadmin Only) */}
               <button
-                onClick={() => setActiveAdminTab('log')}
+                onClick={() => handleTabChange('log')}
                 className={`w-full px-3 py-2 font-bold rounded-xl flex items-center justify-between transition-all cursor-pointer text-left ${
                   activeAdminTab === 'log'
                     ? 'bg-emerald-800 text-white shadow-xs'

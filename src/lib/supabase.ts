@@ -386,6 +386,20 @@ export async function bulkSyncParticipantsToSupabase(participants: Participant[]
 }
 
 /**
+ * Normalisasi status audit log agar sesuai dengan CHECK constraint di database PostgreSQL Supabase
+ * Schema database Supabase standar: CHECK (status IN ('SUCCESS', 'BLOCKED_BOT', 'FLAGGED'))
+ */
+function normalizeAuditStatusForDb(status?: string): 'SUCCESS' | 'BLOCKED_BOT' | 'FLAGGED' {
+  if (!status) return 'SUCCESS';
+  const clean = status.trim().toUpperCase();
+  if (clean === 'SUCCESS' || clean === 'BLOCKED_BOT' || clean === 'FLAGGED') {
+    return clean as 'SUCCESS' | 'BLOCKED_BOT' | 'FLAGGED';
+  }
+  // Jika status adalah 'ERROR' atau nilai lainnya, petakan ke 'FLAGGED' agar tidak melanggar check constraint
+  return 'FLAGGED';
+}
+
+/**
  * Mengambil data audit log dari Supabase
  */
 export async function fetchAuditLogsFromSupabase(): Promise<AuditLog[] | null> {
@@ -400,15 +414,22 @@ export async function fetchAuditLogsFromSupabase(): Promise<AuditLog[] | null> {
       .limit(100);
 
     if (error) throw error;
-    return (data || []).map((row) => ({
-      id: row.id,
-      user: row.user_name || row.user || 'Unknown',
-      action: row.action,
-      details: row.details,
-      status: row.status,
-      ipMock: row.ip_address || row.ip_mock || '127.0.0.1',
-      timestamp: row.timestamp,
-    }));
+    return (data || []).map((row) => {
+      const isError =
+        row.status === 'ERROR' ||
+        (row.status === 'FLAGGED' &&
+          (row.action === 'SYSTEM_ERROR' || (row.details && row.details.startsWith('[ERROR]'))));
+
+      return {
+        id: row.id,
+        user: row.user_name || row.user || 'Unknown',
+        action: row.action,
+        details: row.details,
+        status: isError ? 'ERROR' : (row.status as any),
+        ipMock: row.ip_address || row.ip_mock || '127.0.0.1',
+        timestamp: row.timestamp,
+      };
+    });
   } catch (error) {
     console.error('Gagal mengambil audit log dari Supabase:', error);
     return null;
@@ -423,19 +444,28 @@ export async function insertAuditLogToSupabase(log: AuditLog): Promise<boolean> 
   if (!client) return false;
 
   try {
+    const dbStatus = normalizeAuditStatusForDb(log.status);
+    let detailsText = log.details || '';
+    if (log.status === 'ERROR' && !detailsText.startsWith('[ERROR]')) {
+      detailsText = `[ERROR] ${detailsText}`;
+    }
+    if (log.stack) {
+      detailsText += `\nStack: ${log.stack.slice(0, 300)}`;
+    }
+
     const { error } = await client.from('audit_logs').insert({
       id: log.id,
       user_name: log.user,
       action: log.action,
-      details: log.details,
-      status: log.status,
+      details: detailsText,
+      status: dbStatus,
       ip_address: log.ipMock || null,
       timestamp: formatTimestampToIso(log.timestamp),
     });
     if (error) throw error;
     return true;
   } catch (error) {
-    console.error('Gagal mencatat audit log ke Supabase:', error);
+    console.warn('Gagal mencatat audit log ke Supabase:', error);
     return false;
   }
 }

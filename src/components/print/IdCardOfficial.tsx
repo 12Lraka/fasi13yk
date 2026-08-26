@@ -46,12 +46,14 @@ export const IdCardOfficial: React.FC<IdCardOfficialProps> = ({
           <img
             src={ID_CARD_ASSETS.logoBadko}
             alt="Logo Badko"
+            crossOrigin="anonymous"
             className="h-6 w-auto object-contain drop-shadow-xs"
           />
           <div className="h-4 w-[1px] bg-slate-400/60" />
           <img
             src={ID_CARD_ASSETS.logoFasi}
             alt="Logo FASI"
+            crossOrigin="anonymous"
             className="h-6 w-auto object-contain drop-shadow-xs"
           />
         </div>
