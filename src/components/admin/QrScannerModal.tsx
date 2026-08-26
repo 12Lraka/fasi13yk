@@ -56,8 +56,9 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const qrRegionId = 'html5qr-code-full-region';
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const lastScanTimestampRef = useRef<number>(0);
 
-  // Stop camera helper
+  // Stop camera helper safely without interfering with React's DOM
   const stopCamera = async () => {
     if (scannerRef.current) {
       try {
@@ -98,7 +99,12 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
         { facingMode: facing },
         config,
         (decodedText) => {
-          handleProcessCode(decodedText);
+          // Debounce scan 1.5 detik agar tidak memicu re-render ganda saat kamera menyorot kartu
+          const now = Date.now();
+          if (now - lastScanTimestampRef.current > 1500) {
+            lastScanTimestampRef.current = now;
+            handleProcessCode(decodedText);
+          }
         },
         () => {
           // Ignored per-frame scan errors
@@ -152,10 +158,9 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
   // Effect saat modal dibuka/tutup
   useEffect(() => {
     if (isOpen) {
-      // Buka kamera otomatis saat modal muncul
       const timer = setTimeout(() => {
         startCamera(cameraFacingMode);
-      }, 300);
+      }, 200);
       return () => {
         clearTimeout(timer);
         stopCamera();
@@ -173,17 +178,37 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
     const clean = code.trim();
     if (!clean) return;
 
-    // Cari berdasarkan Registration Number, ID, atau nama
-    const found = participants.find(
-      (p) =>
+    // 1. Ekstrak data jika QR berisi format JSON
+    let searchReg = clean;
+    let searchName = clean;
+    try {
+      if (clean.startsWith('{') && clean.endsWith('}')) {
+        const parsed = JSON.parse(clean);
+        if (parsed.reg) searchReg = String(parsed.reg).trim();
+        if (parsed.nama) searchName = String(parsed.nama).trim();
+      }
+    } catch {
+      // bukan json, pakai raw string
+    }
+
+    // 2. Cari berdasarkan Registration Number, ID, atau nama
+    const found = participants.find((p) => {
+      const regMatch =
+        p.registrationNumber.toLowerCase() === searchReg.toLowerCase() ||
         p.registrationNumber.toLowerCase() === clean.toLowerCase() ||
-        p.fullName.toLowerCase().includes(clean.toLowerCase()) ||
-        p.id.toLowerCase() === clean.toLowerCase() ||
-        clean.includes(p.registrationNumber)
-    );
+        clean.toLowerCase().includes(p.registrationNumber.toLowerCase());
+
+      const idMatch = p.id.toLowerCase() === clean.toLowerCase();
+
+      const nameMatch =
+        p.fullName.toLowerCase().includes(searchName.toLowerCase()) ||
+        clean.toLowerCase().includes(p.fullName.toLowerCase());
+
+      return regMatch || idMatch || nameMatch;
+    });
 
     if (!found) {
-      setErrorMessage(`Data santri dengan kode "${clean}" tidak ditemukan dalam sistem FASI XIII.`);
+      setErrorMessage(`Data santri dengan kode/nama "${searchReg}" tidak ditemukan dalam sistem FASI XIII.`);
       return;
     }
 
@@ -256,13 +281,14 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
         <div className="p-6 space-y-4">
           {/* Scanner Viewport */}
           <div className="relative rounded-2xl bg-slate-900 border-2 border-emerald-500/40 p-3 text-center text-white overflow-hidden">
-            {/* HTML5 QR Code Container */}
-            <div
-              id={qrRegionId}
-              className="w-full max-w-[320px] mx-auto min-h-[240px] bg-slate-950 rounded-xl overflow-hidden flex items-center justify-center relative"
-            >
+            {/* HTML5 QR Code Host Container - MUST BE EMPTY FOR REACT */}
+            <div className="relative w-full max-w-[320px] mx-auto min-h-[250px] bg-slate-950 rounded-xl overflow-hidden flex items-center justify-center">
+              {/* Dedicated pure DOM element for html5-qrcode, NO React children inside */}
+              <div id={qrRegionId} className="w-full h-full min-h-[240px]" />
+
+              {/* Sibling React overlay when camera is not active */}
               {!isCameraActive && (
-                <div className="p-6 text-center space-y-3">
+                <div className="absolute inset-0 bg-slate-950 flex flex-col items-center justify-center p-6 text-center space-y-3 z-10">
                   <CameraOff className="w-10 h-10 text-slate-500 mx-auto" />
                   <p className="text-xs text-slate-400">
                     {cameraPermissionError || 'Kamera sedang non-aktif.'}

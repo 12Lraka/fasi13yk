@@ -32,6 +32,10 @@ import {
   FileDown,
   Download,
   Loader2,
+  Archive,
+  Image as ImageIcon,
+  CheckCircle2,
+  HelpCircle,
 } from 'lucide-react';
 import { Participant, UserSession, CompetitionCategory, Kemantren } from '../../types/fasi';
 import { CATEGORIES_LIST, KEMANTREN_LIST } from '../../data/fasiMasterData';
@@ -41,6 +45,7 @@ import { IdCardParticipant } from './IdCardParticipant';
 import { IdCardOfficial, OfficialCardData } from './IdCardOfficial';
 import { IdCardCommittee, CommitteeCardData } from './IdCardCommittee';
 import { generateIdCardsPdfFromDom } from '../../utils/idCardPdfGenerator';
+import { downloadSingleCardAsPng, downloadBatchCardsAsZip } from '../../utils/idCardPngGenerator';
 import { showToast } from '../../utils/sweetalert';
 
 interface IdCardPrintViewProps {
@@ -63,9 +68,12 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
   // 1. Tab Tipe Kartu (Peserta, Official, Panitia)
   const [activeCardType, setActiveCardType] = useState<CardType>('peserta');
 
-  // PDF Generation State
+  // PDF & PNG Generation State
   const [isGeneratingPdf, setIsGeneratingPdf] = useState<boolean>(false);
   const [pdfProgress, setPdfProgress] = useState<{ current: number; total: number }>({ current: 0, total: 0 });
+  const [isGeneratingZip, setIsGeneratingZip] = useState<boolean>(false);
+  const [zipProgress, setZipProgress] = useState<{ current: number; total: number }>({ current: 0, total: 0 });
+  const [downloadingCardId, setDownloadingCardId] = useState<string | null>(null);
 
   // 2. Customizer Tema Warna & Tagline
   const [selectedThemeKey, setSelectedThemeKey] = useState<string>('emerald');
@@ -331,8 +339,72 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
     window.print();
   };
 
+  // Unduh 1 Kartu Tunggal ke format PNG
+  const handleDownloadSingleCard = async (elementId: string, fileName: string, cardId: string) => {
+    const el = document.getElementById(elementId);
+    if (!el || downloadingCardId) return;
+
+    setDownloadingCardId(cardId);
+    try {
+      await downloadSingleCardAsPng(el, fileName);
+      showToast('success', `Gambar ID Card "${fileName}" berhasil diunduh!`);
+    } catch (err) {
+      console.error('Gagal mengunduh kartu PNG:', err);
+      showToast('error', 'Gagal memproses gambar kartu PNG.');
+    } finally {
+      setDownloadingCardId(null);
+    }
+  };
+
+  // Unduh Semua Kartu yang aktif sekaligus ke format ZIP berisi file-file .PNG
+  const handleDownloadAllAsZip = async () => {
+    if (currentTotalCards === 0 || isGeneratingZip || isGeneratingPdf) return;
+
+    // Cari seluruh kartu yang sedang ter-render di DOM
+    const cardElements = Array.from(document.querySelectorAll<HTMLElement>('.fasi-id-card'));
+    if (!cardElements.length) {
+      showToast('warning', 'Tidak ada kartu yang ter-render di layar.');
+      return;
+    }
+
+    setIsGeneratingZip(true);
+    setZipProgress({ current: 1, total: cardElements.length });
+
+    try {
+      // Susun nama file yang rapi untuk tiap kartu
+      let fileNames: string[] = [];
+      if (activeCardType === 'peserta') {
+        fileNames = filteredParticipants.map(
+          (p) => `${p.registrationNumber}_${p.fullName.replace(/\s+/g, '_')}`
+        );
+      } else if (activeCardType === 'official') {
+        fileNames = generatedOfficials.map(
+          (off, i) => `Official_${off.kemantrenCode || i + 1}_${off.name ? off.name.replace(/\s+/g, '_') : 'Blanko'}`
+        );
+      } else {
+        fileNames = generatedCommittees.map(
+          (com, i) => `Panitia_${i + 1}_${com.name ? com.name.replace(/\s+/g, '_') : 'Blanko'}`
+        );
+      }
+
+      await downloadBatchCardsAsZip({
+        cardElements,
+        fileNames,
+        zipFileName: `ID_Card_FASI_XIII_${activeCardType}_PNG_300DPI.zip`,
+        onProgress: (cur, tot) => setZipProgress({ current: cur, total: tot }),
+      });
+
+      showToast('success', `Berhasil mengunduh ${cardElements.length} kartu dalam berkas ZIP!`);
+    } catch (err) {
+      console.error('Gagal membuat ZIP ID Card:', err);
+      showToast('error', 'Gagal memproses berkas ZIP ID Card.');
+    } finally {
+      setIsGeneratingZip(false);
+    }
+  };
+
   const handleDownloadPdf = async () => {
-    if (currentTotalCards === 0 || isGeneratingPdf) return;
+    if (currentTotalCards === 0 || isGeneratingPdf || isGeneratingZip) return;
     setIsGeneratingPdf(true);
     setPdfProgress({ current: 1, total: 1 });
 
@@ -393,31 +465,61 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
               </span>
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              Standar Portrait 5.5cm × 8.8cm (9 Kartu / Lembar A4). Menggunakan Template Resmi Supabase.
+              Standar Portrait 5.5cm × 8.8cm (9 Kartu / Lembar A4). Format PNG Satuan / ZIP & Cetak Dokumen.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
-            {/* Tombol Unduh PDF Dokumen A4 */}
+            {/* Tombol Utama: Unduh Semua PNG (.ZIP) */}
             <button
-              onClick={handleDownloadPdf}
-              disabled={currentTotalCards === 0 || isGeneratingPdf}
+              onClick={handleDownloadAllAsZip}
+              disabled={currentTotalCards === 0 || isGeneratingZip || isGeneratingPdf}
               className={`px-4 py-2.5 rounded-xl font-extrabold text-xs shadow-md flex items-center gap-2 transition-all active:scale-95 cursor-pointer ${
-                currentTotalCards === 0 || isGeneratingPdf
+                currentTotalCards === 0 || isGeneratingZip || isGeneratingPdf
                   ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                  : 'bg-emerald-700 hover:bg-emerald-800 text-white'
+                  : 'bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white shadow-amber-900/20'
               }`}
+              title="Unduh semua kartu sebagai file gambar .PNG beresolusi tinggi 300 DPI dalam arsip .ZIP (100% identik dengan preview)"
             >
-              {isGeneratingPdf ? (
+              {isGeneratingZip ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin text-amber-300" />
+                  <Loader2 className="w-4 h-4 animate-spin text-amber-200" />
                   <span>
-                    Menyiapkan PDF ({pdfProgress.current}/{pdfProgress.total})...
+                    Membuat ZIP ({zipProgress.current}/{zipProgress.total})...
                   </span>
                 </>
               ) : (
                 <>
-                  <FileDown className="w-4 h-4 text-amber-300" />
+                  <Archive className="w-4 h-4 text-amber-200" />
+                  <span>Unduh Semua PNG (.ZIP)</span>
+                  <span className="px-1.5 py-0.5 bg-amber-950/40 text-amber-200 rounded text-[10px] uppercase font-mono">
+                    Rekomendasi
+                  </span>
+                </>
+              )}
+            </button>
+
+            {/* Tombol Unduh PDF Dokumen A4 */}
+            <button
+              onClick={handleDownloadPdf}
+              disabled={currentTotalCards === 0 || isGeneratingPdf || isGeneratingZip}
+              className={`px-3.5 py-2.5 rounded-xl font-bold text-xs shadow-xs border border-emerald-800/30 flex items-center gap-2 transition-all active:scale-95 cursor-pointer ${
+                currentTotalCards === 0 || isGeneratingPdf || isGeneratingZip
+                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                  : 'bg-emerald-800 hover:bg-emerald-900 text-white'
+              }`}
+              title="Unduh berkas PDF A4 (9 kartu per lembar)"
+            >
+              {isGeneratingPdf ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-emerald-300" />
+                  <span>
+                    PDF ({pdfProgress.current}/{pdfProgress.total})...
+                  </span>
+                </>
+              ) : (
+                <>
+                  <FileDown className="w-4 h-4 text-emerald-300" />
                   <span>Download PDF (A4)</span>
                 </>
               )}
@@ -426,16 +528,32 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
             {/* Tombol Cetak Browser */}
             <button
               onClick={handlePrint}
-              disabled={currentTotalCards === 0 || isGeneratingPdf}
-              className={`px-4 py-2.5 rounded-xl font-bold text-xs border border-slate-300 shadow-xs flex items-center gap-2 transition-all active:scale-95 cursor-pointer ${
+              disabled={currentTotalCards === 0 || isGeneratingPdf || isGeneratingZip}
+              className={`px-3.5 py-2.5 rounded-xl font-bold text-xs border border-slate-300 shadow-xs flex items-center gap-2 transition-all active:scale-95 cursor-pointer ${
                 currentTotalCards === 0
                   ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
                   : 'bg-white hover:bg-slate-50 text-slate-800'
               }`}
+              title="Cetak langsung menggunakan printer bawaan browser (Ctrl+P)"
             >
               <Printer className="w-4 h-4 text-slate-600" />
-              <span>Cetak Langsung (Ctrl+P)</span>
+              <span>Cetak Langsung</span>
             </button>
+          </div>
+        </div>
+
+        {/* Info & Rekomendasi Format */}
+        <div className="bg-gradient-to-r from-emerald-50 via-amber-50/50 to-slate-50 border border-emerald-200/80 rounded-xl p-3 text-xs text-slate-700 flex items-start gap-2.5">
+          <Sparkles className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+          <div className="space-y-0.5">
+            <p className="font-bold text-emerald-950">
+              💡 Rekomendasi Format Cetak ID Card FASI XIII:
+            </p>
+            <p className="text-[11.5px] text-slate-600 leading-relaxed">
+              • <strong>Unduh PNG Satuan / ZIP:</strong> Menghasilkan gambar .PNG murni beresolusi tajam <strong>300 DPI</strong> yang <strong>100% identik</strong> dengan preview (paling disukai untuk printer kartu PVC / foto satuan dan share WhatsApp).
+              <br />
+              • <strong>Cetak Langsung (Ctrl+P):</strong> Menggunakan CSS cetak browser resmi untuk lembaran kertas A4 (9 kartu/lembar) dengan ketajaman teks vektor murni.
+            </p>
           </div>
         </div>
 
@@ -1001,15 +1119,37 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
                   >
                     {pageItems.map((p) => {
                       const cat = categoriesList.find((c) => c.id === p.categoryId);
+                      const elementId = `card-peserta-${p.id}`;
+                      const fileName = `${p.registrationNumber}_${p.fullName.replace(/\s+/g, '_')}`;
                       return (
-                        <IdCardParticipant
-                          key={p.id}
-                          participant={p}
-                          category={cat}
-                          qrCodeUrl={qrCodes[p.id]}
-                          theme={activeTheme}
-                          customTagline={customTagline}
-                        />
+                        <div key={p.id} className="relative group flex justify-center">
+                          <div id={elementId}>
+                            <IdCardParticipant
+                              participant={p}
+                              category={cat}
+                              qrCodeUrl={qrCodes[p.id]}
+                              theme={activeTheme}
+                              customTagline={customTagline}
+                            />
+                          </div>
+                          {/* Hover Single Card PNG Download Button */}
+                          <div className="no-print absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadSingleCard(elementId, fileName, p.id)}
+                              disabled={downloadingCardId === p.id}
+                              className="px-2 py-1 bg-slate-900/90 hover:bg-black text-white rounded-md text-[10px] font-bold shadow-md flex items-center gap-1 cursor-pointer transition-all active:scale-95"
+                              title="Download kartu ini saja sebagai gambar PNG 300 DPI"
+                            >
+                              {downloadingCardId === p.id ? (
+                                <Loader2 className="w-3 h-3 animate-spin text-amber-300" />
+                              ) : (
+                                <ImageIcon className="w-3 h-3 text-amber-300" />
+                              )}
+                              <span>Unduh PNG</span>
+                            </button>
+                          </div>
+                        </div>
                       );
                     })}
                   </div>
@@ -1038,14 +1178,38 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
                       width: '173mm',
                     }}
                   >
-                    {pageItems.map((off) => (
-                      <IdCardOfficial
-                        key={off.id}
-                        data={off}
-                        theme={activeTheme}
-                        customTagline={customTagline}
-                      />
-                    ))}
+                    {pageItems.map((off, idx) => {
+                      const elementId = `card-official-${off.id || idx}`;
+                      const fileName = `Official_${off.kemantrenCode || idx + 1}_${off.name ? off.name.replace(/\s+/g, '_') : 'Blanko'}`;
+                      return (
+                        <div key={off.id || idx} className="relative group flex justify-center">
+                          <div id={elementId}>
+                            <IdCardOfficial
+                              data={off}
+                              theme={activeTheme}
+                              customTagline={customTagline}
+                            />
+                          </div>
+                          {/* Hover Single Card PNG Download Button */}
+                          <div className="no-print absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadSingleCard(elementId, fileName, off.id || String(idx))}
+                              disabled={downloadingCardId === (off.id || String(idx))}
+                              className="px-2 py-1 bg-slate-900/90 hover:bg-black text-white rounded-md text-[10px] font-bold shadow-md flex items-center gap-1 cursor-pointer transition-all active:scale-95"
+                              title="Download kartu official ini saja sebagai gambar PNG 300 DPI"
+                            >
+                              {downloadingCardId === (off.id || String(idx)) ? (
+                                <Loader2 className="w-3 h-3 animate-spin text-amber-300" />
+                              ) : (
+                                <ImageIcon className="w-3 h-3 text-amber-300" />
+                              )}
+                              <span>Unduh PNG</span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               ))}
@@ -1072,14 +1236,38 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
                       width: '173mm',
                     }}
                   >
-                    {pageItems.map((com) => (
-                      <IdCardCommittee
-                        key={com.id}
-                        data={com}
-                        theme={activeTheme}
-                        customTagline={customTagline}
-                      />
-                    ))}
+                    {pageItems.map((com, idx) => {
+                      const elementId = `card-panitia-${com.id || idx}`;
+                      const fileName = `Panitia_${idx + 1}_${com.name ? com.name.replace(/\s+/g, '_') : 'Blanko'}`;
+                      return (
+                        <div key={com.id || idx} className="relative group flex justify-center">
+                          <div id={elementId}>
+                            <IdCardCommittee
+                              data={com}
+                              theme={activeTheme}
+                              customTagline={customTagline}
+                            />
+                          </div>
+                          {/* Hover Single Card PNG Download Button */}
+                          <div className="no-print absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadSingleCard(elementId, fileName, com.id || String(idx))}
+                              disabled={downloadingCardId === (com.id || String(idx))}
+                              className="px-2 py-1 bg-slate-900/90 hover:bg-black text-white rounded-md text-[10px] font-bold shadow-md flex items-center gap-1 cursor-pointer transition-all active:scale-95"
+                              title="Download kartu panitia ini saja sebagai gambar PNG 300 DPI"
+                            >
+                              {downloadingCardId === (com.id || String(idx)) ? (
+                                <Loader2 className="w-3 h-3 animate-spin text-amber-300" />
+                              ) : (
+                                <ImageIcon className="w-3 h-3 text-amber-300" />
+                              )}
+                              <span>Unduh PNG</span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               ))}
