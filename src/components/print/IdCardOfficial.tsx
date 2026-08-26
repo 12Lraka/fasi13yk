@@ -3,7 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  * 
  * Sistem Informasi FASI XIII Kota Yogyakarta
- * Komponen ID Card Official Kontingen Kemantren (Portrait 85mm x 55mm)
+ * Komponen ID Card Official Kontingen Rayon (Portrait 5.5cm x 8.8cm)
+ * Menggunakan Template Kartu Resmi Supabase
  */
 
 import React from 'react';
@@ -26,148 +27,111 @@ interface IdCardOfficialProps {
 
 export const IdCardOfficial: React.FC<IdCardOfficialProps> = ({
   data,
-  theme = ID_CARD_THEMES.navy, // Default official is royal navy or selected theme
+  theme = ID_CARD_THEMES.navy,
   customTagline = 'Santri Hebat, Hebat Prestasi, Hebat Mengaji, & Berakhlakul Karimah.',
 }) => {
   return (
     <div
-      className={`fasi-id-card relative bg-gradient-to-b ${theme.bgGradient} rounded-xl border-[1.5px] p-2.5 flex flex-col justify-between overflow-hidden shadow-sm select-none`}
+      className="fasi-id-card relative rounded-none border-0 p-2.5 flex flex-col justify-between overflow-hidden shadow-none select-none bg-cover bg-center bg-no-repeat"
       style={{
-        width: '55mm',
-        height: '85mm',
+        width: '5.5cm',
+        height: '8.8cm',
         boxSizing: 'border-box',
-        borderColor: theme.borderColor,
+        backgroundImage: `url(${ID_CARD_ASSETS.templateKartu})`,
       }}
     >
-      {/* 1. Background Watermark Logo Desain */}
-      <div
-        className="absolute inset-0 pointer-events-none flex items-center justify-center z-0 overflow-hidden"
-        style={{ opacity: theme.watermarkOpacity }}
-      >
-        <img
-          src={ID_CARD_ASSETS.watermarkDesain}
-          alt="Watermark FASI"
-          className="w-[125px] h-[125px] object-contain rotate-[-12deg] scale-115"
-        />
-      </div>
-
-      {/* Islamic Corner Accents */}
-      <div
-        className="absolute top-1 left-1 w-3 h-3 border-t border-l pointer-events-none opacity-40 rounded-tl-sm"
-        style={{ borderColor: theme.accentColor }}
-      />
-      <div
-        className="absolute top-1 right-1 w-3 h-3 border-t border-r pointer-events-none opacity-40 rounded-tr-sm"
-        style={{ borderColor: theme.accentColor }}
-      />
-      <div
-        className="absolute bottom-1 left-1 w-3 h-3 border-b border-l pointer-events-none opacity-40 rounded-bl-sm"
-        style={{ borderColor: theme.accentColor }}
-      />
-      <div
-        className="absolute bottom-1 right-1 w-3 h-3 border-b border-r pointer-events-none opacity-40 rounded-br-sm"
-        style={{ borderColor: theme.accentColor }}
-      />
-
-      {/* 2. Header: Logo Badko & Logo FASI berdampingan + Text Panitia */}
-      <div className="relative z-10 text-center pb-1 border-b" style={{ borderColor: `${theme.borderColor}40` }}>
-        <div className="flex items-center justify-center gap-2.5 mb-1">
+      {/* 1. Header: Logo Badko & Logo FASI berdampingan + Text Panitia */}
+      <div className="relative z-10 text-center pb-1">
+        <div className="flex items-center justify-center gap-2 mb-0.5">
           <img
             src={ID_CARD_ASSETS.logoBadko}
             alt="Logo Badko"
-            className="h-6 sm:h-7 w-auto object-contain drop-shadow-xs"
+            className="h-6 w-auto object-contain drop-shadow-xs"
           />
-          <div className="h-5 w-[1px] bg-slate-300/80" />
+          <div className="h-4 w-[1px] bg-slate-400/60" />
           <img
             src={ID_CARD_ASSETS.logoFasi}
             alt="Logo FASI"
-            className="h-6 sm:h-7 w-auto object-contain drop-shadow-xs"
+            className="h-6 w-auto object-contain drop-shadow-xs"
           />
         </div>
         <div className="leading-tight">
-          <p className="font-extrabold text-[8px] tracking-wider uppercase text-slate-800 font-sans">
+          <p className="font-extrabold text-[7.5px] tracking-wider uppercase text-slate-900 font-sans">
             PANITIA FASI XIII
           </p>
-          <p className="font-bold text-[7px] tracking-wider uppercase text-slate-600">
+          <p className="font-bold text-[6.5px] tracking-wider uppercase text-slate-700">
             KOTA YOGYAKARTA
           </p>
         </div>
       </div>
 
-      {/* 3. Middle Content: Tulisan OFFICIAL BOLD BESAR & Nama Kontingen */}
-      <div className="relative z-10 my-auto py-1 text-center flex flex-col items-center justify-center space-y-2">
+      {/* 2. Middle Content: Tulisan OFFICIAL BOLD BESAR & Nama Kontingen */}
+      <div className="relative z-10 my-auto py-1 text-center flex flex-col items-center justify-center space-y-1.5">
         {/* Tulisan OFFICIAL Bold Besar */}
         <div
-          className="w-full py-1 rounded-lg tracking-widest uppercase font-black text-sm sm:text-base shadow-xs"
+          className="w-full py-1.5 rounded-lg tracking-widest uppercase font-black text-sm shadow-xs"
           style={{
             backgroundColor: theme.badgeBg,
             color: theme.badgeText,
-            letterSpacing: '0.18em',
+            letterSpacing: '0.2em',
           }}
         >
           OFFICIAL
         </div>
 
-        {/* Info Kemantren Asal */}
+        {/* Info Rayon Asal */}
         <div className="w-full">
-          <span className="text-[6.5px] uppercase font-bold text-slate-400 block tracking-wider mb-0.5">
-            Kontingen Kemantren
+          <span className="text-[6px] uppercase font-bold text-slate-500 block tracking-wider mb-0.2">
+            Kontingen Rayon
           </span>
           <h3
             className="font-black text-[11px] uppercase tracking-tight leading-tight"
             style={{ color: theme.primaryColor }}
           >
-            {data.kemantrenName || 'KEMANTREN KOTA YOGYAKARTA'}
+            {data.kemantrenName ? (data.kemantrenName.startsWith('Rayon') ? data.kemantrenName : `Rayon ${data.kemantrenName.replace(/^Kemantren\s*/i, '')}`) : 'RAYON KOTA YOGYAKARTA'}
           </h3>
         </div>
 
         {/* Nama Official & Jabatan */}
         <div
-          className="w-full rounded-lg py-1.5 px-2 border"
+          className="w-full rounded-md py-1.5 px-2 border bg-white/85 shadow-2xs backdrop-blur-xs"
           style={{
-            backgroundColor: 'rgba(255, 255, 255, 0.85)',
-            borderColor: `${theme.borderColor}40`,
+            borderColor: `${theme.borderColor}50`,
           }}
         >
-          <span className="text-[6.5px] uppercase font-bold block text-slate-400">
+          <span className="text-[6px] uppercase font-bold block text-slate-500">
             Nama Lengkap Official
           </span>
           <h4
             className="font-extrabold text-[10px] leading-tight uppercase font-sans tracking-tight line-clamp-2"
             style={{ color: theme.textColor }}
           >
-            {data.name || 'Official Kontingen'}
+            {data.name || 'Official Pendamping'}
           </h4>
           <span
-            className="inline-block mt-0.5 font-bold text-[7.5px] px-2 py-0.2 rounded-full"
+            className="inline-block mt-0.5 font-bold text-[7px] px-2 py-0.2 rounded-full"
             style={{
               color: theme.subtextColor,
               backgroundColor: `${theme.borderColor}15`,
             }}
           >
-            {data.role || 'Pendamping Kontingen'}
+            {data.role || 'Official Kontingen'}
           </span>
         </div>
       </div>
 
-      {/* 4. Bottom Footer: Tanpa QR Code */}
-      <div
-        className="relative z-10 pt-1.5 border-t text-center space-y-1"
-        style={{ borderColor: `${theme.borderColor}40` }}
-      >
+      {/* 3. Bottom Footer: Tanpa QR Code -> Tagline -> Badko TKA TPA Kota Yogyakarta (Font Kecil) */}
+      <div className="relative z-10 pt-1 text-center flex flex-col items-center justify-end space-y-0.5">
         <p
-          className="text-[6.5px] italic leading-tight line-clamp-2 font-serif px-1"
+          className="text-[5.5px] italic leading-tight line-clamp-2 font-serif px-1 max-w-[95%]"
           style={{ color: theme.taglineColor }}
         >
           “{customTagline}”
         </p>
 
-        <div
-          className="w-full py-0.5 rounded text-[6.5px] font-black tracking-wider uppercase"
-          style={{ backgroundColor: `${theme.primaryColor}10`, color: theme.primaryColor }}
-        >
-          BADKO TKA-TPA KOTA YOGYAKARTA
-        </div>
+        <p className="text-[5px] font-extrabold text-slate-600 uppercase tracking-wider">
+          Badko TKA TPA Kota Yogyakarta
+        </p>
       </div>
     </div>
   );

@@ -185,16 +185,16 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
                     : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
                 }`}
               >
-                Admin 14 Kemantren
+                Admin 14 Rayon
               </button>
             </div>
           </div>
 
-          {/* Select Kemantren (if kemantren_admin) */}
+          {/* Select Rayon (if kemantren_admin) */}
           {role === 'kemantren_admin' && (
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                Pilih Wilayah Kemantren
+                Pilih Rayon
               </label>
               <select
                 value={kemantrenId}
@@ -203,7 +203,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
               >
                 {kemantrenList.map((k) => (
                   <option key={k.id} value={k.id}>
-                    Kemantren {k.name} ({k.code}) - {k.adminName}
+                    Rayon {k.name} ({k.code})
                   </option>
                 ))}
               </select>
@@ -216,11 +216,6 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
                 Kata Sandi / PIN Akses
               </label>
-              <span className="text-[10px] text-slate-500 font-mono">
-                {role === 'super_admin'
-                  ? 'Default: badko2026'
-                  : `Default: ${kemantrenList.find((k) => k.id === kemantrenId)?.name.toLowerCase().replace(/\s+/g, '') || 'nama'}123`}
-              </span>
             </div>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">

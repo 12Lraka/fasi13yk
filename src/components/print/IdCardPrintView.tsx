@@ -29,6 +29,9 @@ import {
   Square,
   Building2,
   FileCheck,
+  FileDown,
+  Download,
+  Loader2,
 } from 'lucide-react';
 import { Participant, UserSession, CompetitionCategory, Kemantren } from '../../types/fasi';
 import { CATEGORIES_LIST, KEMANTREN_LIST } from '../../data/fasiMasterData';
@@ -37,6 +40,8 @@ import { ID_CARD_THEMES, IdCardTheme } from './idCardThemes';
 import { IdCardParticipant } from './IdCardParticipant';
 import { IdCardOfficial, OfficialCardData } from './IdCardOfficial';
 import { IdCardCommittee, CommitteeCardData } from './IdCardCommittee';
+import { generateIdCardsPdfFromDom } from '../../utils/idCardPdfGenerator';
+import { showToast } from '../../utils/sweetalert';
 
 interface IdCardPrintViewProps {
   participants: Participant[];
@@ -57,6 +62,10 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
 
   // 1. Tab Tipe Kartu (Peserta, Official, Panitia)
   const [activeCardType, setActiveCardType] = useState<CardType>('peserta');
+
+  // PDF Generation State
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState<boolean>(false);
+  const [pdfProgress, setPdfProgress] = useState<{ current: number; total: number }>({ current: 0, total: 0 });
 
   // 2. Customizer Tema Warna & Tagline
   const [selectedThemeKey, setSelectedThemeKey] = useState<string>('emerald');
@@ -318,7 +327,28 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
   };
 
   const handlePrint = () => {
+    window.focus();
     window.print();
+  };
+
+  const handleDownloadPdf = async () => {
+    if (currentTotalCards === 0 || isGeneratingPdf) return;
+    setIsGeneratingPdf(true);
+    setPdfProgress({ current: 1, total: 1 });
+
+    try {
+      await generateIdCardsPdfFromDom({
+        containerSelector: '.idcard-print-page',
+        fileName: `ID_Card_FASI_XIII_${activeCardType}_A4.pdf`,
+        onProgress: (cur, tot) => setPdfProgress({ current: cur, total: tot }),
+      });
+      showToast('success', 'File PDF ID Card (A4 - 9 Kartu/Lembar) berhasil diunduh!');
+    } catch (err) {
+      console.error('Gagal generate PDF ID Card:', err);
+      showToast('error', 'Gagal memproses dokumen PDF ID Card.');
+    } finally {
+      setIsGeneratingPdf(false);
+    }
   };
 
   // Hitung jumlah kartu yang aktif saat ini
@@ -329,12 +359,25 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
       ? generatedOfficials.length
       : generatedCommittees.length;
 
+  // Chunk items into 9 cards per A4 page
+  const chunkArray = <T,>(arr: T[], size: number = 9): T[][] => {
+    const result: T[][] = [];
+    for (let i = 0; i < arr.length; i += size) {
+      result.push(arr.slice(i, i + size));
+    }
+    return result;
+  };
+
+  const participantPages = useMemo(() => chunkArray(filteredParticipants, 9), [filteredParticipants]);
+  const officialPages = useMemo(() => chunkArray(generatedOfficials, 9), [generatedOfficials]);
+  const committeePages = useMemo(() => chunkArray(generatedCommittees, 9), [generatedCommittees]);
+
   return (
     <div className="space-y-6">
       {/* 1. TOP CONTROL BAR (Hidden on Print) */}
       <div className="no-print bg-white rounded-2xl p-4 sm:p-6 border border-slate-200 shadow-sm space-y-5">
         {/* Header Bar */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 border-b border-slate-100 pb-4">
           <div>
             <button
               onClick={onBack}
@@ -350,22 +393,48 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
               </span>
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              Standar Portrait 85mm × 55mm (9 Kartu / Lembar A4). Dilengkapi Watermark Resmi, QR Code, dan Pilihan Tema Warna.
+              Standar Portrait 5.5cm × 8.8cm (9 Kartu / Lembar A4). Menggunakan Template Resmi Supabase.
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* Tombol Unduh PDF Dokumen A4 */}
             <button
-              onClick={handlePrint}
-              disabled={currentTotalCards === 0}
-              className={`px-5 py-2.5 rounded-xl font-extrabold text-xs shadow-md flex items-center gap-2 transition-all active:scale-95 cursor-pointer ${
-                currentTotalCards === 0
-                  ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
-                  : 'bg-emerald-800 hover:bg-emerald-700 text-white'
+              onClick={handleDownloadPdf}
+              disabled={currentTotalCards === 0 || isGeneratingPdf}
+              className={`px-4 py-2.5 rounded-xl font-extrabold text-xs shadow-md flex items-center gap-2 transition-all active:scale-95 cursor-pointer ${
+                currentTotalCards === 0 || isGeneratingPdf
+                  ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                  : 'bg-emerald-700 hover:bg-emerald-800 text-white'
               }`}
             >
-              <Printer className="w-4 h-4 text-amber-400" />
-              <span>Cetak Sekarang (Ctrl+P)</span>
+              {isGeneratingPdf ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-amber-300" />
+                  <span>
+                    Menyiapkan PDF ({pdfProgress.current}/{pdfProgress.total})...
+                  </span>
+                </>
+              ) : (
+                <>
+                  <FileDown className="w-4 h-4 text-amber-300" />
+                  <span>Download PDF (A4)</span>
+                </>
+              )}
+            </button>
+
+            {/* Tombol Cetak Browser */}
+            <button
+              onClick={handlePrint}
+              disabled={currentTotalCards === 0 || isGeneratingPdf}
+              className={`px-4 py-2.5 rounded-xl font-bold text-xs border border-slate-300 shadow-xs flex items-center gap-2 transition-all active:scale-95 cursor-pointer ${
+                currentTotalCards === 0
+                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                  : 'bg-white hover:bg-slate-50 text-slate-800'
+              }`}
+            >
+              <Printer className="w-4 h-4 text-slate-600" />
+              <span>Cetak Langsung (Ctrl+P)</span>
             </button>
           </div>
         </div>
@@ -851,7 +920,7 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
 
       {/* 3. PRINT CANVAS & GRID (9 Kartu per Lembar A4) */}
       <div className="print-area">
-        {/* CSS Printing Styles for High Precision 85mm x 55mm Portrait */}
+        {/* CSS Printing Styles for High Precision 55mm x 88mm Portrait (9 Kartu / Lembar A4) */}
         <style dangerouslySetInnerHTML={{
           __html: `
           @media print {
@@ -868,32 +937,28 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
             }
             @page {
               size: A4 portrait;
-              margin: 8mm 6mm;
+              margin: 10mm 15mm;
             }
-            .print-page {
+            .idcard-print-page {
               page-break-after: always;
-              display: grid !important;
-              grid-template-columns: repeat(3, 1fr) !important;
-              grid-template-rows: repeat(3, 1fr) !important;
-              gap: 4mm !important;
-              height: 275mm !important;
-              width: 198mm !important;
+              break-after: page;
+              padding: 0 !important;
               margin: 0 auto !important;
+              box-shadow: none !important;
+              border: none !important;
+              background: white !important;
             }
             .fasi-id-card {
               box-shadow: none !important;
               page-break-inside: avoid !important;
+              break-inside: avoid !important;
               width: 55mm !important;
-              height: 85mm !important;
+              height: 88mm !important;
             }
           }
           @media screen {
-            .print-page {
-              display: flex;
-              flex-wrap: wrap;
-              gap: 16px;
-              justify-content: center;
-              padding: 16px 0;
+            .idcard-print-page {
+              box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
             }
           }
         `}} />
@@ -911,43 +976,112 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
             </p>
           </div>
         ) : (
-          <div className="print-page bg-transparent">
-            {/* RENDER PESERTA */}
+          <div className="space-y-8">
+            {/* RENDER PESERTA PER LEMBAR A4 */}
             {activeCardType === 'peserta' &&
-              filteredParticipants.map((p) => {
-                const cat = categoriesList.find((c) => c.id === p.categoryId);
-                return (
-                  <IdCardParticipant
-                    key={p.id}
-                    participant={p}
-                    category={cat}
-                    qrCodeUrl={qrCodes[p.id]}
-                    theme={activeTheme}
-                    customTagline={customTagline}
-                  />
-                );
-              })}
-
-            {/* RENDER OFFICIAL */}
-            {activeCardType === 'official' &&
-              generatedOfficials.map((off) => (
-                <IdCardOfficial
-                  key={off.id}
-                  data={off}
-                  theme={activeTheme}
-                  customTagline={customTagline}
-                />
+              participantPages.map((pageItems, pageIdx) => (
+                <div
+                  key={`page-peserta-${pageIdx}`}
+                  className="idcard-print-page bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 mx-auto transition-all"
+                  style={{
+                    width: '210mm',
+                    minHeight: '297mm',
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  <div className="no-print flex items-center justify-between border-b border-slate-100 pb-2 mb-3 text-[11px] text-slate-400 font-mono">
+                    <span className="font-semibold text-emerald-800">ID Card Peserta FASI XIII</span>
+                    <span>Lembar {pageIdx + 1} dari {participantPages.length} ({pageItems.length} Kartu)</span>
+                  </div>
+                  <div
+                    className="grid grid-cols-3 gap-x-[4mm] gap-y-[3mm] justify-center items-center mx-auto py-1"
+                    style={{
+                      width: '173mm', // 3 * 55mm + 2 * 4mm = 173mm
+                    }}
+                  >
+                    {pageItems.map((p) => {
+                      const cat = categoriesList.find((c) => c.id === p.categoryId);
+                      return (
+                        <IdCardParticipant
+                          key={p.id}
+                          participant={p}
+                          category={cat}
+                          qrCodeUrl={qrCodes[p.id]}
+                          theme={activeTheme}
+                          customTagline={customTagline}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
               ))}
 
-            {/* RENDER COMMITTEE */}
+            {/* RENDER OFFICIAL PER LEMBAR A4 */}
+            {activeCardType === 'official' &&
+              officialPages.map((pageItems, pageIdx) => (
+                <div
+                  key={`page-official-${pageIdx}`}
+                  className="idcard-print-page bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 mx-auto transition-all"
+                  style={{
+                    width: '210mm',
+                    minHeight: '297mm',
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  <div className="no-print flex items-center justify-between border-b border-slate-100 pb-2 mb-3 text-[11px] text-slate-400 font-mono">
+                    <span className="font-semibold text-blue-800">ID Card Official Kontingen FASI XIII</span>
+                    <span>Lembar {pageIdx + 1} dari {officialPages.length} ({pageItems.length} Kartu)</span>
+                  </div>
+                  <div
+                    className="grid grid-cols-3 gap-x-[4mm] gap-y-[3mm] justify-center items-center mx-auto py-1"
+                    style={{
+                      width: '173mm',
+                    }}
+                  >
+                    {pageItems.map((off) => (
+                      <IdCardOfficial
+                        key={off.id}
+                        data={off}
+                        theme={activeTheme}
+                        customTagline={customTagline}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+
+            {/* RENDER COMMITTEE PER LEMBAR A4 */}
             {activeCardType === 'panitia' &&
-              generatedCommittees.map((com) => (
-                <IdCardCommittee
-                  key={com.id}
-                  data={com}
-                  theme={activeTheme}
-                  customTagline={customTagline}
-                />
+              committeePages.map((pageItems, pageIdx) => (
+                <div
+                  key={`page-panitia-${pageIdx}`}
+                  className="idcard-print-page bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 mx-auto transition-all"
+                  style={{
+                    width: '210mm',
+                    minHeight: '297mm',
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  <div className="no-print flex items-center justify-between border-b border-slate-100 pb-2 mb-3 text-[11px] text-slate-400 font-mono">
+                    <span className="font-semibold text-rose-800">ID Card Panitia & Juri FASI XIII</span>
+                    <span>Lembar {pageIdx + 1} dari {committeePages.length} ({pageItems.length} Kartu)</span>
+                  </div>
+                  <div
+                    className="grid grid-cols-3 gap-x-[4mm] gap-y-[3mm] justify-center items-center mx-auto py-1"
+                    style={{
+                      width: '173mm',
+                    }}
+                  >
+                    {pageItems.map((com) => (
+                      <IdCardCommittee
+                        key={com.id}
+                        data={com}
+                        theme={activeTheme}
+                        customTagline={customTagline}
+                      />
+                    ))}
+                  </div>
+                </div>
               ))}
           </div>
         )}

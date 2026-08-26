@@ -59,6 +59,7 @@ export const UndianNomorTampil: React.FC<UndianNomorTampilProps> = ({
   const [isShuffling, setIsShuffling] = useState<boolean>(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [groupDrawMode, setGroupDrawMode] = useState<boolean>(true);
 
   // Keep local participants in sync when props change (if not dirty)
   React.useEffect(() => {
@@ -78,6 +79,13 @@ export const UndianNomorTampil: React.FC<UndianNomorTampilProps> = ({
     return categoriesList.find((c) => c.id === selectedCategoryId) || tabCategories[0] || categoriesList[0];
   }, [categoriesList, selectedCategoryId, tabCategories]);
 
+  // Sync group draw mode when category changes
+  React.useEffect(() => {
+    if (currentCategory?.isGroup) {
+      setGroupDrawMode(true);
+    }
+  }, [currentCategory]);
+
   // Participants belonging to this category
   const categoryParticipants = useMemo(() => {
     return localParticipants.filter(
@@ -85,19 +93,78 @@ export const UndianNomorTampil: React.FC<UndianNomorTampilProps> = ({
     );
   }, [localParticipants, currentCategory]);
 
-  // Stats for the active category
-  const stats = useMemo(() => {
-    const total = categoryParticipants.length;
-    const drawn = categoryParticipants.filter((p) => p.lotteryNumber != null && p.lotteryNumber > 0).length;
-    const undrawn = total - drawn;
-    const isComplete = total > 0 && undrawn === 0;
-    return { total, drawn, undrawn, isComplete };
-  }, [categoryParticipants]);
-
   const getKemantrenName = (id: string) => {
     const k = kemantrenList.find((item) => item.id === id);
     return k ? k.name : id;
   };
+
+  // Grouped structure for Beregu / Group categories (e.g. 3 members per group)
+  interface ParticipantGroup {
+    groupId: string;
+    groupLabel: string;
+    kemantrenId: string;
+    kemantrenName: string;
+    tpaUnitName: string;
+    lotteryNumber?: number | null;
+    members: Participant[];
+  }
+
+  const categoryGroups = useMemo<ParticipantGroup[]>(() => {
+    if (!currentCategory) return [];
+    
+    // Group participants by Kemantren
+    const byKemantren: Record<string, Participant[]> = {};
+    categoryParticipants.forEach((p) => {
+      if (!byKemantren[p.kemantrenId]) {
+        byKemantren[p.kemantrenId] = [];
+      }
+      byKemantren[p.kemantrenId].push(p);
+    });
+
+    const groups: ParticipantGroup[] = [];
+    const memberCountPerGroup = currentCategory.groupMemberCount || 3;
+
+    Object.keys(byKemantren).forEach((kemId) => {
+      const parts = byKemantren[kemId];
+      const kemName = getKemantrenName(kemId);
+      
+      // Chunk per memberCountPerGroup (default 3)
+      for (let i = 0; i < parts.length; i += memberCountPerGroup) {
+        const chunk = parts.slice(i, i + memberCountPerGroup);
+        const groupIndex = Math.floor(i / memberCountPerGroup) + 1;
+        const firstLotteryNum = chunk.find((m) => m.lotteryNumber != null)?.lotteryNumber ?? null;
+        
+        groups.push({
+          groupId: `${kemId}-grp-${groupIndex}`,
+          groupLabel: `Regu ${groupIndex} - Kemantren ${kemName}`,
+          kemantrenId: kemId,
+          kemantrenName: kemName,
+          tpaUnitName: chunk[0]?.tpaUnitName || `Kontingen ${kemName}`,
+          lotteryNumber: firstLotteryNum,
+          members: chunk,
+        });
+      }
+    });
+
+    return groups;
+  }, [categoryParticipants, currentCategory, kemantrenList]);
+
+  // Stats for the active category
+  const stats = useMemo(() => {
+    if (currentCategory?.isGroup && groupDrawMode) {
+      const total = categoryGroups.length;
+      const drawn = categoryGroups.filter((g) => g.lotteryNumber != null && g.lotteryNumber > 0).length;
+      const undrawn = total - drawn;
+      const isComplete = total > 0 && undrawn === 0;
+      return { total, drawn, undrawn, isComplete, totalMembers: categoryParticipants.length };
+    }
+
+    const total = categoryParticipants.length;
+    const drawn = categoryParticipants.filter((p) => p.lotteryNumber != null && p.lotteryNumber > 0).length;
+    const undrawn = total - drawn;
+    const isComplete = total > 0 && undrawn === 0;
+    return { total, drawn, undrawn, isComplete, totalMembers: total };
+  }, [categoryParticipants, categoryGroups, currentCategory, groupDrawMode]);
 
   // Perform Lottery Draw / Shuffle
   const handleDrawLottery = () => {
@@ -109,43 +176,85 @@ export const UndianNomorTampil: React.FC<UndianNomorTampilProps> = ({
     setIsShuffling(true);
 
     setTimeout(() => {
-      // 1. Generate array of numbers 1..N
-      const total = categoryParticipants.length;
-      const numbers = Array.from({ length: total }, (_, i) => i + 1);
-
-      // 2. Fisher-Yates Shuffle
-      for (let i = numbers.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [numbers[i], numbers[j]] = [numbers[j], numbers[i]];
-      }
-
-      // 3. Assign to participants of this category
-      const targetIds = new Set(categoryParticipants.map((p) => p.id));
-      let numIndex = 0;
       const nowIso = new Date().toISOString();
 
-      const updated = localParticipants.map((p) => {
-        if (targetIds.has(p.id)) {
-          const lotNum = numbers[numIndex++];
-          return {
-            ...p,
-            lotteryNumber: lotNum,
-            lotteryDrawnAt: nowIso,
-            lotteryDrawnBy: session.name || 'Panitia FASI XIII',
-            updatedAt: nowIso,
-          };
+      if (currentCategory?.isGroup && groupDrawMode) {
+        // --- MODE UNDIAN REGU / GRUP (1 NOMOR SAMA UNTUK SELURUH ANGGOTA 1 REGU) ---
+        const totalGroups = categoryGroups.length;
+        const numbers = Array.from({ length: totalGroups }, (_, i) => i + 1);
+
+        // Fisher-Yates Shuffle
+        for (let i = numbers.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [numbers[i], numbers[j]] = [numbers[j], numbers[i]];
         }
-        return p;
-      });
 
-      setLocalParticipants(updated);
-      setIsShuffling(false);
-      setHasUnsavedChanges(true);
+        // Map member IDs to the drawn group number
+        const memberToLotteryMap = new Map<string, number>();
+        categoryGroups.forEach((grp, idx) => {
+          const assignedNum = numbers[idx];
+          grp.members.forEach((m) => {
+            memberToLotteryMap.set(m.id, assignedNum);
+          });
+        });
 
-      showToast(
-        'success',
-        `Berhasil mengundi nomor urut tampil untuk ${categoryParticipants.length} santri. Jangan lupa klik Simpan ke Database.`
-      );
+        const updated = localParticipants.map((p) => {
+          if (memberToLotteryMap.has(p.id)) {
+            return {
+              ...p,
+              lotteryNumber: memberToLotteryMap.get(p.id)!,
+              lotteryDrawnAt: nowIso,
+              lotteryDrawnBy: session.name || 'Panitia FASI XIII',
+              updatedAt: nowIso,
+            };
+          }
+          return p;
+        });
+
+        setLocalParticipants(updated);
+        setIsShuffling(false);
+        setHasUnsavedChanges(true);
+
+        showToast(
+          'success',
+          `Berhasil mengundi nomor urut tampil untuk ${totalGroups} Regu (${categoryParticipants.length} santri). Seluruh anggota regu otomatis mendapatkan nomor undian yang sama!`
+        );
+      } else {
+        // --- MODE UNDIAN INDIVIDU (1 NOMOR PER SANTRI) ---
+        const total = categoryParticipants.length;
+        const numbers = Array.from({ length: total }, (_, i) => i + 1);
+
+        for (let i = numbers.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [numbers[i], numbers[j]] = [numbers[j], numbers[i]];
+        }
+
+        const targetIds = new Set(categoryParticipants.map((p) => p.id));
+        let numIndex = 0;
+
+        const updated = localParticipants.map((p) => {
+          if (targetIds.has(p.id)) {
+            const lotNum = numbers[numIndex++];
+            return {
+              ...p,
+              lotteryNumber: lotNum,
+              lotteryDrawnAt: nowIso,
+              lotteryDrawnBy: session.name || 'Panitia FASI XIII',
+              updatedAt: nowIso,
+            };
+          }
+          return p;
+        });
+
+        setLocalParticipants(updated);
+        setIsShuffling(false);
+        setHasUnsavedChanges(true);
+
+        showToast(
+          'success',
+          `Berhasil mengundi nomor urut tampil untuk ${categoryParticipants.length} santri. Jangan lupa klik Simpan ke Database.`
+        );
+      }
     }, 500);
   };
 
@@ -456,6 +565,29 @@ export const UndianNomorTampil: React.FC<UndianNomorTampilProps> = ({
               </div>
             </div>
 
+            {/* Beregu / Group Mode Notification & Toggle */}
+            {currentCategory?.isGroup && (
+              <div className="bg-emerald-950/60 p-3 rounded-xl border border-amber-400/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs">
+                <div className="flex items-center gap-2 text-amber-300">
+                  <Users className="w-4 h-4 shrink-0" />
+                  <span>
+                    <strong>Cabang Lomba Beregu / Grup:</strong> Terdeteksi <strong>{categoryGroups.length} Regu</strong> ({categoryParticipants.length} santri). Seluruh 3 anggota satu regu akan mendapatkan 1 nomor undian yang sama.
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <label className="text-[11px] text-emerald-200 cursor-pointer flex items-center gap-1.5">
+                    <input
+                      type="checkbox"
+                      checked={groupDrawMode}
+                      onChange={(e) => setGroupDrawMode(e.target.checked)}
+                      className="rounded text-amber-500 focus:ring-amber-400"
+                    />
+                    <span>Undi per Regu</span>
+                  </label>
+                </div>
+              </div>
+            )}
+
             {/* Action Bar (Undi, Reset, Simpan) */}
             <div className="no-print pt-3 border-t border-emerald-700/60 flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
@@ -468,6 +600,10 @@ export const UndianNomorTampil: React.FC<UndianNomorTampilProps> = ({
                   <span>
                     {isShuffling
                       ? 'Mengacak Nomor...'
+                      : currentCategory?.isGroup && groupDrawMode
+                      ? stats.drawn > 0
+                        ? `Undi Ulang (${categoryGroups.length} Regu)`
+                        : `Undi Acak (${categoryGroups.length} Regu)`
                       : stats.drawn > 0
                       ? 'Undi Ulang Acak'
                       : 'Undi Acak Nomor Tampil'}
@@ -512,95 +648,175 @@ export const UndianNomorTampil: React.FC<UndianNomorTampilProps> = ({
               </div>
 
               <div className="text-xs text-slate-500">
-                Menampilkan <strong>{displayedParticipants.length}</strong> dari{' '}
-                <strong>{categoryParticipants.length}</strong> santri terdaftar
+                {currentCategory?.isGroup && groupDrawMode ? (
+                  <span>
+                    Menampilkan <strong>{categoryGroups.length}</strong> Regu (Total <strong>{categoryParticipants.length}</strong> santri)
+                  </span>
+                ) : (
+                  <span>
+                    Menampilkan <strong>{displayedParticipants.length}</strong> dari{' '}
+                    <strong>{categoryParticipants.length}</strong> santri terdaftar
+                  </span>
+                )}
               </div>
             </div>
 
-            {/* Table */}
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
-                    <th className="py-3 px-4 w-12 text-center">No</th>
-                    <th className="py-3 px-4">No. Registrasi</th>
-                    <th className="py-3 px-4">Nama Lengkap Santri</th>
-                    <th className="py-3 px-4">Kemantren & Unit TPA</th>
-                    <th className="py-3 px-4 text-center">Nomor Undian</th>
-                    <th className="py-3 px-4 text-center">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {displayedParticipants.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="py-12 text-center text-slate-400">
-                        <Users className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                        <p className="font-semibold">Belum ada peserta terdaftar pada cabang lomba ini.</p>
-                        <p className="text-[11px] mt-0.5">
-                          Gunakan menu pendaftaran santri untuk mengisi utusan kemantren.
-                        </p>
-                      </td>
-                    </tr>
-                  ) : (
-                    displayedParticipants.map((p, idx) => {
-                      const kem = getKemantrenName(p.kemantrenId);
-                      const hasNumber = p.lotteryNumber != null && p.lotteryNumber > 0;
-
-                      return (
-                        <tr
-                          key={p.id}
-                          className={`hover:bg-slate-50/80 transition-colors ${
-                            hasNumber ? 'bg-emerald-50/20' : ''
-                          }`}
-                        >
-                          <td className="py-3.5 px-4 font-mono font-bold text-slate-500 text-center">
-                            {idx + 1}
-                          </td>
-                          <td className="py-3.5 px-4">
-                            <span className="font-mono font-bold text-emerald-900 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                              {p.registrationNumber}
-                            </span>
-                          </td>
-                          <td className="py-3.5 px-4">
-                            <div className="font-bold text-slate-900">{p.fullName}</div>
-                            <div className="text-[11px] text-slate-400 font-medium">
-                              {p.gender === 'L' ? '👦 Putra' : '🧕 Putri'} • Usia: {p.ageOnCutoff?.years || 0} Thn {p.ageOnCutoff?.months || 0} Bln
+            {/* Table or Grouped View */}
+            {currentCategory?.isGroup && groupDrawMode ? (
+              <div className="divide-y divide-slate-200">
+                {categoryGroups.length === 0 ? (
+                  <div className="py-12 text-center text-slate-400">
+                    <Users className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <p className="font-semibold">Belum ada regu peserta terdaftar pada cabang lomba ini.</p>
+                  </div>
+                ) : (
+                  categoryGroups.map((grp, grpIdx) => {
+                    const hasNumber = grp.lotteryNumber != null && grp.lotteryNumber > 0;
+                    return (
+                      <div key={grp.groupId} className="p-4 hover:bg-slate-50/60 transition-colors">
+                        {/* Group Header Banner */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-900 flex items-center justify-center font-bold text-xs">
+                              {grpIdx + 1}
                             </div>
-                          </td>
-                          <td className="py-3.5 px-4">
-                            <div className="font-semibold text-slate-800">Kemantren {kem}</div>
-                            <div className="text-[11px] text-slate-500">{p.tpaUnitName}</div>
-                          </td>
-                          <td className="py-3.5 px-4 text-center">
-                            {hasNumber ? (
-                              <div className="inline-flex items-center justify-center w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-500 text-emerald-950 font-black font-mono text-base shadow-sm border border-amber-300">
-                                {String(p.lotteryNumber).padStart(2, '0')}
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-bold text-sm text-slate-900">{grp.groupLabel}</h4>
+                                <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 text-[10px] font-bold border border-emerald-200">
+                                  {grp.members.length} Santri
+                                </span>
                               </div>
-                            ) : (
-                              <span className="inline-block px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-400">
-                                Belum Diundi
+                              <p className="text-xs text-slate-500">{grp.tpaUnitName}</p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            <div className="text-right">
+                              <span className="text-[10px] text-slate-400 font-medium block">Nomor Undian Regu</span>
+                              {hasNumber ? (
+                                <div className="inline-flex items-center justify-center px-3 py-1 rounded-xl bg-gradient-to-br from-amber-400 to-amber-500 text-emerald-950 font-black font-mono text-base shadow-xs border border-amber-300">
+                                  No. {String(grp.lotteryNumber).padStart(2, '0')}
+                                </div>
+                              ) : (
+                                <span className="inline-block px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-400">
+                                  Belum Diundi
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Group Members List */}
+                        <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          {grp.members.map((m, mIdx) => (
+                            <div
+                              key={m.id}
+                              className="p-2.5 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between gap-2"
+                            >
+                              <div className="min-w-0">
+                                <span className="text-[10px] font-bold text-slate-400 font-mono">Anggota {mIdx + 1}</span>
+                                <p className="font-bold text-xs text-slate-800 truncate">{m.fullName}</p>
+                                <p className="text-[10px] font-mono text-emerald-700">{m.registrationNumber}</p>
+                              </div>
+                              {hasNumber && (
+                                <span className="text-[10px] font-bold bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded font-mono">
+                                  #{String(m.lotteryNumber).padStart(2, '0')}
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
+                      <th className="py-3 px-4 w-12 text-center">No</th>
+                      <th className="py-3 px-4">No. Registrasi</th>
+                      <th className="py-3 px-4">Nama Lengkap Santri</th>
+                      <th className="py-3 px-4">Kemantren & Unit TPA</th>
+                      <th className="py-3 px-4 text-center">Nomor Undian</th>
+                      <th className="py-3 px-4 text-center">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {displayedParticipants.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-12 text-center text-slate-400">
+                          <Users className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                          <p className="font-semibold">Belum ada peserta terdaftar pada cabang lomba ini.</p>
+                          <p className="text-[11px] mt-0.5">
+                            Gunakan menu pendaftaran santri untuk mengisi utusan kemantren.
+                          </p>
+                        </td>
+                      </tr>
+                    ) : (
+                      displayedParticipants.map((p, idx) => {
+                        const kem = getKemantrenName(p.kemantrenId);
+                        const hasNumber = p.lotteryNumber != null && p.lotteryNumber > 0;
+
+                        return (
+                          <tr
+                            key={p.id}
+                            className={`hover:bg-slate-50/80 transition-colors ${
+                              hasNumber ? 'bg-emerald-50/20' : ''
+                            }`}
+                          >
+                            <td className="py-3.5 px-4 font-mono font-bold text-slate-500 text-center">
+                              {idx + 1}
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <span className="font-mono font-bold text-emerald-900 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                {p.registrationNumber}
                               </span>
-                            )}
-                          </td>
-                          <td className="py-3.5 px-4 text-center">
-                            {hasNumber ? (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                                <CheckCircle2 className="w-3 h-3" />
-                                Siap Tampil
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-800">
-                                Menunggu Undian
-                              </span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <div className="font-bold text-slate-900">{p.fullName}</div>
+                              <div className="text-[11px] text-slate-400 font-medium">
+                                {p.gender === 'L' ? '👦 Putra' : '🧕 Putri'} • Usia: {p.ageOnCutoff?.years || 0} Thn {p.ageOnCutoff?.months || 0} Bln
+                              </div>
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <div className="font-semibold text-slate-800">Kemantren {kem}</div>
+                              <div className="text-[11px] text-slate-500">{p.tpaUnitName}</div>
+                            </td>
+                            <td className="py-3.5 px-4 text-center">
+                              {hasNumber ? (
+                                <div className="inline-flex items-center justify-center w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-500 text-emerald-950 font-black font-mono text-base shadow-sm border border-amber-300">
+                                  {String(p.lotteryNumber).padStart(2, '0')}
+                                </div>
+                              ) : (
+                                <span className="inline-block px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-400">
+                                  Belum Diundi
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3.5 px-4 text-center">
+                              {hasNumber ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  Siap Tampil
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-800">
+                                  Menunggu Undian
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
 
             {/* Print Footer Summary (Visible in Print Mode) */}
             <div className="p-4 bg-slate-50 border-t border-slate-200 text-xs text-slate-500 flex flex-col sm:flex-row items-center justify-between gap-2">

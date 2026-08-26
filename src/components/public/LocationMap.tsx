@@ -66,7 +66,7 @@ export const LocationMap: React.FC = () => {
               <span>Sekretariat BADKO Kota</span>
             </div>
             <p className="font-semibold text-slate-900 text-sm">Panitia Pelaksana FASI XIII</p>
-            <p className="text-slate-500 text-[11px]">Helpdesk: 08XX-XXXX-XXXX (WhatsApp)</p>
+            <p className="text-slate-500 text-[11px]">Helpdesk: 0812-2334-4000 (WhatsApp)</p>
           </div>
         </div>
       </div>

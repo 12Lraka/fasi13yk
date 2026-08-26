@@ -148,12 +148,15 @@ export function getStoredParticipants(): Participant[] {
   try {
     const raw = localStorage.getItem(PARTICIPANTS_KEY);
     if (!raw) {
-      localStorage.setItem(PARTICIPANTS_KEY, JSON.stringify(INITIAL_PARTICIPANTS));
-      return INITIAL_PARTICIPANTS;
+      localStorage.setItem(PARTICIPANTS_KEY, JSON.stringify([]));
+      return [];
     }
-    return JSON.parse(raw);
+    const parsed: Participant[] = JSON.parse(raw);
+    // Filter out legacy dummy sample participant items
+    const cleaned = parsed.filter((p) => !p.id.match(/^p-0[1-9]$|^p-10$/));
+    return cleaned;
   } catch {
-    return INITIAL_PARTICIPANTS;
+    return [];
   }
 }
 

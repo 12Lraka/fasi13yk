@@ -85,7 +85,7 @@ export const AgeCalculatorModal: React.FC<AgeCalculatorModalProps> = ({
           {/* Preset Buttons for Quick Testing */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Contoh Cepat:
+              Contoh Cepat Uji Kasus:
             </label>
             <div className="flex flex-wrap gap-2 text-xs">
               <button
@@ -93,21 +93,21 @@ export const AgeCalculatorModal: React.FC<AgeCalculatorModalProps> = ({
                 onClick={() => handleApplyPreset('15/04/2022', 'Ahmad (TKA)')}
                 className="px-2.5 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-md hover:bg-emerald-100 font-medium"
               >
-                TKA (5 Thn)
+                👶 TKA (5 Thn)
               </button>
               <button
                 type="button"
                 onClick={() => handleApplyPreset('10/08/2017', 'Faris (TPA)')}
                 className="px-2.5 py-1 bg-sky-50 text-sky-800 border border-sky-200 rounded-md hover:bg-sky-100 font-medium"
               >
-                TPA (10 Thn)
+                👦 TPA (10 Thn)
               </button>
               <button
                 type="button"
                 onClick={() => handleApplyPreset('20/03/2014', 'Zahra (TQA)')}
                 className="px-2.5 py-1 bg-purple-50 text-purple-800 border border-purple-200 rounded-md hover:bg-purple-100 font-medium"
               >
-                TQA (13 Thn)
+                🧕 TQA (13 Thn)
               </button>
               <button
                 type="button"
@@ -261,7 +261,7 @@ export const AgeCalculatorModal: React.FC<AgeCalculatorModalProps> = ({
         <div className="bg-slate-50 px-6 py-3.5 border-t border-slate-200 flex items-center justify-between">
           <div className="flex items-center gap-1.5 text-slate-400 text-xs">
             <ShieldCheck className="w-4 h-4 text-emerald-600" />
-            <span>Validasi Terverifikasi</span>
+            <span>Validasi Terverifikasi BADKO</span>
           </div>
           <button
             onClick={onClose}

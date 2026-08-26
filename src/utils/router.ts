@@ -35,7 +35,23 @@ export const ROUTE_PATH_MAP: Record<string, AppRoute> = {
   '/lokasi': 'lokasi',
   '/kalkulator': 'kalkulator',
   '/login': 'login',
+  // Admin Base & Sub-Routes
   '/admin': 'admin',
+  '/admin/admindashboard': 'admin',
+  '/admin/dashboard': 'admin',
+  '/admin/peserta': 'admin',
+  '/admin/undian': 'undian',
+  '/admin/cetak-kartu': 'cetak',
+  '/admin/cetak': 'cetak',
+  '/admin/idcard': 'cetak',
+  '/admin/rekap': 'rekapitulasi',
+  '/admin/rekapitulasi': 'rekapitulasi',
+  '/admin/pengaturan': 'pengaturan',
+  '/admin/settings': 'pengaturan',
+  '/admin/log': 'log',
+  '/admin/presensi': 'presensi',
+  '/admin/penjurian': 'penjurian',
+  // Shortcuts
   '/superadmin': 'superadmin',
   '/adminkecamatan': 'adminkecamatan',
   '/undian': 'undian',
@@ -63,15 +79,15 @@ export const CANONICAL_PATH_MAP: Record<AppRoute, string> = {
   kalkulator: '/kalkulator',
   login: '/login',
   admin: '/admin',
-  superadmin: '/superadmin',
-  adminkecamatan: '/adminkecamatan',
-  undian: '/undian',
-  presensi: '/presensi',
-  penjurian: '/penjurian',
-  rekapitulasi: '/rekapitulasi',
-  cetak: '/cetak',
-  pengaturan: '/pengaturan',
-  log: '/log',
+  superadmin: '/admin',
+  adminkecamatan: '/admin',
+  undian: '/admin/undian',
+  presensi: '/admin/presensi',
+  penjurian: '/admin/penjurian',
+  rekapitulasi: '/admin/rekapitulasi',
+  cetak: '/admin/cetak-kartu',
+  pengaturan: '/admin/pengaturan',
+  log: '/admin/log',
 };
 
 /**
@@ -80,16 +96,29 @@ export const CANONICAL_PATH_MAP: Record<AppRoute, string> = {
 export function getCurrentRouteFromURL(): AppRoute {
   if (typeof window === 'undefined') return 'beranda';
 
-  // 1. Check Hash first (if user uses #/admin)
+  // 1. Check Hash first (if user uses #/admin/undian)
   const hash = window.location.hash.replace(/^#\/?/, '/').toLowerCase();
   if (hash && ROUTE_PATH_MAP[hash]) {
     return ROUTE_PATH_MAP[hash];
   }
 
-  // 2. Check Pathname (e.g. /klasemen, /admin)
+  // 2. Check Pathname (e.g. /admin/cetak-kartu, /admin/undian)
   const pathname = window.location.pathname.toLowerCase().replace(/\/$/, '') || '/';
   if (ROUTE_PATH_MAP[pathname]) {
     return ROUTE_PATH_MAP[pathname];
+  }
+
+  // Prefix matching for any nested admin route
+  if (pathname.startsWith('/admin/')) {
+    const sub = pathname.replace(/^\/admin\//, '');
+    if (sub.includes('undian')) return 'undian';
+    if (sub.includes('cetak') || sub.includes('idcard')) return 'cetak';
+    if (sub.includes('rekap')) return 'rekapitulasi';
+    if (sub.includes('presensi') || sub.includes('scan')) return 'presensi';
+    if (sub.includes('juri') || sub.includes('penjurian')) return 'penjurian';
+    if (sub.includes('pengaturan') || sub.includes('setting')) return 'pengaturan';
+    if (sub.includes('log') || sub.includes('audit')) return 'log';
+    return 'admin';
   }
 
   return 'beranda';

@@ -69,7 +69,8 @@ export const Footer: React.FC = () => {
 
         {/* Baris Bawah */}
         <div className="pt-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-slate-400 text-[11px]">
-          <p>© 2026 BADKO TKA-TPA Kota Yogyakarta</p>
+          <p>© 2026 BADKO TKA-TPA Kota Yogyakarta. Hak Cipta Dilindungi Undang-Undang.</p>
+          <p className="text-slate-300">Versi 1.0 (Produksi Juknis Resmi)</p>
         </div>
       </div>
     </footer>

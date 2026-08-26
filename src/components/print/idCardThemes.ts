@@ -24,7 +24,7 @@ export interface IdCardTheme {
 export const ID_CARD_ASSETS = {
   logoBadko: 'https://gigluvvkswjaiwxpnqet.supabase.co/storage/v1/object/public/public-assets/logobadko.png',
   logoFasi: 'https://gigluvvkswjaiwxpnqet.supabase.co/storage/v1/object/public/public-assets/logofasi.png',
-  watermarkDesain: 'https://gigluvvkswjaiwxpnqet.supabase.co/storage/v1/object/public/public-assets/logodesain.png',
+  templateKartu: 'https://gigluvvkswjaiwxpnqet.supabase.co/storage/v1/object/public/public-assets/templatekartu.png',
 };
 
 export const ID_CARD_THEMES: Record<string, IdCardTheme> = {

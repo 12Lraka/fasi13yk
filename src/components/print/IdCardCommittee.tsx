@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  * 
  * Sistem Informasi FASI XIII Kota Yogyakarta
- * Komponen ID Card Panitia Pelaksana Resmi (Portrait 85mm x 55mm)
- * Dilengkapi Space Area Tempel Nama / Cetak Digital Divisi
+ * Komponen ID Card Panitia Pelaksana Resmi (Portrait 5.5cm x 8.8cm)
+ * Menggunakan Template Kartu Resmi Supabase
  */
 
 import React from 'react';
@@ -25,81 +25,51 @@ interface IdCardCommitteeProps {
 
 export const IdCardCommittee: React.FC<IdCardCommitteeProps> = ({
   data,
-  theme = ID_CARD_THEMES.maroon, // Default committee can be maroon, gold, or selected theme
+  theme = ID_CARD_THEMES.maroon,
   customTagline = 'Santri Hebat, Hebat Prestasi, Hebat Mengaji, & Berakhlakul Karimah.',
 }) => {
   const hasDigitalName = Boolean(data.name && data.name.trim().length > 0);
 
   return (
     <div
-      className={`fasi-id-card relative bg-gradient-to-b ${theme.bgGradient} rounded-xl border-[1.5px] p-2.5 flex flex-col justify-between overflow-hidden shadow-sm select-none`}
+      className="fasi-id-card relative rounded-none border-0 p-2.5 flex flex-col justify-between overflow-hidden shadow-none select-none bg-cover bg-center bg-no-repeat"
       style={{
-        width: '55mm',
-        height: '85mm',
+        width: '5.5cm',
+        height: '8.8cm',
         boxSizing: 'border-box',
-        borderColor: theme.borderColor,
+        backgroundImage: `url(${ID_CARD_ASSETS.templateKartu})`,
       }}
     >
-      {/* 1. Background Watermark Logo Desain */}
-      <div
-        className="absolute inset-0 pointer-events-none flex items-center justify-center z-0 overflow-hidden"
-        style={{ opacity: theme.watermarkOpacity }}
-      >
-        <img
-          src={ID_CARD_ASSETS.watermarkDesain}
-          alt="Watermark FASI"
-          className="w-[125px] h-[125px] object-contain rotate-[-12deg] scale-115"
-        />
-      </div>
-
-      {/* Islamic Corner Accents */}
-      <div
-        className="absolute top-1 left-1 w-3 h-3 border-t border-l pointer-events-none opacity-40 rounded-tl-sm"
-        style={{ borderColor: theme.accentColor }}
-      />
-      <div
-        className="absolute top-1 right-1 w-3 h-3 border-t border-r pointer-events-none opacity-40 rounded-tr-sm"
-        style={{ borderColor: theme.accentColor }}
-      />
-      <div
-        className="absolute bottom-1 left-1 w-3 h-3 border-b border-l pointer-events-none opacity-40 rounded-bl-sm"
-        style={{ borderColor: theme.accentColor }}
-      />
-      <div
-        className="absolute bottom-1 right-1 w-3 h-3 border-b border-r pointer-events-none opacity-40 rounded-br-sm"
-        style={{ borderColor: theme.accentColor }}
-      />
-
-      {/* 2. Header: Logo Badko & Logo FASI berdampingan + Text Panitia */}
-      <div className="relative z-10 text-center pb-1 border-b" style={{ borderColor: `${theme.borderColor}40` }}>
-        <div className="flex items-center justify-center gap-2.5 mb-1">
+      {/* 1. Header: Logo Badko & Logo FASI berdampingan + Text Panitia */}
+      <div className="relative z-10 text-center pb-1">
+        <div className="flex items-center justify-center gap-2 mb-0.5">
           <img
             src={ID_CARD_ASSETS.logoBadko}
             alt="Logo Badko"
-            className="h-6 sm:h-7 w-auto object-contain drop-shadow-xs"
+            className="h-6 w-auto object-contain drop-shadow-xs"
           />
-          <div className="h-5 w-[1px] bg-slate-300/80" />
+          <div className="h-4 w-[1px] bg-slate-400/60" />
           <img
             src={ID_CARD_ASSETS.logoFasi}
             alt="Logo FASI"
-            className="h-6 sm:h-7 w-auto object-contain drop-shadow-xs"
+            className="h-6 w-auto object-contain drop-shadow-xs"
           />
         </div>
         <div className="leading-tight">
-          <p className="font-extrabold text-[8px] tracking-wider uppercase text-slate-800 font-sans">
+          <p className="font-extrabold text-[7.5px] tracking-wider uppercase text-slate-900 font-sans">
             PANITIA FASI XIII
           </p>
-          <p className="font-bold text-[7px] tracking-wider uppercase text-slate-600">
+          <p className="font-bold text-[6.5px] tracking-wider uppercase text-slate-700">
             KOTA YOGYAKARTA
           </p>
         </div>
       </div>
 
-      {/* 3. Middle Content: Tulisan PANITIA BOLD BESAR + Space Area Tempel Nama */}
+      {/* 2. Middle Content: Tulisan PANITIA BOLD BESAR + Divisi + Space Area Tempel Nama */}
       <div className="relative z-10 my-auto py-1 text-center flex flex-col items-center justify-center space-y-1.5">
         {/* Tulisan PANITIA Bold Besar */}
         <div
-          className="w-full py-1 rounded-lg tracking-widest uppercase font-black text-sm sm:text-base shadow-xs"
+          className="w-full py-1.5 rounded-lg tracking-widest uppercase font-black text-sm shadow-xs"
           style={{
             backgroundColor: theme.badgeBg,
             color: theme.badgeText,
@@ -112,7 +82,7 @@ export const IdCardCommittee: React.FC<IdCardCommitteeProps> = ({
         {/* Divisi / Seksi Panitia */}
         <div className="w-full">
           <div
-            className="inline-block px-2 py-0.5 rounded-full font-black text-[8px] tracking-wider uppercase"
+            className="inline-block px-2.5 py-0.5 rounded-full font-black text-[7.5px] tracking-wider uppercase shadow-2xs"
             style={{
               backgroundColor: `${theme.accentColor}20`,
               color: theme.accentColor,
@@ -125,59 +95,53 @@ export const IdCardCommittee: React.FC<IdCardCommitteeProps> = ({
         {/* Space Area untuk Tempel Nama / Tulisan Nama */}
         {hasDigitalName ? (
           <div
-            className="w-full rounded-lg py-1.5 px-2 border bg-white/90 shadow-2xs"
-            style={{ borderColor: `${theme.borderColor}60` }}
+            className="w-full rounded-md py-1.5 px-2 border bg-white/85 shadow-2xs backdrop-blur-xs"
+            style={{ borderColor: `${theme.borderColor}50` }}
           >
-            <span className="text-[6.5px] uppercase font-bold block text-slate-400">
+            <span className="text-[6px] uppercase font-bold block text-slate-500">
               Nama Panitia
             </span>
             <h4
-              className="font-black text-[10.5px] leading-tight uppercase font-sans tracking-tight line-clamp-2"
+              className="font-black text-[10px] leading-tight uppercase font-sans tracking-tight line-clamp-2"
               style={{ color: theme.textColor }}
             >
               {data.name}
             </h4>
-            <span className="text-[6.5px] font-bold text-slate-500 block uppercase mt-0.5">
+            <span className="text-[6.5px] font-bold text-slate-600 block uppercase mt-0.5">
               {data.accessLevel || 'ALL ACCESS'}
             </span>
           </div>
         ) : (
-          /* Area Tempel Nama Blanko yang Presisi & Bersih */
+          /* Area Tempel Nama Blanko yang Bersih */
           <div
-            className="w-full rounded-lg p-2 border-2 border-dashed bg-white/80 flex flex-col items-center justify-center min-h-[16mm]"
+            className="w-full rounded-md p-1.5 border-2 border-dashed bg-white/85 flex flex-col items-center justify-center min-h-[14mm] backdrop-blur-xs"
             style={{
               borderColor: `${theme.borderColor}70`,
             }}
           >
-            <span className="text-[6px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-              [ AREA TEMPEL NAMA / TULIS NAMA ]
+            <span className="text-[6px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">
+              [ TEMPEL LABEL / TULIS NAMA ]
             </span>
-            <div className="w-4/5 h-[1px] bg-slate-300 my-0.5" />
-            <span className="text-[5.5px] font-medium text-slate-400">
+            <div className="w-3/4 h-[1px] bg-slate-300 my-0.5" />
+            <span className="text-[5.5px] font-medium text-slate-500">
               Label Stiker No. 103 / 107
             </span>
           </div>
         )}
       </div>
 
-      {/* 4. Bottom Footer: Tanpa QR Code */}
-      <div
-        className="relative z-10 pt-1.5 border-t text-center space-y-1"
-        style={{ borderColor: `${theme.borderColor}40` }}
-      >
+      {/* 3. Bottom Footer: Tanpa QR Code -> Tagline -> Badko TKA TPA Kota Yogyakarta (Font Kecil) */}
+      <div className="relative z-10 pt-1 text-center flex flex-col items-center justify-end space-y-0.5">
         <p
-          className="text-[6.5px] italic leading-tight line-clamp-2 font-serif px-1"
+          className="text-[5.5px] italic leading-tight line-clamp-2 font-serif px-1 max-w-[95%]"
           style={{ color: theme.taglineColor }}
         >
           “{customTagline}”
         </p>
 
-        <div
-          className="w-full py-0.5 rounded text-[6.5px] font-black tracking-wider uppercase"
-          style={{ backgroundColor: `${theme.primaryColor}10`, color: theme.primaryColor }}
-        >
-          BADKO TKA-TPA KOTA YOGYAKARTA
-        </div>
+        <p className="text-[5px] font-extrabold text-slate-600 uppercase tracking-wider">
+          Badko TKA TPA Kota Yogyakarta
+        </p>
       </div>
     </div>
   );
