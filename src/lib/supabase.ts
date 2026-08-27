@@ -7,7 +7,7 @@
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { Participant, CompetitionCategory, Kemantren, AppSettings, AuditLog, FasiLevel } from '../types/fasi';
+import { Participant, CompetitionCategory, Kemantren, AppSettings, AuditLog, FasiLevel, BeritaAcaraKejuaraan } from '../types/fasi';
 import { KEMANTREN_LIST } from '../data/fasiMasterData';
 
 // Environment variables via Vite import.meta.env
@@ -568,6 +568,111 @@ export async function syncKemantrenToSupabase(kemantrenList: Kemantren[]): Promi
   } catch (error: any) {
     console.error('Gagal sinkronisasi kemantren ke Supabase:', error);
     return { success: false, count: 0, error: error?.message || 'Gagal menyimpan ke Supabase' };
+  }
+}
+
+/**
+ * Mengambil seluruh Berita Acara Kejuaraan dari Supabase
+ */
+export async function fetchBeritaAcaraFromSupabase(): Promise<BeritaAcaraKejuaraan[] | null> {
+  const client = getSupabaseClient();
+  if (!client) return null;
+
+  try {
+    const { data, error } = await client
+      .from('berita_acara_kejuaraan')
+      .select('*')
+      .order('updated_at', { ascending: false });
+
+    if (error) {
+      // Jika tabel belum dibuat di Supabase, jangan crash, return null
+      console.warn('Gagal memuat berita acara dari Supabase:', error.message);
+      return null;
+    }
+
+    if (!data) return [];
+
+    return data.map((row: any): BeritaAcaraKejuaraan => ({
+      id: row.id,
+      cabangId: row.cabang_id,
+      namaCabang: row.nama_cabang,
+      jenjang: row.jenjang,
+      golongan: row.golongan,
+      isCabangUtama: Boolean(row.is_cabang_utama),
+      tanggalPenetapan: row.tanggal_penetapan || new Date().toISOString().split('T')[0],
+      status: (row.status === 'Disahkan' ? 'Disahkan' : 'Draft') as 'Draft' | 'Disahkan',
+      namaKetuaJuri: row.nama_ketua_juri || '',
+      namaSekretarisJuri: row.nama_sekretaris_juri || '',
+      catatan: row.catatan || '',
+      pemenang: row.pemenang || {},
+      updatedAt: row.updated_at || new Date().toISOString(),
+    }));
+  } catch (error: any) {
+    console.warn('Exception fetchBeritaAcaraFromSupabase:', error?.message || error);
+    return null;
+  }
+}
+
+/**
+ * Menyimpan / Upsert satu Berita Acara ke Supabase
+ */
+export async function upsertBeritaAcaraToSupabase(ba: BeritaAcaraKejuaraan): Promise<boolean> {
+  const client = getSupabaseClient();
+  if (!client) return false;
+
+  try {
+    const payload = {
+      id: ba.id,
+      cabang_id: ba.cabangId,
+      nama_cabang: ba.namaCabang,
+      jenjang: ba.jenjang,
+      golongan: ba.golongan,
+      is_cabang_utama: ba.isCabangUtama,
+      tanggal_penetapan: ba.tanggalPenetapan || new Date().toISOString().split('T')[0],
+      status: ba.status,
+      nama_ketua_juri: ba.namaKetuaJuri || null,
+      nama_sekretaris_juri: ba.namaSekretarisJuri || null,
+      catatan: ba.catatan || null,
+      pemenang: ba.pemenang || {},
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error } = await client
+      .from('berita_acara_kejuaraan')
+      .upsert(payload, { onConflict: 'id' });
+
+    if (error) {
+      console.error('Error upserting berita acara to Supabase:', error);
+      return false;
+    }
+    return true;
+  } catch (error: any) {
+    console.error('Exception upsertBeritaAcaraToSupabase:', error?.message || error);
+    return false;
+  }
+}
+
+/**
+ * Menghapus satu Berita Acara dari Supabase
+ */
+export async function deleteBeritaAcaraFromSupabase(id: string): Promise<boolean> {
+  const client = getSupabaseClient();
+  if (!client) return false;
+
+  try {
+    const { error } = await client
+      .from('berita_acara_kejuaraan')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error deleting berita acara from Supabase:', error);
+      return false;
+    }
+    return true;
+  } catch (error: any) {
+    console.error('Exception deleteBeritaAcaraFromSupabase:', error?.message || error);
+    return false;
   }
 }
 

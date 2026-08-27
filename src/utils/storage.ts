@@ -7,7 +7,7 @@
  * (Local Persistence, RBAC Session, Medal Calculator, Lottery Engine)
  */
 
-import { Participant, ParticipantDraft, MedalTally, UserSession, AuditLog, AppSettings, CompetitionCategory, Kemantren } from '../types/fasi';
+import { Participant, ParticipantDraft, MedalTally, UserSession, AuditLog, AppSettings, CompetitionCategory, Kemantren, BeritaAcaraKejuaraan } from '../types/fasi';
 import { KEMANTREN_LIST, CATEGORIES_LIST, INITIAL_PARTICIPANTS } from '../data/fasiMasterData';
 import { createAuditLog } from './security';
 import {
@@ -25,6 +25,7 @@ const SESSION_KEY = 'fasi13_user_session';
 const SETTINGS_KEY = 'fasi13_app_settings';
 const CATEGORIES_KEY = 'fasi13_categories_data';
 const KEMANTREN_KEY = 'fasi13_kemantren_data';
+const BERITA_ACARA_KEY = 'fasi13_berita_acara_data';
 
 export const DEFAULT_SETTINGS: AppSettings = {
   tagline: 'Santri Hebat, Hebat Prestasi, Hebat Mengaji, & Berakhlakul Karimah.',
@@ -456,5 +457,31 @@ export function clearSession(): void {
     localStorage.removeItem(SESSION_KEY);
   } catch (err) {
     console.error('Gagal menghapus session:', err);
+  }
+}
+
+/**
+ * Manajemen Berita Acara Kejuaraan Resmi (FASI XIII)
+ */
+export function getStoredBeritaAcara(): BeritaAcaraKejuaraan[] {
+  try {
+    const raw = localStorage.getItem(BERITA_ACARA_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (err) {
+    console.error('Gagal mengambil data berita acara:', err);
+    return [];
+  }
+}
+
+export function saveBeritaAcaraList(list: BeritaAcaraKejuaraan[]): void {
+  try {
+    localStorage.setItem(BERITA_ACARA_KEY, JSON.stringify(list));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('fasi_berita_acara_updated', { detail: list }));
+    }
+  } catch (err) {
+    console.error('Gagal menyimpan berita acara:', err);
   }
 }

@@ -7,12 +7,47 @@
  */
 
 export type FasiLevel = 'TKA' | 'TPA' | 'TQA';
+export type Jenjang = 'TKA' | 'TPA' | 'TQA';
 
 export type Gender = 'L' | 'P';
 
 export type ParticipantStatus = 'verified' | 'pending' | 'rejected';
 
 export type AttendanceStatus = 'belum_hadir' | 'hadir' | 'siap_tampil' | 'sudah_tampil';
+
+export interface WinnerSlot {
+  participantId?: string;
+  nama: string;
+  kemantren: string;
+  unitTpa: string;
+  totalNilai: number;
+}
+
+export interface BeritaAcaraKejuaraan {
+  id: string;
+  cabangId: string;
+  cabangNama?: string;
+  namaCabang?: string;
+  jenjang: Jenjang;
+  golongan: string;
+  isCabangUtama: boolean;
+  status: 'Draft' | 'Disahkan';
+  tanggalPenetapan: string;
+  namaKetuaJuri: string;
+  namaAnggotaJuri?: string;
+  namaSekretarisJuri?: string;
+  catatanJuri?: string;
+  catatan?: string;
+  pemenang: {
+    juara1?: WinnerSlot;
+    juara2?: WinnerSlot;
+    juara3?: WinnerSlot;
+    harapan1?: WinnerSlot;
+    harapan2?: WinnerSlot;
+  };
+  createdAt?: string;
+  updatedAt?: string;
+}
 
 export interface Kemantren {
   id: string;
@@ -34,6 +69,12 @@ export interface AppSettings {
   themeColor: 'emerald' | 'islamic-green' | 'teal' | 'sapphire' | 'maroon' | 'gold';
   customAccentColor?: string;
   superAdminPassword?: string;
+  eventOrganizer?: string;
+  eventTitle?: string;
+  eventYear?: string;
+  eventVenue?: string;
+  eventLogoUrl?: string;
+  fontFamily?: string;
 }
 
 export interface CompetitionCategory {

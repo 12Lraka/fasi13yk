@@ -104,6 +104,7 @@ export default function App() {
       route === 'admin-data-peserta' ||
       route === 'admin-rekap-peserta' ||
       route === 'admin-rekapcbg-lomba' ||
+      route === 'berita-acara' ||
       route === 'pengaturan' ||
       route === 'log' ||
       route === 'superadmin' ||
@@ -332,6 +333,7 @@ export default function App() {
           activeTab === 'admin-data-peserta' ||
           activeTab === 'admin-rekap-peserta' ||
           activeTab === 'admin-rekapcbg-lomba' ||
+          activeTab === 'berita-acara' ||
           activeTab === 'pengaturan' ||
           activeTab === 'log') &&
           session && (

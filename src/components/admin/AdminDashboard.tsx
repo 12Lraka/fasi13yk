@@ -48,6 +48,7 @@ import { exportParticipantsToExcel } from '../../utils/excelExport';
 import { showToast, showConfirmDialog, showSuccessAlert } from '../../utils/sweetalert';
 import { RekapPesertaAdmin } from './RekapPesertaAdmin';
 import { RekapCabangLombaAdmin } from './RekapCabangLombaAdmin';
+import { BeritaAcaraAdmin } from './BeritaAcaraAdmin';
 import { PengaturanAdmin } from './PengaturanAdmin';
 import { LogAktivitasAdmin } from './LogAktivitasAdmin';
 import { AppRoute } from '../../utils/router';
@@ -87,30 +88,33 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   activeRoute = 'admin-data-peserta',
   onNavigateRoute,
 }) => {
-  const getInitialTab = (): 'peserta' | 'rekap-peserta' | 'rekap-cabang' | 'pengaturan' | 'log' => {
+  const getInitialTab = (): 'peserta' | 'rekap-peserta' | 'rekap-cabang' | 'berita-acara' | 'pengaturan' | 'log' => {
     if (activeRoute === 'admin-rekap-peserta') return 'rekap-peserta';
     if (activeRoute === 'admin-rekapcbg-lomba') return 'rekap-cabang';
+    if (activeRoute === 'berita-acara') return 'berita-acara';
     if (activeRoute === 'pengaturan') return 'pengaturan';
     if (activeRoute === 'log') return 'log';
     return 'peserta';
   };
 
-  const [activeAdminTab, setActiveAdminTab] = useState<'peserta' | 'rekap-peserta' | 'rekap-cabang' | 'pengaturan' | 'log'>(getInitialTab);
+  const [activeAdminTab, setActiveAdminTab] = useState<'peserta' | 'rekap-peserta' | 'rekap-cabang' | 'berita-acara' | 'pengaturan' | 'log'>(getInitialTab);
 
   useEffect(() => {
     if (activeRoute === 'admin-rekap-peserta') setActiveAdminTab('rekap-peserta');
     else if (activeRoute === 'admin-rekapcbg-lomba') setActiveAdminTab('rekap-cabang');
+    else if (activeRoute === 'berita-acara') setActiveAdminTab('berita-acara');
     else if (activeRoute === 'pengaturan') setActiveAdminTab('pengaturan');
     else if (activeRoute === 'log') setActiveAdminTab('log');
     else if (activeRoute === 'admin-data-peserta' || activeRoute === 'admin') setActiveAdminTab('peserta');
   }, [activeRoute]);
 
-  const handleTabChange = (tab: 'peserta' | 'rekap-peserta' | 'rekap-cabang' | 'pengaturan' | 'log') => {
+  const handleTabChange = (tab: 'peserta' | 'rekap-peserta' | 'rekap-cabang' | 'berita-acara' | 'pengaturan' | 'log') => {
     setActiveAdminTab(tab);
     if (onNavigateRoute) {
       if (tab === 'peserta') onNavigateRoute('admin-data-peserta');
       else if (tab === 'rekap-peserta') onNavigateRoute('admin-rekap-peserta');
       else if (tab === 'rekap-cabang') onNavigateRoute('admin-rekapcbg-lomba');
+      else if (tab === 'berita-acara') onNavigateRoute('berita-acara');
       else if (tab === 'pengaturan') onNavigateRoute('pengaturan');
       else if (tab === 'log') onNavigateRoute('log');
     }
@@ -312,6 +316,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
           </button>
 
+          {/* Berita Acara Kejuaraan Tab (Superadmin Only) */}
+          {session.role === 'super_admin' && (
+            <button
+              onClick={() => handleTabChange('berita-acara')}
+              className={`w-full px-3 py-2 font-bold rounded-xl flex items-center justify-between transition-all cursor-pointer text-left ${
+                activeAdminTab === 'berita-acara'
+                  ? 'bg-emerald-800 text-white shadow-xs'
+                  : 'text-slate-700 hover:text-emerald-900 hover:bg-slate-100'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4 shrink-0 text-amber-400" />
+                <span>Berita Acara Kejuaraan</span>
+              </div>
+              <span className="px-1.5 py-0.2 bg-amber-400 text-emerald-950 text-[9px] font-extrabold rounded">
+                Super
+              </span>
+            </button>
+          )}
+
           {/* Undian Nomor Tampil (Superadmin Only) */}
           {session.role === 'super_admin' && (
             <button
@@ -452,6 +476,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             session={session}
             participants={participants}
             onOpenJudgingModal={onOpenJudgingModal}
+          />
+        )}
+
+        {/* VIEW: BERITA ACARA KEJUARAAN (SUPERADMIN ONLY) */}
+        {activeAdminTab === 'berita-acara' && session.role === 'super_admin' && (
+          <BeritaAcaraAdmin
+            participants={participants}
+            onDataChanged={() => {
+              // Trigger state refresh
+            }}
           />
         )}
 
@@ -604,16 +638,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <th className="py-3 px-3">Cabang Lomba</th>
                       <th className="py-3 px-3 text-center">No. Undian</th>
                       <th className="py-3 px-3 text-center">Kehadiran</th>
-                      {session.role === 'super_admin' && (
-                        <th className="py-3 px-3 text-center">Nilai & Juara</th>
-                      )}
                       <th className="py-3 px-3 text-center w-36">Aksi</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200">
                     {paginatedParticipants.length === 0 ? (
                       <tr>
-                        <td colSpan={session.role === 'super_admin' ? 9 : 8} className="py-12 text-center text-slate-400">
+                        <td colSpan={8} className="py-12 text-center text-slate-400">
                           <div className="max-w-xs mx-auto space-y-2">
                             <Users className="w-8 h-8 text-slate-300 mx-auto" />
                             <p className="font-semibold text-slate-600">Tidak ada data santri ditemukan</p>
@@ -705,31 +736,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               )}
                             </td>
 
-                            {/* Score & Rank (Superadmin Only) */}
-                            {session.role === 'super_admin' && (
-                              <td className="py-3 px-3 text-center">
-                                {participant.averageScore ? (
-                                  <div className="space-y-0.5">
-                                    <div className="font-mono font-bold text-xs text-slate-900">
-                                      {participant.averageScore.toFixed(1)} Pts
-                                    </div>
-                                    {participant.rank && (
-                                      <span className="inline-block px-1.5 py-0.2 bg-amber-100 text-amber-900 font-extrabold text-[10px] rounded">
-                                        Juara {participant.rank}
-                                      </span>
-                                    )}
-                                  </div>
-                                ) : (
-                                  <button
-                                    onClick={() => onOpenJudgingModal(participant)}
-                                    className="text-[10px] text-emerald-700 hover:text-emerald-800 font-bold underline cursor-pointer"
-                                  >
-                                    + Input Nilai
-                                  </button>
-                                )}
-                              </td>
-                            )}
-
                             {/* Action Buttons */}
                             <td className="py-3 px-3 text-center">
                               <div className="flex items-center justify-center gap-1">
@@ -740,15 +746,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                 >
                                   <Eye className="w-3.5 h-3.5" />
                                 </button>
-                                {session.role === 'super_admin' && (
-                                  <button
-                                    onClick={() => onOpenJudgingModal(participant)}
-                                    title="Penilaian Juri"
-                                    className="p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 transition-colors cursor-pointer"
-                                  >
-                                    <Award className="w-3.5 h-3.5" />
-                                  </button>
-                                )}
                                 <button
                                   onClick={() => onOpenEditModal(participant)}
                                   title="Edit Santri"
