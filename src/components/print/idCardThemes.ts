@@ -14,8 +14,9 @@ export interface IdCardTheme {
   badgeBg: string;
   badgeText: string;
   borderColor: string;
-  bgGradient: string;
-  watermarkOpacity: number;
+  cardBg: string;
+  boxBg: string;
+  boxBorder: string;
   textColor: string;
   subtextColor: string;
   taglineColor: string;
@@ -34,12 +35,13 @@ export const ID_CARD_THEMES: Record<string, IdCardTheme> = {
     primaryColor: '#064e3b', // emerald-900
     accentColor: '#d97706', // amber-600
     badgeBg: '#064e3b',
-    badgeText: '#fde68a', // amber-200
+    badgeText: '#fef08a', // yellow-200
     borderColor: '#059669', // emerald-600
-    bgGradient: 'from-emerald-50/50 via-white to-amber-50/40',
-    watermarkOpacity: 0.08,
-    textColor: '#022c22',
-    subtextColor: '#047857',
+    cardBg: '#ffffff',
+    boxBg: '#f0fdf4', // emerald-50 solid
+    boxBorder: '#16a34a', // emerald-600
+    textColor: '#022c22', // emerald-950
+    subtextColor: '#047857', // emerald-700
     taglineColor: '#065f46',
   },
   navy: {
@@ -48,10 +50,11 @@ export const ID_CARD_THEMES: Record<string, IdCardTheme> = {
     primaryColor: '#1e3a8a', // blue-900
     accentColor: '#0284c7', // sky-600
     badgeBg: '#1e3a8a',
-    badgeText: '#bae6fd', // sky-200
+    badgeText: '#e0f2fe', // sky-100
     borderColor: '#2563eb', // blue-600
-    bgGradient: 'from-blue-50/50 via-white to-sky-50/40',
-    watermarkOpacity: 0.08,
+    cardBg: '#ffffff',
+    boxBg: '#eff6ff', // blue-50 solid
+    boxBorder: '#2563eb',
     textColor: '#0f172a',
     subtextColor: '#1d4ed8',
     taglineColor: '#1e40af',
@@ -62,10 +65,11 @@ export const ID_CARD_THEMES: Record<string, IdCardTheme> = {
     primaryColor: '#831843', // pink-950 / maroon
     accentColor: '#e11d48', // rose-600
     badgeBg: '#881337',
-    badgeText: '#fecdd3', // rose-200
+    badgeText: '#ffe4e6', // rose-100
     borderColor: '#be123c', // rose-700
-    bgGradient: 'from-rose-50/50 via-white to-amber-50/40',
-    watermarkOpacity: 0.08,
+    cardBg: '#ffffff',
+    boxBg: '#fff1f2', // rose-50 solid
+    boxBorder: '#be123c',
     textColor: '#4c0519',
     subtextColor: '#9f1239',
     taglineColor: '#881337',
@@ -78,8 +82,9 @@ export const ID_CARD_THEMES: Record<string, IdCardTheme> = {
     badgeBg: '#78350f',
     badgeText: '#fef3c7', // amber-100
     borderColor: '#b45309', // amber-700
-    bgGradient: 'from-amber-50/60 via-white to-yellow-50/40',
-    watermarkOpacity: 0.09,
+    cardBg: '#ffffff',
+    boxBg: '#fffbeb', // amber-50 solid
+    boxBorder: '#b45309',
     textColor: '#451a03',
     subtextColor: '#92400e',
     taglineColor: '#78350f',
@@ -90,10 +95,11 @@ export const ID_CARD_THEMES: Record<string, IdCardTheme> = {
     primaryColor: '#134e4a', // teal-900
     accentColor: '#0d9488', // teal-600
     badgeBg: '#134e4a',
-    badgeText: '#99f6e4', // teal-200
+    badgeText: '#ccfbf1', // teal-100
     borderColor: '#0f766e', // teal-700
-    bgGradient: 'from-teal-50/50 via-white to-cyan-50/40',
-    watermarkOpacity: 0.08,
+    cardBg: '#ffffff',
+    boxBg: '#f0fdfa', // teal-50 solid
+    boxBorder: '#0f766e',
     textColor: '#042f2e',
     subtextColor: '#0f766e',
     taglineColor: '#115e59',
@@ -104,10 +110,11 @@ export const ID_CARD_THEMES: Record<string, IdCardTheme> = {
     primaryColor: '#0f172a', // slate-900
     accentColor: '#475569', // slate-600
     badgeBg: '#0f172a',
-    badgeText: '#f1f5f9', // slate-100
+    badgeText: '#f8fafc', // slate-50
     borderColor: '#334155', // slate-700
-    bgGradient: 'from-slate-100/70 via-white to-slate-50/50',
-    watermarkOpacity: 0.07,
+    cardBg: '#ffffff',
+    boxBg: '#f8fafc', // slate-50 solid
+    boxBorder: '#475569',
     textColor: '#020617',
     subtextColor: '#334155',
     taglineColor: '#1e293b',

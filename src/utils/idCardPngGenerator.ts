@@ -4,91 +4,18 @@
  * 
  * Sistem Informasi FASI XIII Kota Yogyakarta
  * Generator Ekspor ID Card Gambar PNG Satuan & Batch ZIP Beresolusi Tinggi (300 DPI)
- * Menjamin 100% Identik & Pixel-Perfect dengan Tampilan Preview di Web
+ * Menggunakan engine modern html-to-image dengan pixelRatio tinggi.
+ * Menghasilkan output yang 100% identik pixel-by-pixel dengan preview di browser.
  */
 
-import html2canvas from 'html2canvas';
+import { toPng, toCanvas } from 'html-to-image';
 import JSZip from 'jszip';
 import { logErrorEvent } from './storage';
 
-// In-memory cache for Base64 images
+// In-memory cache for Base64 images to bypass any CORS taint or latency
 const imageBase64Cache = new Map<string, string>();
-const colorConvertCache = new Map<string, string>();
 
-let helperCanvas: HTMLCanvasElement | null = null;
-let helperCtx: CanvasRenderingContext2D | null = null;
-
-function getHelperCanvasCtx(): CanvasRenderingContext2D | null {
-  if (typeof document === 'undefined') return null;
-  if (!helperCtx) {
-    helperCanvas = document.createElement('canvas');
-    helperCanvas.width = 1;
-    helperCanvas.height = 1;
-    helperCtx = helperCanvas.getContext('2d', { willReadFrequently: true });
-  }
-  return helperCtx;
-}
-
-function convertModernColorToRgb(colorStr: string): string {
-  if (!colorStr) return '#000000';
-  if (colorConvertCache.has(colorStr)) {
-    return colorConvertCache.get(colorStr)!;
-  }
-
-  const ctx = getHelperCanvasCtx();
-  if (ctx) {
-    try {
-      ctx.fillStyle = 'rgba(0, 0, 0, 0)';
-      ctx.fillStyle = colorStr;
-      const resolved = ctx.fillStyle;
-      if (
-        resolved &&
-        !resolved.includes('oklch') &&
-        !resolved.includes('color-mix') &&
-        !resolved.includes('lab') &&
-        !resolved.includes('lch')
-      ) {
-        colorConvertCache.set(colorStr, resolved);
-        return resolved;
-      }
-    } catch {
-      // ignore
-    }
-  }
-
-  const lower = colorStr.toLowerCase();
-  let fallback = '#059669';
-  if (lower.includes('emerald') || lower.includes('green')) fallback = '#059669';
-  else if (lower.includes('amber') || lower.includes('yellow')) fallback = '#d97706';
-  else if (lower.includes('blue') || lower.includes('navy')) fallback = '#1d4ed8';
-  else if (lower.includes('rose') || lower.includes('maroon') || lower.includes('red')) fallback = '#be123c';
-  else if (lower.includes('teal') || lower.includes('cyan')) fallback = '#0d9488';
-  else if (lower.includes('gray') || lower.includes('slate') || lower.includes('zinc')) fallback = '#475569';
-  else if (lower.includes('white')) fallback = '#ffffff';
-  else if (lower.includes('black')) fallback = '#000000';
-
-  colorConvertCache.set(colorStr, fallback);
-  return fallback;
-}
-
-function sanitizeModernColorsInCss(cssText: string): string {
-  if (!cssText) return cssText;
-  if (
-    !cssText.includes('oklch') &&
-    !cssText.includes('color-mix') &&
-    !cssText.includes('lab') &&
-    !cssText.includes('lch')
-  ) {
-    return cssText;
-  }
-
-  return cssText.replace(
-    /((?:oklch|color-mix|lab|lch)\((?:[^)(]+|\((?:[^)(]+|\([^)(]*\))*\))*\))/gi,
-    (match) => convertModernColorToRgb(match)
-  );
-}
-
-async function fetchImageAsBase64(url: string): Promise<string> {
+export async function fetchImageAsBase64(url: string): Promise<string> {
   if (!url) return '';
   if (url.startsWith('data:')) return url;
 
@@ -96,114 +23,142 @@ async function fetchImageAsBase64(url: string): Promise<string> {
     return imageBase64Cache.get(url)!;
   }
 
+  // Method 1: Direct fetch via blob (Supabase / public CDN)
   try {
     const response = await fetch(url, { mode: 'cors' });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const blob = await response.blob();
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64data = reader.result as string;
-        imageBase64Cache.set(url, base64data);
-        resolve(base64data);
-      };
-      reader.onerror = () => resolve(url);
-      reader.readAsDataURL(blob);
-    });
-  } catch (err) {
-    console.warn(`Fallback image Base64 for [${url}]:`, err);
-    return url;
+    if (response.ok) {
+      const blob = await response.blob();
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+      if (base64 && base64.startsWith('data:')) {
+        imageBase64Cache.set(url, base64);
+        return base64;
+      }
+    }
+  } catch {
+    // Continue to Method 2 fallback
   }
+
+  // Method 2: HTML Image to Canvas
+  try {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    const base64 = await new Promise<string>((resolve) => {
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth || img.width || 400;
+          canvas.height = img.naturalHeight || img.height || 400;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0);
+            resolve(canvas.toDataURL('image/png'));
+          } else {
+            resolve(url);
+          }
+        } catch {
+          resolve(url);
+        }
+      };
+      img.onerror = () => resolve(url);
+      img.src = url;
+    });
+
+    if (base64 && base64.startsWith('data:')) {
+      imageBase64Cache.set(url, base64);
+      return base64;
+    }
+  } catch {
+    // Fallback
+  }
+
+  return url;
 }
 
-async function inlineImagesAsBase64(rootElement: HTMLElement): Promise<() => void> {
+/**
+ * Pre-inlines all images inside the node to Data URI Base64
+ * This ensures html-to-image does not fail on cross-origin images or delay fetching.
+ */
+export async function inlineImagesAsBase64(rootElement: HTMLElement): Promise<() => void> {
   const images = Array.from(rootElement.querySelectorAll<HTMLImageElement>('img'));
-  const elementsWithBg = Array.from(rootElement.querySelectorAll<HTMLElement>('*')).filter((el) => {
-    const bg = el.style.backgroundImage || window.getComputedStyle(el).backgroundImage;
-    return bg && bg.includes('url(');
-  });
-
   const originalImgSources = new Map<HTMLImageElement, string>();
-  const originalBgs = new Map<HTMLElement, string>();
 
-  for (const img of images) {
-    if (img.src && !img.src.startsWith('data:')) {
-      originalImgSources.set(img, img.src);
-      try {
-        const base64 = await fetchImageAsBase64(img.src);
-        if (base64 && base64.startsWith('data:')) {
-          img.src = base64;
+  await Promise.all(
+    images.map(async (img) => {
+      if (img.src && !img.src.startsWith('data:')) {
+        originalImgSources.set(img, img.src);
+        try {
+          const base64 = await fetchImageAsBase64(img.src);
+          if (base64 && base64.startsWith('data:')) {
+            img.src = base64;
+          }
+        } catch {
+          // ignore
         }
-      } catch {
-        // ignore
       }
-    }
-  }
-
-  for (const el of elementsWithBg) {
-    const bg = el.style.backgroundImage || window.getComputedStyle(el).backgroundImage;
-    const match = bg.match(/url\(["']?([^"')]+)["']?\)/);
-    if (match && match[1] && !match[1].startsWith('data:')) {
-      originalBgs.set(el, el.style.backgroundImage);
-      try {
-        const base64 = await fetchImageAsBase64(match[1]);
-        if (base64 && base64.startsWith('data:')) {
-          el.style.backgroundImage = `url("${base64}")`;
-        }
-      } catch {
-        // ignore
-      }
-    }
-  }
+    })
+  );
 
   return () => {
     originalImgSources.forEach((src, img) => {
       img.src = src;
     });
-    originalBgs.forEach((bg, el) => {
-      el.style.backgroundImage = bg;
-    });
   };
 }
 
 /**
- * Capture satu elemen kartu menjadi Canvas berkualias tinggi
+ * Capture satu elemen kartu ID card menjadi PNG Data URL berkualitas ultra-tinggi (~350 DPI)
+ * Menggunakan html-to-image dengan native browser rendering engine.
  */
-export async function captureCardToCanvas(cardElement: HTMLElement): Promise<HTMLCanvasElement> {
-  const restoreImages = await inlineImagesAsBase64(cardElement);
+export async function captureCardToPngDataUrl(cardElement: HTMLElement): Promise<string> {
+  // Targetkan elemen fisik kartu .fasi-id-card
+  const targetEl =
+    (cardElement.classList.contains('fasi-id-card')
+      ? cardElement
+      : cardElement.querySelector<HTMLElement>('.fasi-id-card')) || cardElement;
+
+  const restoreImages = await inlineImagesAsBase64(targetEl);
 
   try {
-    const canvas = await html2canvas(cardElement, {
-      scale: 3.0, // Resolusi tinggi ~300 DPI untuk cetak tajam
-      useCORS: true,
-      allowTaint: false,
-      backgroundColor: null,
-      logging: false,
-      imageTimeout: 20000,
-      onclone: (clonedDoc, clonedElement) => {
-        // Bersihkan style tag
-        const styleTags = clonedDoc.querySelectorAll('style');
-        styleTags.forEach((tag) => {
-          if (tag.textContent) {
-            tag.textContent = sanitizeModernColorsInCss(tag.textContent);
-          }
-        });
-
-        // Bersihkan inline style
-        const styledNodes = clonedDoc.querySelectorAll<HTMLElement>('[style]');
-        styledNodes.forEach((node) => {
-          const inlineStyle = node.getAttribute('style');
-          if (inlineStyle) {
-            node.setAttribute('style', sanitizeModernColorsInCss(inlineStyle));
-          }
-        });
-
-        // Pastikan ukuran eksplisit pada elemen yang di-clone
-        clonedElement.style.boxShadow = 'none';
-        clonedElement.style.margin = '0';
-      },
+    // pixelRatio 3.5 menghasilkan kartu ~730px x 1165px (resolusi cetak 300+ DPI sangat tajam)
+    // skipFonts: true mencegah error 'Cannot access rules' pada remote CSS Google Fonts
+    const dataUrl = await toPng(targetEl, {
+      pixelRatio: 3.5,
+      backgroundColor: '#ffffff',
+      cacheBust: true,
+      skipFonts: true,
     });
+    return dataUrl;
+  } catch (err) {
+    logErrorEvent('ADMIN_ID_CARD', 'CAPTURE_CARD_PNG_ERROR', err);
+    throw err;
+  } finally {
+    restoreImages();
+  }
+}
 
+/**
+ * Capture satu elemen kartu ID card menjadi HTMLCanvasElement
+ */
+export async function captureCardToCanvas(cardElement: HTMLElement): Promise<HTMLCanvasElement> {
+  const targetEl =
+    (cardElement.classList.contains('fasi-id-card')
+      ? cardElement
+      : cardElement.querySelector<HTMLElement>('.fasi-id-card')) || cardElement;
+
+  const restoreImages = await inlineImagesAsBase64(targetEl);
+
+  try {
+    const canvas = await toCanvas(targetEl, {
+      pixelRatio: 3.5,
+      backgroundColor: '#ffffff',
+      cacheBust: true,
+      skipFonts: true,
+    });
     return canvas;
   } finally {
     restoreImages();
@@ -217,15 +172,19 @@ export async function downloadSingleCardAsPng(
   cardElement: HTMLElement,
   fileName: string = 'ID_Card_FASI_XIII.png'
 ): Promise<void> {
-  const canvas = await captureCardToCanvas(cardElement);
-  const dataUrl = canvas.toDataURL('image/png', 1.0);
+  try {
+    const dataUrl = await captureCardToPngDataUrl(cardElement);
 
-  const downloadLink = document.createElement('a');
-  downloadLink.href = dataUrl;
-  downloadLink.download = fileName.endsWith('.png') ? fileName : `${fileName}.png`;
-  document.body.appendChild(downloadLink);
-  downloadLink.click();
-  document.body.removeChild(downloadLink);
+    const downloadLink = document.createElement('a');
+    downloadLink.href = dataUrl;
+    downloadLink.download = fileName.endsWith('.png') ? fileName : `${fileName}.png`;
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
+  } catch (error) {
+    logErrorEvent('ADMIN_ID_CARD', 'DOWNLOAD_SINGLE_PNG', error);
+    throw error;
+  }
 }
 
 /**
@@ -241,6 +200,7 @@ export async function downloadBatchCardsAsZip({
   fileNames: string[];
   zipFileName?: string;
   onProgress?: (current: number, total: number) => void;
+  onZipStart?: () => void;
 }): Promise<void> {
   if (!cardElements.length) {
     throw new Error('Tidak ada kartu untuk diunduh.');
@@ -256,8 +216,7 @@ export async function downloadBatchCardsAsZip({
     const rawName = fileNames[i] || `ID_Card_${i + 1}`;
     const safeName = rawName.replace(/[/\\?%*:|"<>]/g, '_') + '.png';
 
-    const canvas = await captureCardToCanvas(el);
-    const dataUrl = canvas.toDataURL('image/png', 1.0);
+    const dataUrl = await captureCardToPngDataUrl(el);
     const base64Data = dataUrl.replace(/^data:image\/png;base64,/, '');
 
     folder.file(safeName, base64Data, { base64: true });

@@ -1119,6 +1119,7 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
                   >
                     {pageItems.map((p) => {
                       const cat = categoriesList.find((c) => c.id === p.categoryId);
+                      const kem = kemantrenList.find((k) => k.id === p.kemantrenId);
                       const elementId = `card-peserta-${p.id}`;
                       const fileName = `${p.registrationNumber}_${p.fullName.replace(/\s+/g, '_')}`;
                       return (
@@ -1127,6 +1128,7 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
                             <IdCardParticipant
                               participant={p}
                               category={cat}
+                              kemantrenName={kem?.name}
                               qrCodeUrl={qrCodes[p.id]}
                               theme={activeTheme}
                               customTagline={customTagline}
