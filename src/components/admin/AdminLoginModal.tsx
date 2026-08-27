@@ -68,7 +68,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
 
     if (role === 'super_admin') {
       if (password !== validSuperAdminPass && password !== 'admin' && password !== 'badko2026') {
-        setErrorMessage('Kata sandi Super Admin salah. (Default: badko2026 atau admin)');
+        setErrorMessage('Kata sandi Super Admin salah.');
         return;
       }
 
@@ -95,7 +95,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
         password !== 'admin' &&
         password !== kem?.code.toLowerCase()
       ) {
-        setErrorMessage(`Kata sandi Admin Kemantren salah. (Default: ${defaultKemPass})`);
+        setErrorMessage('Kata sandi Admin Kemantren/Rayon salah.');
         return;
       }
 
