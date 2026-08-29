@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  * 
  * Sistem Informasi FASI XIII Kota Yogyakarta
- * Rekapitulasi Cabang Lomba (Fitur Search, Filter Tingkat/Kategori, & Download PDF)
- * Memuat Berita Acara dan Daftar Peserta per Cabang Lomba
+ * Rekapitulasi Cabang Lomba (Fitur Search, Filter Tingkat/Kategori, & Download PDF / Excel .xlsx Resmi A4 Satuan/Semua)
+ * Memuat Format Kop Resmi FASI XIII, Tabel Standar Penilaian, dan Tanda Tangan Resmi
  */
 
 import React, { useState, useMemo } from 'react';
@@ -21,10 +21,18 @@ import {
   Trophy,
   Dices,
   Layers,
-  ChevronDown
+  ChevronDown,
+  FileDown,
+  FileSpreadsheet,
+  Loader2,
 } from 'lucide-react';
 import { Participant, UserSession, CompetitionCategory } from '../../types/fasi';
-import { getStoredKemantren, getStoredCategories, getStoredSettings } from '../../utils/storage';
+import { getStoredKemantren, getStoredCategories } from '../../utils/storage';
+import { downloadSingleBranchPdf, downloadAllBranchesPdf } from '../../utils/branchPdfGenerator';
+import { exportBranchToExcel } from '../../utils/branchExcelExport';
+
+const LOGO_BADKO_URL = 'https://gigluvvkswjaiwxpnqet.supabase.co/storage/v1/object/public/public-assets/logobadko.png';
+const LOGO_FASI_URL = 'https://gigluvvkswjaiwxpnqet.supabase.co/storage/v1/object/public/public-assets/logofasi.png';
 
 interface RekapCabangLombaAdminProps {
   session: UserSession;
@@ -35,11 +43,9 @@ interface RekapCabangLombaAdminProps {
 export const RekapCabangLombaAdmin: React.FC<RekapCabangLombaAdminProps> = ({
   session,
   participants,
-  onOpenJudgingModal,
 }) => {
   const kemantrenList = getStoredKemantren();
   const categoriesList = getStoredCategories();
-  const appSettings = getStoredSettings();
 
   const isSuperAdmin = session.role === 'super_admin';
   const myKemantren = kemantrenList.find((k) => k.id === session.kemantrenId);
@@ -48,6 +54,11 @@ export const RekapCabangLombaAdmin: React.FC<RekapCabangLombaAdminProps> = ({
   const [selectedLevel, setSelectedLevel] = useState<'ALL' | 'TKA' | 'TPA' | 'TQA'>('TPA');
   const [selectedCategoryCode, setSelectedCategoryCode] = useState<string>('cat-tpa-1');
   const [searchTerm, setSearchTerm] = useState<string>('');
+
+  // Loading States for PDF Download
+  const [isExportingSingle, setIsExportingSingle] = useState<boolean>(false);
+  const [isExportingAll, setIsExportingAll] = useState<boolean>(false);
+  const [exportProgress, setExportProgress] = useState<{ current: number; total: number } | null>(null);
 
   // Available categories based on selectedLevel
   const levelCategories = useMemo(() => {
@@ -61,12 +72,6 @@ export const RekapCabangLombaAdmin: React.FC<RekapCabangLombaAdminProps> = ({
     if (found) return found;
     return levelCategories[0] || categoriesList[0];
   }, [categoriesList, selectedCategoryCode, levelCategories]);
-
-  // All participants for this Kemantren (for summary stats)
-  const myKemantrenParticipants = useMemo(() => {
-    if (isSuperAdmin) return participants;
-    return participants.filter((p) => p.kemantrenId === session.kemantrenId);
-  }, [participants, session.kemantrenId, isSuperAdmin]);
 
   // Participants in active category (filtered by role)
   const branchParticipants = useMemo(() => {
@@ -114,65 +119,136 @@ export const RekapCabangLombaAdmin: React.FC<RekapCabangLombaAdminProps> = ({
     });
   }, [kemantrenList, participants, activeCategory]);
 
-  // Category Participation Status for Kemantren Admin
-  const kemantrenCategoryStatus = useMemo(() => {
-    return levelCategories.map((cat) => {
-      const registered = participants.filter(
-        (p) => p.kemantrenId === session.kemantrenId && p.categoryId === cat.id
-      );
-      return {
-        cat,
-        count: registered.length,
-        isRegistered: registered.length > 0,
-        participants: registered,
-      };
-    });
-  }, [levelCategories, participants, session.kemantrenId]);
-
   const filledCount = kemantrenQuotaStatus.filter((k) => k.isFilled).length;
-  const myFilledCategoriesCount = kemantrenCategoryStatus.filter((c) => c.isRegistered).length;
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleDownloadSinglePdf = async () => {
+    try {
+      setIsExportingSingle(true);
+      await downloadSingleBranchPdf(activeCategory, participants, kemantrenList);
+    } catch (err) {
+      console.error('Error exporting single branch PDF:', err);
+    } finally {
+      setIsExportingSingle(false);
+    }
+  };
+
+  const handleDownloadAllPdf = async () => {
+    try {
+      setIsExportingAll(true);
+      const targetCategories = selectedLevel === 'ALL'
+        ? categoriesList
+        : categoriesList.filter((c) => c.level === selectedLevel);
+
+      await downloadAllBranchesPdf({
+        categories: targetCategories,
+        participants,
+        kemantrenList,
+        onProgress: (current, total) => setExportProgress({ current, total }),
+      });
+    } catch (err) {
+      console.error('Error exporting all branches PDF:', err);
+    } finally {
+      setIsExportingAll(false);
+      setExportProgress(null);
+    }
+  };
+
+  const handleExportExcel = () => {
+    exportBranchToExcel({
+      category: activeCategory,
+      participants,
+      kemantrenList,
+    });
   };
 
   const getKem = (kemId: string) => kemantrenList.find((k) => k.id === kemId);
 
   return (
     <div className="space-y-6">
-      {/* 1. Filter Control Header */}
+      {/* 1. FILTER & CONTROLS HEADER (SCREEN ONLY) */}
       <div className="no-print bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-6">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
               <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-950 border border-emerald-300 font-extrabold text-[10px] uppercase tracking-wider rounded-md">
                 {isSuperAdmin
-                  ? 'Rekapitulasi Majelis / Cabang Lomba'
-                  : `Rekap Cabang Lomba Kemantren ${myKemantren?.name || ''}`}
+                  ? 'BADKO TKA-TPA KOTA YOGYAKARTA'
+                  : `Kemantren ${myKemantren?.name || ''}`}
               </span>
               <span className="text-xs text-slate-500 font-medium">
-                {isSuperAdmin ? 'Berita Acara & Nilai Juri' : 'Daftar Santri & Cabang Terdaftar'}
+                Rekapitulasi Cabang Lomba & Berita Acara
               </span>
             </div>
             <h2 className="text-xl font-extrabold text-slate-900 mt-1">
-              {isSuperAdmin
-                ? 'Rekapitulasi Per Cabang Lomba FASI XIII'
-                : `Cabang Lomba yang Diikuti Kemantren ${myKemantren?.name || ''}`}
+              Rekapitulasi Peserta Cabang Lomba FASI XIII
             </h2>
             <p className="text-xs text-slate-600 mt-0.5">
-              {isSuperAdmin
-                ? 'Pilih tingkat dan cabang lomba untuk meninjau kuota 14 kemantren, urutan tampil undian, nilai dewan hakim, serta cetak laporan PDF.'
-                : `Menampilkan daftar cabang lomba yang diikuti dan santri utusan Kemantren ${myKemantren?.name || ''} pada ajang FASI XIII.`}
+              Pratinjau nomor undian, nama santri, asal TPA, form penilaian dewan hakim, dan unduh berkas PDF resmi A4 / Excel (.xlsx).
             </p>
           </div>
 
-          <button
-            onClick={handlePrint}
-            className="w-full md:w-auto px-5 py-2.5 bg-emerald-800 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
-          >
-            <Download className="w-4 h-4 text-amber-400" />
-            <span>{isSuperAdmin ? 'Download Berita Acara PDF' : 'Cetak Rekap Cabang Lomba'}</span>
-          </button>
+          {/* Action Buttons */}
+          <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
+            {/* Download Excel (.xlsx) */}
+            <button
+              onClick={handleExportExcel}
+              className="flex-1 md:flex-initial px-4 py-2.5 bg-emerald-800 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer whitespace-nowrap"
+            >
+              <FileSpreadsheet className="w-4 h-4 text-amber-300" />
+              <span>Download Excel (.xlsx)</span>
+            </button>
+
+            {/* Download 1 Cabang PDF */}
+            <button
+              onClick={handleDownloadSinglePdf}
+              disabled={isExportingSingle || isExportingAll}
+              className="flex-1 md:flex-initial px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer disabled:opacity-50 whitespace-nowrap"
+            >
+              {isExportingSingle ? (
+                <Loader2 className="w-4 h-4 text-amber-300 animate-spin" />
+              ) : (
+                <FileDown className="w-4 h-4 text-amber-300" />
+              )}
+              <span>Download PDF (Cabang Ini)</span>
+            </button>
+
+            {/* Download Semua Cabang PDF */}
+            <button
+              onClick={handleDownloadAllPdf}
+              disabled={isExportingSingle || isExportingAll}
+              className="flex-1 md:flex-initial px-4 py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer disabled:opacity-50 whitespace-nowrap"
+            >
+              {isExportingAll ? (
+                <>
+                  <Loader2 className="w-4 h-4 text-white animate-spin" />
+                  <span>
+                    Proses ({exportProgress ? `${exportProgress.current}/${exportProgress.total}` : '...'})
+                  </span>
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4 text-white" />
+                  <span>
+                    Download Semua PDF {selectedLevel !== 'ALL' ? `(${selectedLevel})` : '(Semua)'}
+                  </span>
+                </>
+              )}
+            </button>
+
+            {/* Cetak Browser */}
+            <button
+              onClick={handlePrint}
+              className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl border border-slate-300 shadow-2xs flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer whitespace-nowrap"
+              title="Cetak Halaman Ini"
+            >
+              <Printer className="w-4 h-4 text-emerald-800" />
+              <span>Cetak</span>
+            </button>
+          </div>
         </div>
 
         {/* Level Tabs */}
@@ -256,265 +332,159 @@ export const RekapCabangLombaAdmin: React.FC<RekapCabangLombaAdminProps> = ({
             <h3 className="text-base font-extrabold text-emerald-950">
               {activeCategory.name}
             </h3>
-            <p className="text-xs text-slate-600">
-              {activeCategory.description}
-            </p>
           </div>
 
           <div className="flex items-center gap-3 shrink-0">
-            {isSuperAdmin ? (
-              <>
-                <div className="bg-white px-3.5 py-2 rounded-xl border border-emerald-200 text-center">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Partisipasi</span>
-                  <span className="text-sm font-black text-emerald-950">
-                    {filledCount} / {kemantrenList.length} Kemantren
-                  </span>
-                </div>
-                <div className="bg-white px-3.5 py-2 rounded-xl border border-emerald-200 text-center">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Total Peserta</span>
-                  <span className="text-sm font-black text-amber-600">
-                    {branchParticipants.length} Santri
-                  </span>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="bg-white px-3.5 py-2 rounded-xl border border-emerald-200 text-center">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Santri Kemantren</span>
-                  <span className="text-sm font-black text-emerald-950">
-                    {branchParticipants.length} Santri
-                  </span>
-                </div>
-                <div className="bg-white px-3.5 py-2 rounded-xl border border-emerald-200 text-center">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Cabang Terisi ({selectedLevel})</span>
-                  <span className="text-sm font-black text-amber-600">
-                    {myFilledCategoriesCount} / {levelCategories.length}
-                  </span>
-                </div>
-              </>
-            )}
+            <div className="bg-white px-3.5 py-2 rounded-xl border border-emerald-200 text-center">
+              <span className="text-[10px] font-bold text-slate-400 uppercase block">Partisipasi</span>
+              <span className="text-sm font-black text-emerald-950">
+                {filledCount} / {kemantrenList.length} Kemantren
+              </span>
+            </div>
+            <div className="bg-white px-3.5 py-2 rounded-xl border border-emerald-200 text-center">
+              <span className="text-[10px] font-bold text-slate-400 uppercase block">Total Peserta</span>
+              <span className="text-sm font-black text-amber-600">
+                {branchParticipants.length} Santri
+              </span>
+            </div>
           </div>
         </div>
-
-        {/* Superadmin Quota Badges Grid OR Kemantren Category Badges */}
-        {isSuperAdmin ? (
-          <div>
-            <div className="text-[11px] font-bold text-slate-500 mb-2 flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <Building2 className="w-3.5 h-3.5 text-emerald-700" />
-                <span>Status Utusan Kemantren untuk Cabang Ini:</span>
-              </div>
-              <span className="text-[10px] text-slate-400">Maks. {activeCategory.maxParticipantsPerKemantren} per Kemantren</span>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2">
-              {kemantrenQuotaStatus.map((k) => (
-                <div
-                  key={k.id}
-                  className={`p-2 rounded-xl border text-center transition-all ${
-                    k.isFilled
-                      ? 'bg-emerald-50 border-emerald-300 text-emerald-950 shadow-2xs'
-                      : 'bg-slate-50 border-slate-200 text-slate-400'
-                  }`}
-                >
-                  <div className="text-[11px] font-bold truncate">{k.name}</div>
-                  <div className="mt-0.5 flex items-center justify-center gap-1">
-                    {k.isFilled ? (
-                      <span className="text-[10px] font-black text-emerald-800 flex items-center gap-0.5">
-                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                        <span>{k.count} Terdaftar</span>
-                      </span>
-                    ) : (
-                      <span className="text-[10px] text-slate-400 font-medium">Kosong</span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div>
-            <div className="text-[11px] font-bold text-slate-500 mb-2 flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <Layers className="w-3.5 h-3.5 text-emerald-700" />
-                <span>Status Keikutsertaan Cabang Lomba Tingkat {selectedLevel === 'ALL' ? 'Semua' : selectedLevel}:</span>
-              </div>
-              <span className="text-[10px] text-slate-400">Klik cabang untuk beralih</span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-              {kemantrenCategoryStatus.map(({ cat, count, isRegistered }) => (
-                <button
-                  key={cat.id}
-                  onClick={() => setSelectedCategoryCode(cat.id)}
-                  className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between gap-2 ${
-                    activeCategory.id === cat.id
-                      ? 'bg-emerald-800 text-white border-emerald-900 shadow-sm'
-                      : isRegistered
-                      ? 'bg-emerald-50/80 border-emerald-300 text-emerald-950 hover:bg-emerald-100/70'
-                      : 'bg-slate-50 border-slate-200 text-slate-400 hover:bg-slate-100'
-                  }`}
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="text-[10px] font-mono opacity-80">{cat.code}</div>
-                    <div className="text-xs font-bold truncate">{cat.name}</div>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    {isRegistered ? (
-                      <span
-                        className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded ${
-                          activeCategory.id === cat.id
-                            ? 'bg-amber-400 text-emerald-950'
-                            : 'bg-emerald-200 text-emerald-900'
-                        }`}
-                      >
-                        {count} Santri
-                      </span>
-                    ) : (
-                      <span className="text-[10px] opacity-60">Belum ada</span>
-                    )}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* 2. Official Printable Report Document */}
-      <div className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-sm print:border-none print:shadow-none print:p-0">
-        {/* Kop Surat Resmi */}
-        <div className="border-b-2 border-slate-900 pb-4 mb-4 text-center space-y-1">
-          <h2 className="font-extrabold text-base sm:text-lg text-slate-900 uppercase tracking-wide">
-            BADAN KOORDINASI TKA-TPA (BADKO TKA-TPA) KOTA YOGYAKARTA
-          </h2>
-          <h3 className="font-bold text-xs sm:text-sm text-emerald-900 uppercase tracking-wider">
-            PANITIA PELAKSANA {appSettings.eventName} {appSettings.eventSubtitle}
-          </h3>
-          <p className="text-[10px] sm:text-xs text-slate-600">
-            Sekretariat: Balai Kota Yogyakarta • Pelaksanaan: {appSettings.eventDate} di {appSettings.eventLocation}
-          </p>
+      {/* ========================================================================= */}
+      {/* 2. DOKUMEN RESMI A4 (SCREEN PREVIEW & PRINTABLE FORMAT) */}
+      {/* ========================================================================= */}
+      <div className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-sm print:border-none print:shadow-none print:p-0 print:m-0">
+        {/* KOP SURAT RESMI FASI XIII */}
+        <div className="pb-3 border-b-2 border-slate-900 space-y-1">
+          <div className="flex items-center justify-between gap-4">
+            {/* Logo Kiri: BADKO */}
+            <div className="w-16 h-16 sm:w-20 sm:h-20 shrink-0 flex items-center justify-center">
+              <img
+                src={LOGO_BADKO_URL}
+                alt="Logo Badko TKA-TPA"
+                crossOrigin="anonymous"
+                className="max-h-full max-w-full object-contain"
+              />
+            </div>
+
+            {/* Teks Kop Tengah */}
+            <div className="text-center flex-1 px-2">
+              <h2 className="font-extrabold text-xs sm:text-base md:text-lg text-slate-900 uppercase tracking-wide leading-tight">
+                FESTIVAL ANAK SHOLEH INDONESIA XIII
+              </h2>
+              <h3 className="font-black text-xs sm:text-sm md:text-base text-emerald-950 uppercase tracking-wider leading-tight mt-0.5">
+                BADKO TKA-TPA KOTA YOGYAKARTA
+              </h3>
+              <p className="text-[8.5px] sm:text-[10px] md:text-[11px] text-slate-700 font-medium leading-tight mt-1">
+                Sekretariat : Jln. Kenari No. 56 Muja Muju, Umbulharjo, Kota Yogyakarta | Telp. 085179928551 / 085647392525
+              </p>
+            </div>
+
+            {/* Logo Kanan: FASI */}
+            <div className="w-16 h-16 sm:w-20 sm:h-20 shrink-0 flex items-center justify-center">
+              <img
+                src={LOGO_FASI_URL}
+                alt="Logo FASI XIII"
+                crossOrigin="anonymous"
+                className="max-h-full max-w-full object-contain"
+              />
+            </div>
+          </div>
+
+          {/* Garis Ganda Kop Surat */}
+          <div className="pt-1">
+            <div className="w-full h-[1px] bg-slate-900" />
+          </div>
         </div>
 
-        {/* Title */}
-        <div className="text-center my-3">
-          <h4 className="font-extrabold text-sm sm:text-base underline uppercase text-slate-900">
-            {isSuperAdmin
-              ? 'BERITA ACARA & REKAPITULASI PESERTA CABANG LOMBA'
-              : `DAFTAR PESERTA UTUSAN KEMANTREN ${(myKemantren?.name || '').toUpperCase()}`}
+        {/* JUDUL DOKUMEN & NAMA CABANG LOMBA */}
+        <div className="text-center my-4 space-y-1">
+          <h4 className="font-black text-sm sm:text-base text-slate-900 uppercase tracking-wide underline">
+            REKAPITULASI PESERTA CABANG LOMBA
           </h4>
-          <p className="text-xs font-bold text-emerald-950 mt-1 uppercase">
+          <p className="text-xs sm:text-sm font-black text-emerald-950 uppercase tracking-wider">
             CABANG: [{activeCategory.code}] {activeCategory.name} — TINGKAT {activeCategory.level}
           </p>
-          <p className="text-[11px] text-slate-600">
-            {activeCategory.description}
-          </p>
         </div>
 
-        {/* Table of Contestants */}
+        {/* TABEL DATA REKAPITULASI CABANG LOMBA */}
+        {/* Kolom: No, Undian, No Registrasi, Nama Lengkap, L/P, Rayon & Unit TPA, Juri I, Juri II, Total Nilai */}
         <div className="overflow-x-auto mt-4">
           <table className="w-full text-left text-xs border-collapse border border-slate-300">
             <thead>
               <tr className="bg-slate-100 text-slate-900 font-bold border-b border-slate-300">
-                <th className="py-2 px-2 border border-slate-300 text-center w-10">No</th>
-                <th className="py-2 px-2 border border-slate-300 text-center w-16">Undian</th>
-                <th className="py-2 px-3 border border-slate-300 w-28">No. Registrasi</th>
-                <th className="py-2 px-3 border border-slate-300">Nama Lengkap Santri</th>
-                <th className="py-2 px-2 border border-slate-300 text-center w-10">L/P</th>
-                <th className="py-2 px-3 border border-slate-300 w-28">Utusan Kemantren</th>
-                <th className="py-2 px-3 border border-slate-300">Unit TPA/Asal</th>
-                {isSuperAdmin ? (
-                  <>
-                    <th className="py-2 px-2 border border-slate-300 text-center w-12">Juri 1</th>
-                    <th className="py-2 px-2 border border-slate-300 text-center w-12">Juri 2</th>
-                    <th className="py-2 px-2 border border-slate-300 text-center w-12">Juri 3</th>
-                    <th className="py-2 px-2 border border-slate-300 text-center w-14">Rata2</th>
-                    <th className="py-2 px-2 border border-slate-300 text-center w-16">Peringkat</th>
-                  </>
-                ) : (
-                  <th className="py-2 px-3 border border-slate-300 text-center w-28">Status Kehadiran</th>
-                )}
+                <th className="py-2.5 px-2 border border-slate-300 text-center w-8">No</th>
+                <th className="py-2.5 px-2 border border-slate-300 text-center w-14">Undian</th>
+                <th className="py-2.5 px-2 border border-slate-300 text-center w-28">No Registrasi</th>
+                <th className="py-2.5 px-3 border border-slate-300">Nama Lengkap</th>
+                <th className="py-2.5 px-1.5 border border-slate-300 text-center w-10">L/P</th>
+                <th className="py-2.5 px-3 border border-slate-300">Rayon & Unit TPA</th>
+                <th className="py-2.5 px-2 border border-slate-300 text-center w-14">Juri I</th>
+                <th className="py-2.5 px-2 border border-slate-300 text-center w-14">Juri II</th>
+                <th className="py-2.5 px-2 border border-slate-300 text-center w-16">Total Nilai</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
               {filteredParticipants.length === 0 ? (
                 <tr>
-                  <td colSpan={isSuperAdmin ? 12 : 8} className="py-8 text-center text-slate-400 italic">
-                    {isSuperAdmin
-                      ? 'Belum ada santri terdaftar pada cabang lomba ini.'
-                      : `Belum ada santri utusan Kemantren ${myKemantren?.name || ''} yang didaftarkan pada cabang lomba ini.`}
+                  <td colSpan={9} className="py-8 text-center text-slate-400 italic">
+                    Belum ada santri terdaftar pada cabang lomba ini.
                   </td>
                 </tr>
               ) : (
                 filteredParticipants.map((p, idx) => {
                   const kem = getKem(p.kemantrenId);
+                  const totalNilai = p.averageScore != null
+                    ? p.averageScore.toFixed(2)
+                    : ((p.scoreJury1 || 0) + (p.scoreJury2 || 0)) > 0
+                    ? String((p.scoreJury1 || 0) + (p.scoreJury2 || 0))
+                    : '';
 
                   return (
                     <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="py-2 px-2 border border-slate-300 text-center font-mono text-[11px]">
+                      <td className="py-2 px-2 border border-slate-300 text-center font-mono text-[11px] text-slate-600">
                         {idx + 1}
                       </td>
                       <td className="py-2 px-2 border border-slate-300 text-center">
                         {p.lotteryNumber ? (
-                          <span className="px-2 py-0.5 bg-amber-400 text-emerald-950 font-black rounded text-[11px] shadow-2xs">
-                            {p.lotteryNumber}
+                          <span className="px-1.5 py-0.5 bg-amber-400 text-emerald-950 font-black rounded text-[11px] shadow-2xs">
+                            {String(p.lotteryNumber).padStart(2, '0')}
                           </span>
                         ) : (
                           <span className="text-slate-400 text-[10px]">-</span>
                         )}
                       </td>
-                      <td className="py-2 px-3 border border-slate-300 font-mono font-bold text-[11px] text-emerald-950 whitespace-nowrap">
+                      <td className="py-2 px-2 border border-slate-300 font-mono font-bold text-[11px] text-emerald-950 text-center whitespace-nowrap">
                         {p.registrationNumber}
                       </td>
                       <td className="py-2 px-3 border border-slate-300 font-bold text-slate-950">
                         {p.fullName}
                       </td>
-                      <td className="py-2 px-2 border border-slate-300 text-center font-bold text-[10px]">
-                        {p.gender}
+                      <td className="py-2 px-1.5 border border-slate-300 text-center font-bold text-[10px]">
+                        <span
+                          className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                            p.gender === 'L' ? 'bg-blue-100 text-blue-800' : 'bg-pink-100 text-pink-800'
+                          }`}
+                        >
+                          {p.gender}
+                        </span>
                       </td>
-                      <td className="py-2 px-3 border border-slate-300 font-semibold text-slate-800">
-                        {kem?.name || p.kemantrenId}
+                      <td className="py-2 px-3 border border-slate-300 text-slate-800">
+                        <div className="font-bold text-slate-900">Kem. {kem?.name || p.kemantrenId}</div>
+                        {p.tpaUnitName && (
+                          <div className="text-[10px] text-slate-600 font-medium">{p.tpaUnitName}</div>
+                        )}
                       </td>
-                      <td className="py-2 px-3 border border-slate-300 text-slate-700 truncate max-w-[140px]">
-                        {p.tpaUnitName}
+                      <td className="py-2 px-2 border border-slate-300 text-center font-mono text-[11px] text-slate-700">
+                        {p.scoreJury1 != null ? p.scoreJury1 : ''}
                       </td>
-                      {isSuperAdmin ? (
-                        <>
-                          <td className="py-2 px-2 border border-slate-300 text-center font-mono text-[11px]">
-                            {p.scoreJury1 || '-'}
-                          </td>
-                          <td className="py-2 px-2 border border-slate-300 text-center font-mono text-[11px]">
-                            {p.scoreJury2 || '-'}
-                          </td>
-                          <td className="py-2 px-2 border border-slate-300 text-center font-mono text-[11px]">
-                            {p.scoreJury3 || '-'}
-                          </td>
-                          <td className="py-2 px-2 border border-slate-300 text-center font-mono font-bold text-[11px] text-emerald-950">
-                            {p.averageScore ? p.averageScore.toFixed(2) : '-'}
-                          </td>
-                          <td className="py-2 px-2 border border-slate-300 text-center text-[10px] font-bold">
-                            {p.rank ? (
-                              <span className="px-1.5 py-0.5 bg-amber-100 text-amber-900 rounded font-black">
-                                Juara {p.rank}
-                              </span>
-                            ) : (
-                              <span className="text-slate-400">-</span>
-                            )}
-                          </td>
-                        </>
-                      ) : (
-                        <td className="py-2 px-3 border border-slate-300 text-center">
-                          {p.attendance === 'hadir' || p.attendance === 'siap_tampil' || p.attendance === 'sudah_tampil' ? (
-                            <span className="inline-block px-2 py-0.5 bg-emerald-100 text-emerald-800 font-bold text-[10px] rounded-full">
-                              Hadir
-                            </span>
-                          ) : (
-                            <span className="inline-block px-2 py-0.5 bg-slate-100 text-slate-500 font-medium text-[10px] rounded-full">
-                              Belum Hadir
-                            </span>
-                          )}
-                        </td>
-                      )}
+                      <td className="py-2 px-2 border border-slate-300 text-center font-mono text-[11px] text-slate-700">
+                        {p.scoreJury2 != null ? p.scoreJury2 : ''}
+                      </td>
+                      <td className="py-2 px-2 border border-slate-300 text-center font-mono font-bold text-[11px] text-emerald-950">
+                        {totalNilai}
+                      </td>
                     </tr>
                   );
                 })
@@ -523,29 +493,36 @@ export const RekapCabangLombaAdmin: React.FC<RekapCabangLombaAdminProps> = ({
           </table>
         </div>
 
-        {/* Printable Signature - Super Admin Only (Berita Acara Dewan Hakim) */}
-        {isSuperAdmin && (
-          <div className="mt-10 pt-4 grid grid-cols-3 gap-6 text-center text-xs break-inside-avoid">
+        {/* BLOK TANDA TANGAN RESMI DI BAGIAN BAWAH DOKUMEN */}
+        <div className="mt-10 pt-4 grid grid-cols-2 gap-8 text-center text-xs break-inside-avoid">
+          {/* Sisi Kiri: Ketua Umum BADKO TKA-TPA Kota */}
+          <div className="flex flex-col items-center justify-between min-h-[100px]">
             <div>
-              <p className="font-bold text-slate-900">Hakim / Juri 1</p>
-              <p className="text-[10px] text-slate-500">(Bidang Makhraj & Tajwid)</p>
-              <div className="h-16"></div>
-              <p className="font-bold text-slate-900 underline">( .................................................. )</p>
+              <p className="text-slate-600 font-medium">Mengetahui,</p>
+              <p className="font-bold text-slate-900 mt-0.5">Ketua Umum BADKO TKA-TPA Kota</p>
             </div>
-            <div>
-              <p className="font-bold text-slate-900">Hakim / Juri 2</p>
-              <p className="text-[10px] text-slate-500">(Bidang Irama & Lagu)</p>
-              <div className="h-16"></div>
-              <p className="font-bold text-slate-900 underline">( .................................................. )</p>
-            </div>
-            <div>
-              <p className="font-bold text-slate-900">Hakim / Juri 3</p>
-              <p className="text-[10px] text-slate-500">(Bidang Adab & Fashahah)</p>
-              <div className="h-16"></div>
-              <p className="font-bold text-slate-900 underline">( .................................................. )</p>
+            <div className="mt-14">
+              <p className="font-extrabold text-slate-950 underline tracking-wide text-xs sm:text-sm">
+                Dicky Artanto, S.Pd., M.Pd.
+              </p>
             </div>
           </div>
-        )}
+
+          {/* Sisi Kanan: Ketua Panitia FASI XIII */}
+          <div className="flex flex-col items-center justify-between min-h-[100px]">
+            <div>
+              <p className="text-slate-600 font-medium">
+                Yogyakarta, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+              </p>
+              <p className="font-bold text-slate-900 mt-0.5">Ketua Panitia FASI XIII</p>
+            </div>
+            <div className="mt-14">
+              <p className="font-extrabold text-slate-950 underline tracking-wide text-xs sm:text-sm">
+                Andry Sunny, S.E.
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

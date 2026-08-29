@@ -381,7 +381,7 @@ export default function App() {
           />
         )}
 
-        {activeTab === 'rekapitulasi' && session && session.role === 'super_admin' && (
+        {activeTab === 'rekapitulasi' && session && (
           <RecapPrintView
             participants={participants}
             session={session}

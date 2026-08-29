@@ -3,27 +3,19 @@
  * SPDX-License-Identifier: Apache-2.0
  * 
  * Sistem Informasi FASI XIII Kota Yogyakarta
- * Generator Ekspor Excel & CSV Data Peserta
+ * Generator Ekspor Microsoft Excel (.xlsx) Resmi & Rapi Data Peserta
  */
 
+import * as XLSX from 'xlsx';
 import { Participant } from '../types/fasi';
 import { getStoredCategories, getStoredKemantren } from './storage';
 
 /**
- * Escapes fields for CSV / Excel compatibility
- */
-function escapeCsvValue(val: any): string {
-  if (val === null || val === undefined) return '""';
-  const str = String(val).replace(/"/g, '""');
-  return `"${str}"`;
-}
-
-/**
- * Downloads participant data as an Excel-compatible CSV file (with UTF-8 BOM)
+ * Downloads participant data as a clean, professionally formatted Microsoft Excel (.xlsx) file
  */
 export function exportParticipantsToExcel(
   participants: Participant[],
-  fileNamePrefix: string = 'Data_Peserta_FASI_XIII'
+  fileNamePrefix: string = 'Daftar_Peserta_FASI_XIII'
 ) {
   const kemantrenList = getStoredKemantren();
   const categoriesList = getStoredCategories();
@@ -37,90 +29,118 @@ export function exportParticipantsToExcel(
     return categoriesList.find((item) => item.id === id);
   };
 
-  // Header Columns
+  // Title rows for official letterhead in Excel
+  const titleRows = [
+    ['FESTIVAL ANAK SHOLEH INDONESIA (FASI) XIII'],
+    ['BADKO TKA-TPA KOTA YOGYAKARTA'],
+    ['Sekretariat : Jln. Kenari No. 56 Muja Muju, Umbulharjo, Kota Yogyakarta | Telp. 085179928551 / 085647392525'],
+    [],
+    ['REKAPITULASI NOMINASI TETAP PESERTA LOMBA'],
+    [`Tanggal Cetak: ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })} | Total Peserta: ${participants.length} Santri`],
+    [],
+  ];
+
+  // Header Columns: Rayon & Unit TPA
   const headers = [
     'No',
     'No. Registrasi',
     'Nama Lengkap Santri',
-    'Jenis Kelamin',
-    'Tanggal Lahir',
-    'Usia (Thn-Bln-Hari)',
-    'Kategori Jenjang',
+    'L/P',
+    'Tgl Lahir / Usia',
+    'Rayon (Kemantren)',
+    'Asal Unit TPA',
     'Cabang Lomba',
-    'Kemantren / Kecamatan',
-    'Unit TKA/TPA',
-    'Nama PJ / Pendamping',
-    'Nomor WhatsApp PJ',
-    'Nomor Undian Tampil',
-    'Status Pendaftaran',
-    'Status Presensi',
-    'Nilai Juri 1',
-    'Nilai Juri 2',
-    'Nilai Juri 3',
+    'Jenjang',
+    'No. Undian',
+    'Kehadiran',
     'Nilai Rata-rata',
     'Peringkat Juara',
-    'Poin Juara Umum',
-    'Catatan / Keterangan',
+    'Nama PJ / Pendamping',
+    'No. WhatsApp PJ',
+    'Status Validasi',
   ];
 
   // Rows Data
-  const rows = participants.map((p, index) => {
+  const dataRows = participants.map((p, index) => {
     const cat = getCategory(p.categoryId);
     const kemName = getKemantrenName(p.kemantrenId);
-    const ageString = p.ageOnCutoff
-      ? `${p.ageOnCutoff.years} Thn ${p.ageOnCutoff.months} Bln ${p.ageOnCutoff.days} Hr`
-      : '-';
 
-    const points = p.rank === 1 ? 5 : p.rank === 2 ? 3 : p.rank === 3 ? 1 : 0;
+    let kehadiran = 'Belum Hadir';
+    if (p.attendance === 'sudah_tampil') kehadiran = 'Sudah Tampil';
+    else if (p.attendance === 'siap_tampil' || p.attendance === 'hadir') kehadiran = 'Hadir';
+
+    const birthAndAge = p.birthDate
+      ? `${p.birthDate} (${p.ageOnCutoff.years}th ${p.ageOnCutoff.months}bln)`
+      : '-';
 
     return [
       index + 1,
       p.registrationNumber || '-',
       p.fullName || '-',
-      p.gender === 'L' ? 'Putra (L)' : 'Putri (P)',
-      p.birthDate || '-',
-      ageString,
-      cat?.level || p.ageOnCutoff?.levelEligible || 'FASI',
-      cat ? `[${cat.code}] ${cat.name}` : p.categoryId,
+      p.gender === 'L' ? 'L' : 'P',
+      birthAndAge,
       `Kemantren ${kemName}`,
       p.tpaUnitName || '-',
+      cat ? cat.name : p.categoryId,
+      cat?.level || 'FASI',
+      p.lotteryNumber ? String(p.lotteryNumber).padStart(2, '0') : '-',
+      kehadiran,
+      p.averageScore != null ? Number(p.averageScore.toFixed(2)) : '-',
+      p.rank != null ? `Juara ${p.rank}` : '-',
       p.pjName || '-',
       p.whatsappNumber || '-',
-      p.lotteryNumber ? String(p.lotteryNumber).padStart(2, '0') : 'Belum Diundi',
       p.status === 'verified' ? 'Terverifikasi' : p.status === 'rejected' ? 'Ditolak' : 'Draft',
-      p.attendance === 'sudah_tampil'
-        ? 'Sudah Tampil'
-        : p.attendance === 'siap_tampil'
-        ? 'Siap / Hadir'
-        : 'Belum Tampil',
-      p.scoreJury1 != null ? p.scoreJury1 : '-',
-      p.scoreJury2 != null ? p.scoreJury2 : '-',
-      p.scoreJury3 != null ? p.scoreJury3 : '-',
-      p.averageScore != null ? p.averageScore : '-',
-      p.rank != null ? `Juara ${p.rank}` : '-',
-      points,
-      p.notes || '-',
     ];
   });
 
-  // Construct CSV Content with UTF-8 BOM (\uFEFF) for Excel compatibility
-  const csvContent =
-    '\uFEFF' +
-    [
-      headers.map(escapeCsvValue).join(','),
-      ...rows.map((row) => row.map(escapeCsvValue).join(',')),
-    ].join('\r\n');
+  // Footer signature rows in Excel
+  const dateStrId = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+  const footerRows = [
+    [],
+    [],
+    ['', '', '', '', '', '', '', '', '', '', '', 'Yogyakarta, ' + dateStrId],
+    ['Mengetahui,', '', '', '', '', '', '', '', '', '', '', 'Ketua Panitia FASI XIII'],
+    ['Ketua Umum BADKO TKA-TPA Kota', '', '', '', '', '', '', '', '', '', '', ''],
+    [],
+    [],
+    [],
+    ['Dicky Artanto, S.Pd., M.Pd.', '', '', '', '', '', '', '', '', '', '', 'Andry Sunny, S.E.'],
+  ];
 
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
+  // Combine title, headers, data, and signatures
+  const sheetData = [...titleRows, headers, ...dataRows, ...footerRows];
+
+  // Create worksheet
+  const ws = XLSX.utils.aoa_to_sheet(sheetData);
+
+  // Set column widths for neat appearance
+  ws['!cols'] = [
+    { wch: 6 },  // No
+    { wch: 18 }, // No. Registrasi
+    { wch: 32 }, // Nama Lengkap
+    { wch: 6 },  // L/P
+    { wch: 22 }, // Tgl Lahir
+    { wch: 22 }, // Rayon Kemantren
+    { wch: 26 }, // Asal TPA
+    { wch: 32 }, // Cabang Lomba
+    { wch: 10 }, // Jenjang
+    { wch: 12 }, // No. Undian
+    { wch: 14 }, // Kehadiran
+    { wch: 14 }, // Nilai
+    { wch: 14 }, // Peringkat Juara
+    { wch: 24 }, // Nama PJ
+    { wch: 16 }, // WhatsApp
+    { wch: 15 }, // Status Validasi
+  ];
+
+  // Create workbook
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Rekapitulasi FASI XIII');
+
+  // Generate file name
   const dateStr = new Date().toISOString().slice(0, 10);
-  const fullFileName = `${fileNamePrefix}_${dateStr}.csv`;
+  const fullFileName = `${fileNamePrefix}_${dateStr}.xlsx`;
 
-  const link = document.createElement('a');
-  link.setAttribute('href', url);
-  link.setAttribute('download', fullFileName);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  // Write and trigger download
+  XLSX.writeFile(wb, fullFileName);
 }

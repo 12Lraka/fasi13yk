@@ -219,7 +219,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   return (
     <div className="flex flex-col lg:flex-row items-start gap-6">
       {/* 1. ADMIN SIDEBAR */}
-      <aside className="w-full lg:w-64 shrink-0 bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-4 lg:sticky lg:top-24">
+      <aside className="no-print w-full lg:w-64 shrink-0 bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-4 lg:sticky lg:top-24">
         {/* User Info / Role Badge */}
         <div className="p-3.5 bg-gradient-to-br from-emerald-900 to-emerald-950 text-white rounded-xl space-y-2">
           <div className="flex items-center gap-2">
