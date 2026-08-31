@@ -9,6 +9,7 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Participant, CompetitionCategory, Kemantren, AppSettings, AuditLog, FasiLevel, BeritaAcaraKejuaraan } from '../types/fasi';
 import { KEMANTREN_LIST } from '../data/fasiMasterData';
+import { unescapeHtml } from '../utils/security';
 
 // Environment variables via Vite import.meta.env
 const metaEnv = (import.meta as any).env || {};
@@ -214,19 +215,19 @@ function mapParticipantToDb(p: Participant): Record<string, any> {
   // Ambil fallback nama PJ dan Kontak berdasarkan Kemantren jika data peserta belum mengisinya
   const kemantrenFallback = KEMANTREN_LIST.find((k) => k.id === p.kemantrenId);
   const safePjName = (p.pjName && p.pjName.trim()) 
-    ? p.pjName.trim() 
+    ? unescapeHtml(p.pjName.trim()) 
     : (kemantrenFallback?.adminName || 'Admin Kontingen');
   const safeWhatsapp = (p.whatsappNumber && p.whatsappNumber.trim()) 
-    ? p.whatsappNumber.trim() 
+    ? unescapeHtml(p.whatsappNumber.trim()) 
     : (kemantrenFallback?.contactPerson || '081200000000');
   const safeTpaUnit = (p.tpaUnitName && p.tpaUnitName.trim()) 
-    ? p.tpaUnitName.trim() 
-    : `TPA Kemantren ${kemantrenFallback?.name || ''}`;
+    ? unescapeHtml(p.tpaUnitName.trim()) 
+    : `TPA Rayon ${kemantrenFallback?.name || ''}`;
 
   return {
     id: p.id,
     registration_number: p.registrationNumber,
-    full_name: p.fullName || 'Santri FASI',
+    full_name: unescapeHtml(p.fullName) || 'Santri FASI',
     gender: p.gender === 'L' || p.gender === 'P' ? p.gender : 'L',
     birth_date: formatDateToIso(p.birthDate),
     age_years: p.ageOnCutoff?.years || 0,
@@ -247,7 +248,7 @@ function mapParticipantToDb(p: Participant): Record<string, any> {
     average_score: p.averageScore ?? null,
     rank: p.rank ?? null,
     points_awarded: points,
-    notes: p.notes || null,
+    notes: p.notes ? unescapeHtml(p.notes) : null,
     updated_at: new Date().toISOString(),
   };
 }
@@ -262,16 +263,16 @@ function mapDbToParticipant(row: Record<string, any>): Participant {
   return {
     id: row.id,
     registrationNumber: row.registration_number,
-    fullName: row.full_name,
+    fullName: unescapeHtml(row.full_name),
     gender: row.gender,
     birthDate: formatDateToDisplay(row.birth_date),
     kemantrenId: row.kemantren_id,
     categoryId: row.category_id,
-    tpaUnitName: row.tpa_unit_name,
+    tpaUnitName: unescapeHtml(row.tpa_unit_name),
     documentUrl: row.document_url || undefined,
     lotteryNumber: row.lottery_number || null,
-    pjName: row.pj_name,
-    whatsappNumber: row.whatsapp_number,
+    pjName: unescapeHtml(row.pj_name),
+    whatsappNumber: unescapeHtml(row.whatsapp_number),
     status: row.status || 'verified',
     attendance: row.attendance || 'belum_hadir',
     scoreJury1: row.score_jury1 !== null ? Number(row.score_jury1) : undefined,
@@ -279,7 +280,7 @@ function mapDbToParticipant(row: Record<string, any>): Participant {
     scoreJury3: row.score_jury3 !== null ? Number(row.score_jury3) : undefined,
     averageScore: row.average_score !== null ? Number(row.average_score) : undefined,
     rank: row.rank !== null ? Number(row.rank) : undefined,
-    notes: row.notes || undefined,
+    notes: row.notes ? unescapeHtml(row.notes) : undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     ageOnCutoff: {

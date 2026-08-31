@@ -9,7 +9,7 @@
 
 import { Participant, ParticipantDraft, MedalTally, UserSession, AuditLog, AppSettings, CompetitionCategory, Kemantren, BeritaAcaraKejuaraan } from '../types/fasi';
 import { KEMANTREN_LIST, CATEGORIES_LIST, INITIAL_PARTICIPANTS } from '../data/fasiMasterData';
-import { createAuditLog } from './security';
+import { createAuditLog, unescapeHtml } from './security';
 import {
   isSupabaseConfigured,
   bulkSyncParticipantsToSupabase,
@@ -156,8 +156,17 @@ export function getStoredParticipants(): Participant[] {
       return [];
     }
     const parsed: Participant[] = JSON.parse(raw);
-    // Filter out legacy dummy sample participant items
-    const cleaned = parsed.filter((p) => !p.id.match(/^p-0[1-9]$|^p-10$/));
+    // Filter out legacy dummy sample participant items and unescape any legacy HTML entities
+    const cleaned = parsed
+      .filter((p) => !p.id.match(/^p-0[1-9]$|^p-10$/))
+      .map((p) => ({
+        ...p,
+        fullName: unescapeHtml(p.fullName),
+        tpaUnitName: unescapeHtml(p.tpaUnitName),
+        pjName: unescapeHtml(p.pjName),
+        whatsappNumber: unescapeHtml(p.whatsappNumber),
+        notes: p.notes ? unescapeHtml(p.notes) : undefined,
+      }));
     return cleaned;
   } catch {
     return [];

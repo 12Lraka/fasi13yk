@@ -92,19 +92,34 @@ export function checkRateLimit(actionKey: string, maxRequests = 15, timeWindowMs
 }
 
 /**
- * Sanitasi String dari potensi serangan XSS / Tag Injeksi
+ * Sanitasi String dari potensi serangan XSS / Tag Injeksi berbahaya
+ * Menghapus tag script, html tags, dan event handler tanpa merusak tanda petik/apostrof nama orang/TPA (seperti Sa'diyah, Al'Aadiyat).
  */
 export function sanitizeInput(input: string): string {
   if (!input) return '';
   return input
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#x27;')
-    .replace(/\//g, '&#x2F;')
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '') // Hapus script tag berbahaya
+    .replace(/<[^>]+>/g, '') // Hapus semua tag HTML seperti <b>, <div>, <img>
     .replace(/javascript:/gi, '')
-    .replace(/on\w+=/gi, '');
+    .replace(/on\w+\s*=/gi, '')
+    .trim();
+}
+
+/**
+ * Decode HTML Entities yang mungkin pernah tersimpan sebelumnya (seperti &#x27; menjadi ')
+ */
+export function unescapeHtml(text?: string | null): string {
+  if (!text) return '';
+  return text
+    .replace(/&#x27;/g, "'")
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&#x2F;/g, "/")
+    .replace(/&#47;/g, "/")
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>');
 }
 
 /**

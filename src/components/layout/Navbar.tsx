@@ -78,9 +78,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <h1 className="font-bold text-base sm:text-lg tracking-tight leading-tight text-white group-hover:text-amber-300 transition-colors">
                   {settings?.eventTitle || 'FASI XIII KOTA YOGYAKARTA'}
                 </h1>
-                <span className={`hidden sm:inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${theme.badgeBg} ${theme.badgeText} border ${theme.badgeBorder}`}>
-                  RESMI
-                </span>
               </div>
               <p className={`text-xs ${theme.headerSubtext} font-normal`}>
                 {settings?.eventSubtitle || 'Sistem Pendaftaran, Validasi Usia & Live Score'}
