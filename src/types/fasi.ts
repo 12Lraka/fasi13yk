@@ -21,6 +21,7 @@ export interface WinnerSlot {
   kemantren: string;
   unitTpa: string;
   totalNilai: number;
+  anggota?: string[];
 }
 
 export interface BeritaAcaraKejuaraan {
@@ -33,7 +34,9 @@ export interface BeritaAcaraKejuaraan {
   isCabangUtama: boolean;
   status: 'Draft' | 'Disahkan';
   tanggalPenetapan: string;
-  namaKetuaJuri: string;
+  juriSatu?: string;
+  juriDua?: string;
+  namaKetuaJuri?: string;
   namaAnggotaJuri?: string;
   namaSekretarisJuri?: string;
   catatanJuri?: string;

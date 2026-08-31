@@ -33,8 +33,9 @@ import {
   clearSession,
   logAuditEvent,
   getStoredSettings,
+  saveBeritaAcaraList,
 } from './utils/storage';
-import { isSupabaseConfigured, fetchParticipantsFromSupabase } from './lib/supabase';
+import { isSupabaseConfigured, fetchParticipantsFromSupabase, fetchBeritaAcaraFromSupabase } from './lib/supabase';
 import { showToast, showConfirmDialog } from './utils/sweetalert';
 import { AppRoute, getCurrentRouteFromURL, navigateToRoute } from './utils/router';
 import { getThemeConfig } from './utils/theme';
@@ -164,6 +165,11 @@ export default function App() {
         if (remoteData && remoteData.length > 0) {
           setParticipants(remoteData);
           saveParticipants(remoteData);
+        }
+      });
+      fetchBeritaAcaraFromSupabase().then((remoteBA) => {
+        if (remoteBA && remoteBA.length > 0) {
+          saveBeritaAcaraList(remoteBA);
         }
       });
     }

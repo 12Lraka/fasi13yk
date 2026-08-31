@@ -74,11 +74,11 @@ export const PublicPortal: React.FC<PublicPortalProps> = ({
           </div>
 
           <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight leading-tight text-white">
-            Mewujudkan Generasi Santri Qur’ani yang Unggul, Cerdas & Berakhlakul Karimah
+            Santri Hebat, Hebat Prestasi, Hebat Mengaji, & Berakhlakul Karimah.
           </h1>
 
           <p className={`text-sm sm:text-base ${theme.headerSubtext} leading-relaxed font-light`}>
-            {settings?.eventSubtitle || 'Portal resmi pendaftaran santri, validasi otomatis batas usia, pengacakan nomor undian tampil, dan publikasi live score klasemen 14 Kemantren se-Kota Yogyakarta.'}
+            {settings?.eventSubtitle || 'Portal resmi pendaftaran santri, validasi otomatis batas usia, pengacakan nomor undian tampil, dan publikasi live score klasemen 14 Rayon se-Kota Yogyakarta.'}
           </p>
 
           <div className="flex flex-wrap items-center gap-3 pt-3">
@@ -154,7 +154,7 @@ export const PublicPortal: React.FC<PublicPortalProps> = ({
           </div>
           <div>
             <span className="text-xs text-slate-500 font-medium">Kontingen</span>
-            <h4 className="font-bold text-slate-900 text-sm sm:text-base">14 Kemantren</h4>
+            <h4 className="font-bold text-slate-900 text-sm sm:text-base">14 Rayon</h4>
           </div>
         </div>
 
@@ -205,7 +205,7 @@ export const PublicPortal: React.FC<PublicPortalProps> = ({
             <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
               <span className="font-bold text-slate-800 block">Akun Pendaftaran Mandiri</span>
               <p className="text-slate-500 text-[11px]">
-                14 Admin Kemantren mengelola pendaftaran peserta kontingen wilayahnya secara aman.
+                14 Admin Rayon mengelola pendaftaran peserta kontingen wilayahnya secara aman.
               </p>
             </div>
             <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1">

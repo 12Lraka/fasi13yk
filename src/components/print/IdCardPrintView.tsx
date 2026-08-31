@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  * 
  * Sistem Informasi FASI XIII Kota Yogyakarta
- * Studio Cetak ID Card Cerdas (Peserta, Official, Panitia)
+ * Studio Cetak ID Card Cerdas (Peserta, Official, Panitia & Dewan Hakim)
  * Standar Portrait 85mm x 55mm (9 Kartu / Lembar A4)
  */
 
@@ -36,6 +36,7 @@ import {
   Image as ImageIcon,
   CheckCircle2,
   HelpCircle,
+  Scale,
 } from 'lucide-react';
 import { Participant, UserSession, CompetitionCategory, Kemantren } from '../../types/fasi';
 import { CATEGORIES_LIST, KEMANTREN_LIST } from '../../data/fasiMasterData';
@@ -62,8 +63,20 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
   onBack,
 }) => {
   const isSuperAdmin = session?.role === 'super_admin';
+  const isAdminRayon = session?.role === 'kemantren_admin';
+  const canAccessOfficial = isSuperAdmin || isAdminRayon;
+  const canAccessPanitia = isSuperAdmin;
+
   const kemantrenList: Kemantren[] = getStoredKemantren();
   const categoriesList: CompetitionCategory[] = getStoredCategories();
+
+  // Rayon aktif milik Admin Rayon (jika login sebagai admin rayon)
+  const currentAdminRayon = useMemo(() => {
+    if (isAdminRayon && session?.kemantrenId) {
+      return kemantrenList.find((k) => k.id === session.kemantrenId) || kemantrenList[0];
+    }
+    return null;
+  }, [isAdminRayon, session, kemantrenList]);
 
   // 1. Tab Tipe Kartu (Peserta, Official, Panitia)
   const [activeCardType, setActiveCardType] = useState<CardType>('peserta');
@@ -86,50 +99,61 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
   const [selectedLevelFilter, setSelectedLevelFilter] = useState<string>('ALL'); // ALL, TKA, TPA, TQA
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('ALL');
   const [selectedKemantrenFilter, setSelectedKemantrenFilter] = useState<string>(
-    session?.role === 'kemantren_admin' && session?.kemantrenId ? session.kemantrenId : 'ALL'
+    isAdminRayon && session?.kemantrenId ? session.kemantrenId : 'ALL'
   );
   const [selectedGenderFilter, setSelectedGenderFilter] = useState<string>('ALL');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [qrCodes, setQrCodes] = useState<Record<string, string>>({});
 
-  // 4. State Generator Canggih untuk Official (Superadmin Only)
+  // 4. State Generator untuk Official (Superadmin & Admin Rayon)
   const [officialMode, setOfficialMode] = useState<'auto_kemantren' | 'custom' | 'blanko'>('auto_kemantren');
   const [officialsPerKemantren, setOfficialsPerKemantren] = useState<number>(2); // 1, 2, 3, 4
+  const [selectedOfficialRayonFilter, setSelectedOfficialRayonFilter] = useState<string>(
+    isAdminRayon && session?.kemantrenId ? session.kemantrenId : 'ALL'
+  );
+
   const [customOfficials, setCustomOfficials] = useState<OfficialCardData[]>([
     {
       id: 'off-1',
       name: 'Ust. H. Ahmad Fauzi, S.Pd.I',
       role: 'Ketua Kontingen',
-      kemantrenName: 'Kemantren Danurejan',
+      kemantrenName: 'Rayon Danurejan',
       kemantrenCode: 'DN',
     },
     {
       id: 'off-2',
       name: 'Usth. Siti Nurjanah, S.Ag',
       role: 'Official Pendamping',
-      kemantrenName: 'Kemantren Danurejan',
+      kemantrenName: 'Rayon Danurejan',
       kemantrenCode: 'DN',
     },
   ]);
   const [newOffName, setNewOffName] = useState('');
   const [newOffRole, setNewOffRole] = useState('Official Pendamping');
-  const [newOffKemId, setNewOffKemId] = useState(kemantrenList[0]?.id || 'kem-1');
+  const [newOffKemId, setNewOffKemId] = useState(
+    isAdminRayon && session?.kemantrenId ? session.kemantrenId : kemantrenList[0]?.id || 'kem-1'
+  );
 
-  // 5. State Generator Canggih untuk Panitia (Superadmin Only)
+  // 5. State Generator untuk Panitia & Dewan Hakim (Superadmin Only)
+  const [committeeSubCategory, setCommitteeSubCategory] = useState<'ALL' | 'panitia' | 'dewan_hakim'>('ALL');
   const [committeeMode, setCommitteeMode] = useState<'preset' | 'custom' | 'blanko'>('preset');
+  const [blankoType, setBlankoType] = useState<'panitia' | 'dewan_hakim' | 'campuran'>('campuran');
   const [blankoCount, setBlankoCount] = useState<number>(18);
+
   const [customCommittees, setCustomCommittees] = useState<CommitteeCardData[]>([
-    { id: 'com-1', name: 'Dr. H. Muhammad Asrori, M.Ag', division: 'Ketua Panitia FASI XIII', accessLevel: 'ALL ACCESS' },
-    { id: 'com-2', name: 'Ustadz Ridwan Hakim, S.T', division: 'Sekretaris Panitia', accessLevel: 'ALL ACCESS' },
-    { id: 'com-3', name: 'Ustadzah Hj. Maryam, S.E', division: 'Bendahara Panitia', accessLevel: 'ALL ACCESS' },
-    { id: 'com-4', name: 'Ustadz Farhan Al-Ghifari, S.Pd', division: 'Koordinator Sie Acara & Lomba', accessLevel: 'STAGE & LOMBA' },
-    { id: 'com-5', name: 'Ustadz Ilham Ramadhan, S.Kom', division: 'Koordinator Sie IT & Registrasi', accessLevel: 'ALL ACCESS' },
-    { id: 'com-6', name: 'Ustadzah Nurul Hidayah, S.Pd.I', division: 'Sie Konsumsi & Logistik', accessLevel: 'LOGISTIK' },
-    { id: 'com-7', name: 'Ustadz Bagus Prasetyo', division: 'Sie Perlengkapan & Sound', accessLevel: 'VENUE' },
-    { id: 'com-8', name: 'Dewan Hakim / Dewan Juri', division: 'Dewan Juri FASI XIII', accessLevel: 'RUANG JURI' },
-    { id: 'com-9', name: 'Tim Medis & Keamanan', division: 'Sie Keamanan & Kesehatan', accessLevel: 'ALL ACCESS' },
+    { id: 'com-1', name: 'Dr. H. Muhammad Asrori, M.Ag', division: 'Ketua Panitia FASI XIII', accessLevel: 'ALL ACCESS', cardCategory: 'panitia', customBadge: 'PANITIA' },
+    { id: 'com-2', name: 'Ustadz Ridwan Hakim, S.T', division: 'Sekretaris Panitia', accessLevel: 'ALL ACCESS', cardCategory: 'panitia', customBadge: 'PANITIA' },
+    { id: 'com-3', name: 'Ustadzah Hj. Maryam, S.E', division: 'Bendahara Panitia', accessLevel: 'ALL ACCESS', cardCategory: 'panitia', customBadge: 'PANITIA' },
+    { id: 'com-4', name: 'Ustadz Farhan Al-Ghifari, S.Pd', division: 'Koordinator Sie Acara & Lomba', accessLevel: 'STAGE & LOMBA', cardCategory: 'panitia', customBadge: 'PANITIA' },
+    { id: 'com-5', name: 'Ustadz Ilham Ramadhan, S.Kom', division: 'Koordinator Sie IT & Registrasi', accessLevel: 'ALL ACCESS', cardCategory: 'panitia', customBadge: 'PANITIA' },
+    { id: 'com-6', name: 'K.H. Ahmad Syukri, M.S.I', division: 'Koordinator Dewan Hakim', accessLevel: 'RUANG HAKIM & JURI', cardCategory: 'dewan_hakim', customBadge: 'DEWAN HAKIM' },
+    { id: 'com-7', name: 'Ustadz M. Qasim, S.Th.I', division: 'Sekretaris Dewan Hakim', accessLevel: 'RUANG HAKIM & JURI', cardCategory: 'dewan_hakim', customBadge: 'DEWAN HAKIM' },
+    { id: 'com-8', name: 'Dewan Hakim Tilawah Al-Qur\'an', division: 'Cabang Tilawah (TKA, TPA, TQA)', accessLevel: 'RUANG HAKIM & JURI', cardCategory: 'dewan_hakim', customBadge: 'DEWAN HAKIM' },
+    { id: 'com-9', name: 'Dewan Hakim Tahfidz Juz \'Amma', division: 'Cabang Tahfidz (TPA & TQA)', accessLevel: 'RUANG HAKIM & JURI', cardCategory: 'dewan_hakim', customBadge: 'DEWAN HAKIM' },
   ]);
+
   const [newComName, setNewComName] = useState('');
+  const [newComType, setNewComType] = useState<'panitia' | 'dewan_hakim'>('panitia');
   const [newComDivision, setNewComDivision] = useState('Sie Acara & Lomba');
   const [newComAccess, setNewComAccess] = useState('ALL ACCESS');
 
@@ -173,7 +197,7 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
   const filteredParticipants = useMemo(() => {
     return participants.filter((p) => {
       // Role lock
-      if (session?.role === 'kemantren_admin' && session?.kemantrenId) {
+      if (isAdminRayon && session?.kemantrenId) {
         if (p.kemantrenId !== session.kemantrenId) return false;
       } else if (selectedKemantrenFilter !== 'ALL') {
         if (p.kemantrenId !== selectedKemantrenFilter) return false;
@@ -209,6 +233,7 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
     });
   }, [
     participants,
+    isAdminRayon,
     session,
     selectedKemantrenFilter,
     selectedLevelFilter,
@@ -218,34 +243,53 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
     categoriesList,
   ]);
 
+  // Target Rayon untuk Official
+  const targetRayonList = useMemo(() => {
+    if (isAdminRayon && session?.kemantrenId) {
+      return kemantrenList.filter((k) => k.id === session.kemantrenId);
+    }
+    if (selectedOfficialRayonFilter !== 'ALL') {
+      return kemantrenList.filter((k) => k.id === selectedOfficialRayonFilter);
+    }
+    return kemantrenList;
+  }, [isAdminRayon, session, selectedOfficialRayonFilter, kemantrenList]);
+
   // List Official Tergenerate
   const generatedOfficials: OfficialCardData[] = useMemo(() => {
     if (officialMode === 'custom') {
+      if (isAdminRayon && session?.kemantrenId) {
+        const myKem = kemantrenList.find((k) => k.id === session.kemantrenId);
+        return customOfficials.filter(
+          (off) =>
+            off.kemantrenCode === myKem?.code ||
+            off.kemantrenName.toLowerCase().includes(myKem?.name.toLowerCase() || '')
+        );
+      }
       return customOfficials;
     }
     if (officialMode === 'blanko') {
       const list: OfficialCardData[] = [];
-      kemantrenList.forEach((k) => {
+      targetRayonList.forEach((k) => {
         for (let i = 1; i <= officialsPerKemantren; i++) {
           list.push({
             id: `off-blanko-${k.id}-${i}`,
             name: '',
             role: i === 1 ? 'Ketua Kontingen' : 'Official Pendamping',
-            kemantrenName: `Kemantren ${k.name}`,
+            kemantrenName: `Rayon ${k.name}`,
             kemantrenCode: k.code,
           });
         }
       });
       return list;
     }
-    // Auto Kemantren Mode (Mengambil data nama Admin Kemantren dari master)
+    // Auto Rayon Mode (Mengambil data nama Admin Rayon dari master)
     const list: OfficialCardData[] = [];
-    kemantrenList.forEach((k) => {
+    targetRayonList.forEach((k) => {
       list.push({
         id: `off-auto-1-${k.id}`,
         name: k.adminName || `Ketua Kontingen ${k.name}`,
         role: 'Ketua Kontingen',
-        kemantrenName: `Kemantren ${k.name}`,
+        kemantrenName: `Rayon ${k.name}`,
         kemantrenCode: k.code,
       });
       if (officialsPerKemantren >= 2) {
@@ -253,7 +297,7 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
           id: `off-auto-2-${k.id}`,
           name: `Official Pendamping ${k.name}`,
           role: 'Official Pendamping',
-          kemantrenName: `Kemantren ${k.name}`,
+          kemantrenName: `Rayon ${k.name}`,
           kemantrenCode: k.code,
         });
       }
@@ -262,7 +306,7 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
           id: `off-auto-3-${k.id}`,
           name: `Koordinator Lomba ${k.name}`,
           role: 'Koordinator Lomba',
-          kemantrenName: `Kemantren ${k.name}`,
+          kemantrenName: `Rayon ${k.name}`,
           kemantrenCode: k.code,
         });
       }
@@ -271,40 +315,109 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
           id: `off-auto-4-${k.id}`,
           name: `Official Medis & Logistik`,
           role: 'Official Medis & Logistik',
-          kemantrenName: `Kemantren ${k.name}`,
+          kemantrenName: `Rayon ${k.name}`,
           kemantrenCode: k.code,
         });
       }
     });
     return list;
-  }, [officialMode, customOfficials, officialsPerKemantren, kemantrenList]);
+  }, [officialMode, customOfficials, officialsPerKemantren, targetRayonList, isAdminRayon, session, kemantrenList]);
 
-  // List Panitia Tergenerate
+  // Preset Panitia Pelaksana Resmi FASI XIII
+  const PRESET_PANITIA: CommitteeCardData[] = useMemo(() => [
+    { id: 'com-p-1', name: 'Dr. H. Muhammad Asrori, M.Ag', division: 'Ketua Panitia FASI XIII', accessLevel: 'ALL ACCESS', cardCategory: 'panitia', customBadge: 'PANITIA' },
+    { id: 'com-p-2', name: 'Ustadz Ridwan Hakim, S.T', division: 'Sekretaris Panitia', accessLevel: 'ALL ACCESS', cardCategory: 'panitia', customBadge: 'PANITIA' },
+    { id: 'com-p-3', name: 'Ustadzah Hj. Maryam, S.E', division: 'Bendahara Panitia', accessLevel: 'ALL ACCESS', cardCategory: 'panitia', customBadge: 'PANITIA' },
+    { id: 'com-p-4', name: 'Ustadz Farhan Al-Ghifari, S.Pd', division: 'Koordinator Sie Acara & Lomba', accessLevel: 'STAGE & LOMBA', cardCategory: 'panitia', customBadge: 'PANITIA' },
+    { id: 'com-p-5', name: 'Ustadz Ilham Ramadhan, S.Kom', division: 'Koordinator Sie IT & Registrasi', accessLevel: 'ALL ACCESS', cardCategory: 'panitia', customBadge: 'PANITIA' },
+    { id: 'com-p-6', name: 'Ustadzah Nurul Hidayah, S.Pd.I', division: 'Sie Konsumsi & Logistik', accessLevel: 'LOGISTIK', cardCategory: 'panitia', customBadge: 'PANITIA' },
+    { id: 'com-p-7', name: 'Ustadz Bagus Prasetyo', division: 'Sie Perlengkapan & Sound', accessLevel: 'VENUE', cardCategory: 'panitia', customBadge: 'PANITIA' },
+    { id: 'com-p-8', name: 'Ustadz Hendra Kurniawan', division: 'Sie Publikasi & Dokumentasi', accessLevel: 'MEDIA & PRESS', cardCategory: 'panitia', customBadge: 'PANITIA' },
+    { id: 'com-p-9', name: 'Tim Medis & Keamanan FASI XIII', division: 'Sie Keamanan & Kesehatan', accessLevel: 'ALL ACCESS', cardCategory: 'panitia', customBadge: 'PANITIA' },
+  ], []);
+
+  // Preset Dewan Hakim & Juri FASI XIII
+  const PRESET_DEWAN_HAKIM: CommitteeCardData[] = useMemo(() => [
+    { id: 'com-h-1', name: 'K.H. Ahmad Syukri, M.S.I', division: 'Koordinator Dewan Hakim', accessLevel: 'RUANG HAKIM & JURI', cardCategory: 'dewan_hakim', customBadge: 'DEWAN HAKIM' },
+    { id: 'com-h-2', name: 'Ustadz M. Qasim, S.Th.I', division: 'Sekretaris Dewan Hakim', accessLevel: 'RUANG HAKIM & JURI', cardCategory: 'dewan_hakim', customBadge: 'DEWAN HAKIM' },
+    { id: 'com-h-3', name: 'Dewan Hakim Tilawah Al-Qur\'an', division: 'Cabang Tilawah (TKA, TPA, TQA)', accessLevel: 'RUANG HAKIM & JURI', cardCategory: 'dewan_hakim', customBadge: 'DEWAN HAKIM' },
+    { id: 'com-h-4', name: 'Dewan Hakim Tartil Al-Qur\'an', division: 'Cabang Tartil (TKA & TPA)', accessLevel: 'RUANG HAKIM & JURI', cardCategory: 'dewan_hakim', customBadge: 'DEWAN HAKIM' },
+    { id: 'com-h-5', name: 'Dewan Hakim Tahfidz Juz \'Amma', division: 'Cabang Tahfidz (TPA & TQA)', accessLevel: 'RUANG HAKIM & JURI', cardCategory: 'dewan_hakim', customBadge: 'DEWAN HAKIM' },
+    { id: 'com-h-6', name: 'Dewan Hakim Cerdas Cermat Al-Qur\'an', division: 'Cabang CCQ (TPA)', accessLevel: 'RUANG HAKIM & JURI', cardCategory: 'dewan_hakim', customBadge: 'DEWAN HAKIM' },
+    { id: 'com-h-7', name: 'Dewan Hakim Adzan & Iqamah', division: 'Cabang Adzan (TKA & TPA)', accessLevel: 'RUANG HAKIM & JURI', cardCategory: 'dewan_hakim', customBadge: 'DEWAN HAKIM' },
+    { id: 'com-h-8', name: 'Dewan Hakim Nasyid Islami', division: 'Cabang Nasyid (TPA)', accessLevel: 'RUANG HAKIM & JURI', cardCategory: 'dewan_hakim', customBadge: 'DEWAN HAKIM' },
+    { id: 'com-h-9', name: 'Dewan Hakim Peragaan Sholat', division: 'Cabang Sholat (TKA & TPA)', accessLevel: 'RUANG HAKIM & JURI', cardCategory: 'dewan_hakim', customBadge: 'DEWAN HAKIM' },
+    { id: 'com-h-10', name: 'Dewan Hakim Ikrar & Puitisasi', division: 'Cabang Ikrar & Puitisasi (TPA)', accessLevel: 'RUANG HAKIM & JURI', cardCategory: 'dewan_hakim', customBadge: 'DEWAN HAKIM' },
+    { id: 'com-h-11', name: 'Dewan Hakim Ceramah Agama Islam', division: 'Cabang Pidato/Ceramah (TQA)', accessLevel: 'RUANG HAKIM & JURI', cardCategory: 'dewan_hakim', customBadge: 'DEWAN HAKIM' },
+    { id: 'com-h-12', name: 'Dewan Hakim Kisah Islami', division: 'Cabang Cerita Kisah Islami (TPA)', accessLevel: 'RUANG HAKIM & JURI', cardCategory: 'dewan_hakim', customBadge: 'DEWAN HAKIM' },
+    { id: 'com-h-13', name: 'Dewan Hakim Kaligrafi Al-Qur\'an', division: 'Cabang Kaligrafi (TQA)', accessLevel: 'RUANG HAKIM & JURI', cardCategory: 'dewan_hakim', customBadge: 'DEWAN HAKIM' },
+    { id: 'com-h-14', name: 'Dewan Hakim Menggambar & Mewarnai', division: 'Cabang Gambar/Warna (TKA & TPA)', accessLevel: 'RUANG HAKIM & JURI', cardCategory: 'dewan_hakim', customBadge: 'DEWAN HAKIM' },
+    { id: 'com-h-15', name: 'Dewan Hakim Syarhil / Fahmil Qur\'an', division: 'Cabang Syarhil Qur\'an (TQA)', accessLevel: 'RUANG HAKIM & JURI', cardCategory: 'dewan_hakim', customBadge: 'DEWAN HAKIM' },
+    { id: 'com-h-16', name: 'Anggota Dewan Hakim I', division: 'Penilai Bidang Tajwid & Makhorijul Huruf', accessLevel: 'RUANG HAKIM & JURI', cardCategory: 'dewan_hakim', customBadge: 'DEWAN HAKIM' },
+    { id: 'com-h-17', name: 'Anggota Dewan Hakim II', division: 'Penilai Bidang Lagu, Suara & Irama', accessLevel: 'RUANG HAKIM & JURI', cardCategory: 'dewan_hakim', customBadge: 'DEWAN HAKIM' },
+    { id: 'com-h-18', name: 'Anggota Dewan Hakim III', division: 'Penilai Bidang Adab & Kerapian', accessLevel: 'RUANG HAKIM & JURI', cardCategory: 'dewan_hakim', customBadge: 'DEWAN HAKIM' },
+  ], []);
+
+  // List Panitia & Dewan Hakim Tergenerate
   const generatedCommittees: CommitteeCardData[] = useMemo(() => {
+    let rawList: CommitteeCardData[] = [];
+
     if (committeeMode === 'custom') {
-      return customCommittees;
+      rawList = customCommittees;
+    } else if (committeeMode === 'blanko') {
+      if (blankoType === 'panitia') {
+        rawList = Array.from({ length: blankoCount }, (_, idx) => ({
+          id: `com-blanko-p-${idx + 1}`,
+          name: '',
+          division: idx % 3 === 0 ? 'Sie Acara & Lomba' : idx % 3 === 1 ? 'Sie IT & Registrasi' : 'Sie Perlengkapan',
+          accessLevel: 'ALL ACCESS',
+          cardCategory: 'panitia',
+          customBadge: 'PANITIA',
+        }));
+      } else if (blankoType === 'dewan_hakim') {
+        rawList = Array.from({ length: blankoCount }, (_, idx) => ({
+          id: `com-blanko-h-${idx + 1}`,
+          name: '',
+          division: idx % 2 === 0 ? 'Dewan Hakim Lomba FASI XIII' : 'Anggota Dewan Juri Penilai',
+          accessLevel: 'RUANG HAKIM & JURI',
+          cardCategory: 'dewan_hakim',
+          customBadge: 'DEWAN HAKIM',
+        }));
+      } else {
+        // Campuran
+        const half = Math.floor(blankoCount / 2);
+        const panitiaPart: CommitteeCardData[] = Array.from({ length: half }, (_, idx) => ({
+          id: `com-mix-p-${idx + 1}`,
+          name: '',
+          division: idx % 2 === 0 ? 'Sie Acara & Lomba' : 'Sie IT & Logistik',
+          accessLevel: 'ALL ACCESS',
+          cardCategory: 'panitia',
+          customBadge: 'PANITIA',
+        }));
+        const hakimPart: CommitteeCardData[] = Array.from({ length: blankoCount - half }, (_, idx) => ({
+          id: `com-mix-h-${idx + 1}`,
+          name: '',
+          division: 'Dewan Hakim / Juri FASI XIII',
+          accessLevel: 'RUANG HAKIM & JURI',
+          cardCategory: 'dewan_hakim',
+          customBadge: 'DEWAN HAKIM',
+        }));
+        rawList = [...panitiaPart, ...hakimPart];
+      }
+    } else {
+      // Preset Gabungan
+      rawList = [...PRESET_PANITIA, ...PRESET_DEWAN_HAKIM];
     }
-    if (committeeMode === 'blanko') {
-      return Array.from({ length: blankoCount }, (_, idx) => ({
-        id: `com-blanko-${idx + 1}`,
-        name: '',
-        division: idx % 3 === 0 ? 'Sie Acara & Lomba' : idx % 3 === 1 ? 'Sie IT & Registrasi' : 'Sie Perlengkapan',
-        accessLevel: 'ALL ACCESS',
-      }));
+
+    // Filter berdasarkan subkategori (ALL, panitia, dewan_hakim)
+    if (committeeSubCategory === 'panitia') {
+      return rawList.filter((item) => item.cardCategory === 'panitia');
     }
-    // Preset Struktur Panitia FASI XIII
-    return [
-      { id: 'com-p-1', name: 'Dr. H. Muhammad Asrori, M.Ag', division: 'Ketua Panitia FASI XIII', accessLevel: 'ALL ACCESS' },
-      { id: 'com-p-2', name: 'Ustadz Ridwan Hakim, S.T', division: 'Sekretaris Panitia', accessLevel: 'ALL ACCESS' },
-      { id: 'com-p-3', name: 'Ustadzah Hj. Maryam, S.E', division: 'Bendahara Panitia', accessLevel: 'ALL ACCESS' },
-      { id: 'com-p-4', name: 'Ustadz Farhan Al-Ghifari, S.Pd', division: 'Sie Acara & Lomba', accessLevel: 'STAGE & LOMBA' },
-      { id: 'com-p-5', name: 'Ustadz Ilham Ramadhan, S.Kom', division: 'Sie IT & Registrasi', accessLevel: 'ALL ACCESS' },
-      { id: 'com-p-6', name: 'Ustadzah Nurul Hidayah, S.Pd.I', division: 'Sie Konsumsi & Logistik', accessLevel: 'LOGISTIK' },
-      { id: 'com-p-7', name: 'Ustadz Bagus Prasetyo', division: 'Sie Perlengkapan', accessLevel: 'VENUE' },
-      { id: 'com-p-8', name: 'Ustadz Hendra Kurniawan', division: 'Sie Publikasi & Dokumentasi', accessLevel: 'MEDIA & PRESS' },
-      { id: 'com-p-9', name: 'Dewan Juri FASI XIII', division: 'Dewan Hakim Lomba', accessLevel: 'RUANG JURI' },
-    ];
-  }, [committeeMode, customCommittees, blankoCount]);
+    if (committeeSubCategory === 'dewan_hakim') {
+      return rawList.filter((item) => item.cardCategory === 'dewan_hakim');
+    }
+    return rawList;
+  }, [committeeMode, customCommittees, blankoType, blankoCount, PRESET_PANITIA, PRESET_DEWAN_HAKIM, committeeSubCategory]);
 
   // Handle Tambah Custom Official
   const handleAddCustomOfficial = () => {
@@ -314,14 +427,14 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
       id: `off-c-${Date.now()}`,
       name: newOffName.trim(),
       role: newOffRole,
-      kemantrenName: kem ? `Kemantren ${kem.name}` : 'Kemantren Kota Yogyakarta',
+      kemantrenName: kem ? `Rayon ${kem.name}` : 'Rayon Kota Yogyakarta',
       kemantrenCode: kem?.code,
     };
     setCustomOfficials((prev) => [...prev, newOff]);
     setNewOffName('');
   };
 
-  // Handle Tambah Custom Committee
+  // Handle Tambah Custom Committee / Dewan Hakim
   const handleAddCustomCommittee = () => {
     if (!newComName.trim()) return;
     const newCom: CommitteeCardData = {
@@ -329,6 +442,8 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
       name: newComName.trim(),
       division: newComDivision,
       accessLevel: newComAccess,
+      cardCategory: newComType,
+      customBadge: newComType === 'dewan_hakim' ? 'DEWAN HAKIM' : 'PANITIA',
     };
     setCustomCommittees((prev) => [...prev, newCom]);
     setNewComName('');
@@ -360,7 +475,6 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
   const handleDownloadAllAsZip = async () => {
     if (currentTotalCards === 0 || isGeneratingZip || isGeneratingPdf) return;
 
-    // Cari seluruh kartu yang sedang ter-render di DOM
     const cardElements = Array.from(document.querySelectorAll<HTMLElement>('.fasi-id-card'));
     if (!cardElements.length) {
       showToast('warning', 'Tidak ada kartu yang ter-render di layar.');
@@ -371,7 +485,6 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
     setZipProgress({ current: 1, total: cardElements.length });
 
     try {
-      // Susun nama file yang rapi untuk tiap kartu
       let fileNames: string[] = [];
       if (activeCardType === 'peserta') {
         fileNames = filteredParticipants.map(
@@ -383,7 +496,7 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
         );
       } else {
         fileNames = generatedCommittees.map(
-          (com, i) => `Panitia_${i + 1}_${com.name ? com.name.replace(/\s+/g, '_') : 'Blanko'}`
+          (com, i) => `${com.cardCategory === 'dewan_hakim' ? 'Hakim' : 'Panitia'}_${i + 1}_${com.name ? com.name.replace(/\s+/g, '_') : 'Blanko'}`
         );
       }
 
@@ -466,6 +579,11 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
               Standar Portrait 5.5cm × 8.8cm (9 Kartu / Lembar A4). Format PNG Satuan / ZIP & Cetak Dokumen.
+              {isAdminRayon && currentAdminRayon && (
+                <span className="ml-1.5 font-bold text-blue-700">
+                  (Akses Rayon {currentAdminRayon.name})
+                </span>
+              )}
             </p>
           </div>
 
@@ -557,10 +675,10 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
           </div>
         </div>
 
-        {/* Tab Selector: Peserta, Official, Panitia */}
+        {/* Tab Selector: Peserta, Official, Panitia & Dewan Hakim */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
           <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200">
-            {/* Tab 1: Peserta */}
+            {/* Tab 1: Peserta (Semua Role) */}
             <button
               onClick={() => setActiveCardType('peserta')}
               className={`px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-2 transition-all cursor-pointer ${
@@ -576,50 +694,52 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
               </span>
             </button>
 
-            {/* Tab 2: Official (Superadmin Only) */}
+            {/* Tab 2: Official (Superadmin & Admin Rayon) */}
             <button
               onClick={() => {
-                if (isSuperAdmin) setActiveCardType('official');
+                if (canAccessOfficial) setActiveCardType('official');
               }}
-              disabled={!isSuperAdmin}
+              disabled={!canAccessOfficial}
               className={`px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-2 transition-all ${
-                !isSuperAdmin
+                !canAccessOfficial
                   ? 'opacity-50 cursor-not-allowed text-slate-400'
                   : activeCardType === 'official'
                   ? 'bg-white text-blue-900 shadow-xs cursor-pointer'
                   : 'text-slate-600 hover:text-slate-900 cursor-pointer'
               }`}
-              title={!isSuperAdmin ? 'Hanya dapat diakses oleh Super Admin' : 'Cetak ID Card Official'}
+              title={
+                !canAccessOfficial
+                  ? 'Hanya dapat diakses oleh Super Admin dan Admin Rayon'
+                  : isAdminRayon
+                  ? `Cetak ID Card Official Rayon ${currentAdminRayon?.name || ''}`
+                  : 'Cetak ID Card Official Seluruh Kontingen Rayon'
+              }
             >
               <Shield className="w-4 h-4 text-blue-700" />
               <span>ID Card Official</span>
-              {!isSuperAdmin ? (
-                <Lock className="w-3 h-3 text-slate-400" />
-              ) : (
-                <span className="px-1.5 py-0.2 bg-blue-100 text-blue-800 text-[10px] font-black rounded-md">
-                  {generatedOfficials.length}
-                </span>
-              )}
+              <span className="px-1.5 py-0.2 bg-blue-100 text-blue-800 text-[10px] font-black rounded-md">
+                {generatedOfficials.length}
+              </span>
             </button>
 
-            {/* Tab 3: Panitia (Superadmin Only) */}
+            {/* Tab 3: Panitia & Dewan Hakim (Superadmin Only) */}
             <button
               onClick={() => {
-                if (isSuperAdmin) setActiveCardType('panitia');
+                if (canAccessPanitia) setActiveCardType('panitia');
               }}
-              disabled={!isSuperAdmin}
+              disabled={!canAccessPanitia}
               className={`px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-2 transition-all ${
-                !isSuperAdmin
+                !canAccessPanitia
                   ? 'opacity-50 cursor-not-allowed text-slate-400'
                   : activeCardType === 'panitia'
                   ? 'bg-white text-rose-900 shadow-xs cursor-pointer'
                   : 'text-slate-600 hover:text-slate-900 cursor-pointer'
               }`}
-              title={!isSuperAdmin ? 'Hanya dapat diakses oleh Super Admin' : 'Cetak ID Card Panitia'}
+              title={!canAccessPanitia ? 'Hanya dapat diakses oleh Super Admin' : 'Cetak ID Card Panitia Pelaksana & Dewan Hakim'}
             >
               <Award className="w-4 h-4 text-rose-700" />
-              <span>ID Card Panitia</span>
-              {!isSuperAdmin ? (
+              <span>ID Card Panitia & Hakim</span>
+              {!canAccessPanitia ? (
                 <Lock className="w-3 h-3 text-slate-400" />
               ) : (
                 <span className="px-1.5 py-0.2 bg-rose-100 text-rose-800 text-[10px] font-black rounded-md">
@@ -722,10 +842,10 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
                 </select>
               </div>
 
-              {/* 3. Filter Kemantren */}
+              {/* 3. Filter Rayon */}
               <div>
                 <label className="block text-[10px] font-bold text-slate-600 mb-1 uppercase tracking-wider">
-                  Kemantren / Kontingen:
+                  Rayon / Kontingen:
                 </label>
                 <select
                   value={selectedKemantrenFilter}
@@ -735,10 +855,10 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
                     !isSuperAdmin ? 'bg-slate-100 cursor-not-allowed' : ''
                   }`}
                 >
-                  {isSuperAdmin && <option value="ALL">Semua Kemantren (14 Wilayah)</option>}
+                  {isSuperAdmin && <option value="ALL">Semua Rayon (14 Wilayah)</option>}
                   {kemantrenList.map((k) => (
                     <option key={k.id} value={k.id}>
-                      Kemantren {k.name}
+                      Rayon {k.name}
                     </option>
                   ))}
                 </select>
@@ -780,14 +900,25 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
           </div>
         )}
 
-        {/* B. JIKA MEMILIH ID CARD OFFICIAL (SUPERADMIN ONLY) */}
-        {activeCardType === 'official' && isSuperAdmin && (
+        {/* B. JIKA MEMILIH ID CARD OFFICIAL (SUPERADMIN & ADMIN RAYON) */}
+        {activeCardType === 'official' && canAccessOfficial && (
           <div className="bg-blue-50/50 rounded-xl p-4 border border-blue-200/80 space-y-4">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-              <span className="text-xs font-black text-blue-950 uppercase tracking-wider flex items-center gap-1.5">
-                <Shield className="w-3.5 h-3.5 text-blue-700" />
-                <span>Sistem Generator Kartu Official Kontingen</span>
-              </span>
+              <div>
+                <span className="text-xs font-black text-blue-950 uppercase tracking-wider flex items-center gap-1.5">
+                  <Shield className="w-3.5 h-3.5 text-blue-700" />
+                  <span>
+                    {isAdminRayon
+                      ? `Sistem Generator Kartu Official Rayon ${currentAdminRayon?.name || ''}`
+                      : 'Sistem Generator Kartu Official Kontingen Rayon'}
+                  </span>
+                </span>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  {isAdminRayon
+                    ? `Admin Rayon ${currentAdminRayon?.name} dapat mencetak ID Card Ketua Kontingen dan Official pendamping rayon.`
+                    : 'Cetak kartu official untuk 14 Rayon Kota Yogyakarta (Ketua Kontingen, Official, Medis & Logistik).'}
+                </p>
+              </div>
 
               {/* Mode Switcher */}
               <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-blue-200">
@@ -797,7 +928,7 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
                     officialMode === 'auto_kemantren' ? 'bg-blue-900 text-white' : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  ⚡ Auto 14 Kemantren
+                  ⚡ {isAdminRayon ? `Auto Rayon ${currentAdminRayon?.name || ''}` : 'Auto 14 Rayon'}
                 </button>
                 <button
                   onClick={() => setOfficialMode('custom')}
@@ -813,32 +944,52 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
                     officialMode === 'blanko' ? 'bg-blue-900 text-white' : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  📝 Blanko per Kemantren
+                  📝 {isAdminRayon ? 'Blanko Rayon Ini' : 'Blanko per Rayon'}
                 </button>
               </div>
             </div>
 
-            {/* Sub Controls Auto Kemantren */}
+            {/* Sub Controls Auto Rayon & Filter Rayon untuk Superadmin */}
             {(officialMode === 'auto_kemantren' || officialMode === 'blanko') && (
-              <div className="flex items-center gap-4 bg-white p-3 rounded-lg border border-blue-100">
-                <label className="text-xs font-bold text-slate-700">
-                  Jumlah Kartu per Kemantren:
-                </label>
-                <div className="flex items-center gap-2">
-                  {[1, 2, 3, 4].map((num) => (
-                    <button
-                      key={num}
-                      onClick={() => setOfficialsPerKemantren(num)}
-                      className={`px-3 py-1 rounded-md font-extrabold text-xs transition-colors cursor-pointer ${
-                        officialsPerKemantren === num
-                          ? 'bg-blue-800 text-white shadow-xs'
-                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                      }`}
-                    >
-                      {num} Kartu ({num * 14} Total)
-                    </button>
-                  ))}
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-lg border border-blue-100">
+                <div className="flex items-center gap-4">
+                  <label className="text-xs font-bold text-slate-700">
+                    Jumlah Kartu per Rayon:
+                  </label>
+                  <div className="flex items-center gap-2">
+                    {[1, 2, 3, 4].map((num) => (
+                      <button
+                        key={num}
+                        onClick={() => setOfficialsPerKemantren(num)}
+                        className={`px-3 py-1 rounded-md font-extrabold text-xs transition-colors cursor-pointer ${
+                          officialsPerKemantren === num
+                            ? 'bg-blue-800 text-white shadow-xs'
+                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                        }`}
+                      >
+                        {num} Kartu ({num * targetRayonList.length} Total)
+                      </button>
+                    ))}
+                  </div>
                 </div>
+
+                {isSuperAdmin && (
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-bold text-slate-700">Pilih Rayon:</label>
+                    <select
+                      value={selectedOfficialRayonFilter}
+                      onChange={(e) => setSelectedOfficialRayonFilter(e.target.value)}
+                      className="text-xs font-semibold bg-slate-50 border border-slate-300 rounded-lg p-1.5"
+                    >
+                      <option value="ALL">Semua 14 Rayon</option>
+                      {kemantrenList.map((k) => (
+                        <option key={k.id} value={k.id}>
+                          Rayon {k.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
             )}
 
@@ -863,17 +1014,25 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
                     <option value="Koordinator Lomba">Koordinator Lomba</option>
                     <option value="Official Medis & Logistik">Official Medis & Logistik</option>
                   </select>
-                  <select
-                    value={newOffKemId}
-                    onChange={(e) => setNewOffKemId(e.target.value)}
-                    className="text-xs font-semibold bg-slate-50 border border-slate-300 rounded-lg p-2"
-                  >
-                    {kemantrenList.map((k) => (
-                      <option key={k.id} value={k.id}>
-                        Kemantren {k.name}
-                      </option>
-                    ))}
-                  </select>
+                  
+                  {isSuperAdmin ? (
+                    <select
+                      value={newOffKemId}
+                      onChange={(e) => setNewOffKemId(e.target.value)}
+                      className="text-xs font-semibold bg-slate-50 border border-slate-300 rounded-lg p-2"
+                    >
+                      {kemantrenList.map((k) => (
+                        <option key={k.id} value={k.id}>
+                          Rayon {k.name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <span className="text-xs font-bold text-blue-900 bg-blue-50 px-3 py-2 rounded-lg border border-blue-200">
+                      Rayon {currentAdminRayon?.name || ''}
+                    </span>
+                  )}
+
                   <button
                     onClick={handleAddCustomOfficial}
                     className="px-4 py-2 bg-blue-800 hover:bg-blue-700 text-white font-bold text-xs rounded-lg flex items-center gap-1.5 cursor-pointer shadow-xs"
@@ -909,16 +1068,53 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
           </div>
         )}
 
-        {/* C. JIKA MEMILIH ID CARD PANITIA (SUPERADMIN ONLY) */}
-        {activeCardType === 'panitia' && isSuperAdmin && (
+        {/* C. JIKA MEMILIH ID CARD PANITIA & DEWAN HAKIM (SUPERADMIN ONLY) */}
+        {activeCardType === 'panitia' && canAccessPanitia && (
           <div className="bg-rose-50/50 rounded-xl p-4 border border-rose-200/80 space-y-4">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-              <span className="text-xs font-black text-rose-950 uppercase tracking-wider flex items-center gap-1.5">
-                <Award className="w-3.5 h-3.5 text-rose-700" />
-                <span>Sistem Generator Kartu Panitia Pelaksana & Dewan Juri</span>
-              </span>
+            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3">
+              <div>
+                <span className="text-xs font-black text-rose-950 uppercase tracking-wider flex items-center gap-1.5">
+                  <Award className="w-3.5 h-3.5 text-rose-700" />
+                  <span>Sistem Generator Kartu Panitia Pelaksana & Dewan Hakim</span>
+                </span>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Tersedia opsi kartu khusus <strong>Panitia Pelaksana</strong> (Badge Merah/Maroon) dan <strong>Dewan Hakim / Juri</strong> (Badge Khusus Ruang Hakim).
+                </p>
+              </div>
 
-              {/* Mode Switcher */}
+              {/* Sub-Kategori Filter (ALL, Panitia, Dewan Hakim) */}
+              <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-rose-200">
+                <button
+                  onClick={() => setCommitteeSubCategory('ALL')}
+                  className={`px-2.5 py-1 text-xs font-bold rounded-md transition-colors cursor-pointer ${
+                    committeeSubCategory === 'ALL' ? 'bg-rose-900 text-white' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Semua ({PRESET_PANITIA.length + PRESET_DEWAN_HAKIM.length})
+                </button>
+                <button
+                  onClick={() => setCommitteeSubCategory('panitia')}
+                  className={`px-2.5 py-1 text-xs font-bold rounded-md transition-colors cursor-pointer flex items-center gap-1 ${
+                    committeeSubCategory === 'panitia' ? 'bg-rose-800 text-white' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Award className="w-3 h-3" />
+                  <span>Panitia Pelaksana</span>
+                </button>
+                <button
+                  onClick={() => setCommitteeSubCategory('dewan_hakim')}
+                  className={`px-2.5 py-1 text-xs font-bold rounded-md transition-colors cursor-pointer flex items-center gap-1 ${
+                    committeeSubCategory === 'dewan_hakim' ? 'bg-pink-900 text-white' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Scale className="w-3 h-3" />
+                  <span>Dewan Hakim</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Mode Switcher */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
               <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-rose-200">
                 <button
                   onClick={() => setCommitteeMode('preset')}
@@ -926,7 +1122,7 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
                     committeeMode === 'preset' ? 'bg-rose-900 text-white' : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  🏛️ Preset Struktur Panitia
+                  🏛️ Preset Resmi (Panitia + Hakim)
                 </button>
                 <button
                   onClick={() => setCommitteeMode('blanko')}
@@ -934,7 +1130,7 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
                     committeeMode === 'blanko' ? 'bg-rose-900 text-white' : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  🏷️ Blanko Siap Tempel Nama
+                  🏷️ Blanko Tempel / Tulis Nama
                 </button>
                 <button
                   onClick={() => setCommitteeMode('custom')}
@@ -942,31 +1138,46 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
                     committeeMode === 'custom' ? 'bg-rose-900 text-white' : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  ✏️ Custom Nama Panitia
+                  ✏️ Custom Nama & Jabatan
                 </button>
               </div>
             </div>
 
-            {/* Sub Controls Blanko Panitia */}
+            {/* Sub Controls Blanko Panitia & Hakim */}
             {committeeMode === 'blanko' && (
-              <div className="flex items-center gap-4 bg-white p-3 rounded-lg border border-rose-100">
-                <label className="text-xs font-bold text-slate-700">
-                  Jumlah Kartu Blanko Tempel Nama:
-                </label>
-                <div className="flex items-center gap-2">
-                  {[9, 18, 27, 36, 45, 90].map((num) => (
-                    <button
-                      key={num}
-                      onClick={() => setBlankoCount(num)}
-                      className={`px-3 py-1 rounded-md font-extrabold text-xs transition-colors cursor-pointer ${
-                        blankoCount === num
-                          ? 'bg-rose-800 text-white shadow-xs'
-                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                      }`}
+              <div className="space-y-3 bg-white p-3 rounded-lg border border-rose-100">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-bold text-slate-700">Tipe Kartu Blanko:</label>
+                    <select
+                      value={blankoType}
+                      onChange={(e) => setBlankoType(e.target.value as any)}
+                      className="text-xs font-semibold bg-slate-50 border border-slate-300 rounded-lg p-1.5"
                     >
-                      {num} Kartu ({num / 9} Lembar A4)
-                    </button>
-                  ))}
+                      <option value="campuran">Campuran (Panitia & Dewan Hakim)</option>
+                      <option value="panitia">Khusus Panitia Pelaksana</option>
+                      <option value="dewan_hakim">Khusus Dewan Hakim / Juri</option>
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-bold text-slate-700">Jumlah Kartu:</label>
+                    <div className="flex items-center gap-1.5">
+                      {[9, 18, 27, 36, 45, 90].map((num) => (
+                        <button
+                          key={num}
+                          onClick={() => setBlankoCount(num)}
+                          className={`px-2.5 py-1 rounded-md font-extrabold text-xs transition-colors cursor-pointer ${
+                            blankoCount === num
+                              ? 'bg-rose-800 text-white shadow-xs'
+                              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                          }`}
+                        >
+                          {num} Kartu
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -975,37 +1186,61 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
             {committeeMode === 'custom' && (
               <div className="space-y-3">
                 <div className="flex flex-wrap items-center gap-2 bg-white p-3 rounded-lg border border-rose-100">
+                  {/* Pilih Tipe Kartu (Panitia vs Dewan Hakim) */}
+                  <select
+                    value={newComType}
+                    onChange={(e) => {
+                      const val = e.target.value as 'panitia' | 'dewan_hakim';
+                      setNewComType(val);
+                      if (val === 'dewan_hakim') {
+                        setNewComDivision('Dewan Hakim Tilawah Al-Qur\'an');
+                        setNewComAccess('RUANG HAKIM & JURI');
+                      } else {
+                        setNewComDivision('Sie Acara & Lomba');
+                        setNewComAccess('ALL ACCESS');
+                      }
+                    }}
+                    className="text-xs font-bold bg-slate-100 border border-slate-300 rounded-lg p-2"
+                  >
+                    <option value="panitia">Kartu: Panitia Pelaksana</option>
+                    <option value="dewan_hakim">Kartu: Dewan Hakim / Juri</option>
+                  </select>
+
                   <input
                     type="text"
-                    placeholder="Nama Lengkap Panitia / Dewan Juri..."
+                    placeholder={newComType === 'dewan_hakim' ? 'Nama Lengkap Dewan Hakim...' : 'Nama Lengkap Panitia...'}
                     value={newComName}
                     onChange={(e) => setNewComName(e.target.value)}
                     className="text-xs font-semibold bg-slate-50 border border-slate-300 rounded-lg p-2 flex-1 min-w-[200px]"
                   />
+                  
                   <input
                     type="text"
-                    placeholder="Divisi (misal: Sie Acara & Lomba)..."
+                    placeholder={newComType === 'dewan_hakim' ? 'Bidang Lomba (misal: Cabang Tahfidz)...' : 'Divisi (misal: Sie Acara)...'}
                     value={newComDivision}
                     onChange={(e) => setNewComDivision(e.target.value)}
                     className="text-xs font-semibold bg-slate-50 border border-slate-300 rounded-lg p-2 flex-1 min-w-[180px]"
                   />
+
                   <select
                     value={newComAccess}
                     onChange={(e) => setNewComAccess(e.target.value)}
                     className="text-xs font-semibold bg-slate-50 border border-slate-300 rounded-lg p-2"
                   >
                     <option value="ALL ACCESS">ALL ACCESS</option>
+                    <option value="RUANG HAKIM & JURI">RUANG HAKIM & JURI</option>
                     <option value="STAGE & LOMBA">STAGE & LOMBA</option>
-                    <option value="RUANG JURI">RUANG JURI</option>
                     <option value="MEDIA & PRESS">MEDIA & PRESS</option>
                     <option value="LOGISTIK">LOGISTIK</option>
+                    <option value="VENUE">VENUE</option>
                   </select>
+
                   <button
                     onClick={handleAddCustomCommittee}
                     className="px-4 py-2 bg-rose-800 hover:bg-rose-700 text-white font-bold text-xs rounded-lg flex items-center gap-1.5 cursor-pointer shadow-xs"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    <span>Tambah Panitia</span>
+                    <span>Tambah Kartu</span>
                   </button>
                 </div>
 
@@ -1017,8 +1252,10 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
                       className="bg-white px-2.5 py-1.5 rounded-lg border border-rose-200 text-xs flex items-center gap-2 shadow-2xs"
                     >
                       <span className="font-bold text-slate-800">{com.name}</span>
-                      <span className="text-[10px] text-rose-700 bg-rose-50 px-1.5 py-0.2 rounded font-medium">
-                        {com.division} ({com.accessLevel})
+                      <span className={`text-[10px] px-1.5 py-0.2 rounded font-medium ${
+                        com.cardCategory === 'dewan_hakim' ? 'bg-pink-100 text-pink-900' : 'bg-rose-50 text-rose-800'
+                      }`}>
+                        {com.customBadge || (com.cardCategory === 'dewan_hakim' ? 'DEWAN HAKIM' : 'PANITIA')} - {com.division} ({com.accessLevel})
                       </span>
                       <button
                         onClick={() => setCustomCommittees((prev) => prev.filter((_, i) => i !== idx))}
@@ -1090,7 +1327,7 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
               Tidak Ada Kartu yang Sesuai Filter
             </h3>
             <p className="text-xs text-slate-500 max-w-md mx-auto">
-              Silakan sesuaikan pilihan jenjang kategori, cabang lomba, kemantren, atau kata kunci pencarian Anda.
+              Silakan sesuaikan pilihan jenjang kategori, cabang lomba, rayon, atau kata kunci pencarian Anda.
             </p>
           </div>
         ) : (
@@ -1171,7 +1408,7 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
                   }}
                 >
                   <div className="no-print flex items-center justify-between border-b border-slate-100 pb-2 mb-3 text-[11px] text-slate-400 font-mono">
-                    <span className="font-semibold text-blue-800">ID Card Official Kontingen FASI XIII</span>
+                    <span className="font-semibold text-blue-800">ID Card Official Kontingen Rayon FASI XIII</span>
                     <span>Lembar {pageIdx + 1} dari {officialPages.length} ({pageItems.length} Kartu)</span>
                   </div>
                   <div
@@ -1216,7 +1453,7 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
                 </div>
               ))}
 
-            {/* RENDER COMMITTEE PER LEMBAR A4 */}
+            {/* RENDER COMMITTEE & DEWAN HAKIM PER LEMBAR A4 */}
             {activeCardType === 'panitia' &&
               committeePages.map((pageItems, pageIdx) => (
                 <div
@@ -1229,7 +1466,11 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
                   }}
                 >
                   <div className="no-print flex items-center justify-between border-b border-slate-100 pb-2 mb-3 text-[11px] text-slate-400 font-mono">
-                    <span className="font-semibold text-rose-800">ID Card Panitia & Juri FASI XIII</span>
+                    <span className="font-semibold text-rose-800">
+                      ID Card Panitia & Dewan Hakim FASI XIII
+                      {committeeSubCategory === 'panitia' && ' (Khusus Panitia)'}
+                      {committeeSubCategory === 'dewan_hakim' && ' (Khusus Dewan Hakim)'}
+                    </span>
                     <span>Lembar {pageIdx + 1} dari {committeePages.length} ({pageItems.length} Kartu)</span>
                   </div>
                   <div
@@ -1239,8 +1480,9 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
                     }}
                   >
                     {pageItems.map((com, idx) => {
+                      const isHakim = com.cardCategory === 'dewan_hakim';
                       const elementId = `card-panitia-${com.id || idx}`;
-                      const fileName = `Panitia_${idx + 1}_${com.name ? com.name.replace(/\s+/g, '_') : 'Blanko'}`;
+                      const fileName = `${isHakim ? 'Dewan_Hakim' : 'Panitia'}_${idx + 1}_${com.name ? com.name.replace(/\s+/g, '_') : 'Blanko'}`;
                       return (
                         <div key={com.id || idx} className="relative group flex justify-center">
                           <div id={elementId}>
@@ -1257,7 +1499,7 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
                               onClick={() => handleDownloadSingleCard(elementId, fileName, com.id || String(idx))}
                               disabled={downloadingCardId === (com.id || String(idx))}
                               className="px-2 py-1 bg-slate-900/90 hover:bg-black text-white rounded-md text-[10px] font-bold shadow-md flex items-center gap-1 cursor-pointer transition-all active:scale-95"
-                              title="Download kartu panitia ini saja sebagai gambar PNG 300 DPI"
+                              title={`Download kartu ${isHakim ? 'Dewan Hakim' : 'Panitia'} ini saja sebagai gambar PNG 300 DPI`}
                             >
                               {downloadingCardId === (com.id || String(idx)) ? (
                                 <Loader2 className="w-3 h-3 animate-spin text-amber-300" />

@@ -13,8 +13,10 @@ import { ID_CARD_ASSETS, ID_CARD_THEMES, IdCardTheme } from './idCardThemes';
 export interface CommitteeCardData {
   id: string;
   name?: string; // Optional: If empty, provides empty space area for physical sticker/handwritten name
-  division: string; // e.g. "Sie Acara & Lomba", "Dewan Juri", "Sie IT & Registrasi", "Sie Konsumsi", "Ketua Panitia"
-  accessLevel?: string; // e.g. "ALL ACCESS", "PANITIA INTI", "JURI LOMBA"
+  division: string; // e.g. "Sie Acara & Lomba", "Dewan Juri Tilawah", "Sie IT & Registrasi", "Koordinator Dewan Hakim"
+  accessLevel?: string; // e.g. "ALL ACCESS", "PANITIA INTI", "RUANG HAKIM & JURI"
+  cardCategory?: 'panitia' | 'dewan_hakim';
+  customBadge?: string; // e.g. "PANITIA" or "DEWAN HAKIM"
 }
 
 interface IdCardCommitteeProps {
@@ -29,6 +31,12 @@ export const IdCardCommittee: React.FC<IdCardCommitteeProps> = ({
   customTagline = 'Santri Hebat, Hebat Prestasi, Hebat Mengaji, & Berakhlakul Karimah.',
 }) => {
   const hasDigitalName = Boolean(data.name && data.name.trim().length > 0);
+  const isDewanHakim =
+    data.cardCategory === 'dewan_hakim' ||
+    (data.customBadge && /hakim|juri/i.test(data.customBadge)) ||
+    /hakim|juri/i.test(data.division || '');
+
+  const badgeText = data.customBadge || (isDewanHakim ? 'DEWAN HAKIM' : 'PANITIA');
 
   // Dynamic font sizing
   const nameLength = (data.name || '').trim().length;
@@ -91,27 +99,27 @@ export const IdCardCommittee: React.FC<IdCardCommitteeProps> = ({
 
       {/* 2. Middle Content: Divisi / Jabatan + Area Nama */}
       <div className="relative z-10 my-auto py-1 text-center flex flex-col items-center justify-center space-y-1.5">
-        {/* Badge Panitia: Cukup PANITIA besar & jelas */}
+        {/* Badge: PANITIA atau DEWAN HAKIM */}
         <div
           className="inline-flex items-center justify-center px-4 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-2xs"
           style={{
-            backgroundColor: theme.badgeBg,
-            color: theme.badgeText,
+            backgroundColor: isDewanHakim ? '#831843' : theme.badgeBg,
+            color: '#ffffff',
           }}
         >
-          <span>PANITIA</span>
+          <span>{badgeText}</span>
         </div>
 
-        {/* Divisi / Seksi Panitia */}
+        {/* Divisi / Bidang Lomba */}
         <div className="w-full pt-0.5">
           <span className="text-[5.5px] uppercase font-extrabold text-slate-500 block tracking-widest mb-0.5">
-            SEKSI / DIVISI
+            {isDewanHakim ? 'BIDANG PENILAIAN / JABATAN' : 'SEKSI / DIVISI'}
           </span>
           <h3
             className="font-black text-[11px] uppercase tracking-tight leading-tight m-0"
             style={{ color: theme.primaryColor }}
           >
-            {data.division || 'PANITIA FASI XIII'}
+            {data.division || (isDewanHakim ? 'DEWAN HAKIM FASI XIII' : 'PANITIA FASI XIII')}
           </h3>
         </div>
 
@@ -122,7 +130,7 @@ export const IdCardCommittee: React.FC<IdCardCommitteeProps> = ({
             style={{ borderColor: `${theme.borderColor}60` }}
           >
             <span className="text-[5.5px] uppercase font-bold block text-slate-500 tracking-wider">
-              NAMA LENGKAP PANITIA
+              {isDewanHakim ? 'NAMA LENGKAP DEWAN HAKIM' : 'NAMA LENGKAP PANITIA'}
             </span>
             <h4
               className={`font-black uppercase font-sans tracking-tight line-clamp-2 ${nameFontSizeClass}`}
@@ -138,7 +146,7 @@ export const IdCardCommittee: React.FC<IdCardCommitteeProps> = ({
                   backgroundColor: `${theme.accentColor}18`,
                 }}
               >
-                {data.accessLevel || 'ALL ACCESS'}
+                {data.accessLevel || (isDewanHakim ? 'RUANG HAKIM & JURI' : 'ALL ACCESS')}
               </span>
             </div>
           </div>
@@ -151,7 +159,7 @@ export const IdCardCommittee: React.FC<IdCardCommitteeProps> = ({
             }}
           >
             <span className="text-[6px] font-extrabold uppercase tracking-wider text-slate-600 mb-0.5">
-              [ TEMPEL LABEL / TULIS NAMA ]
+              {isDewanHakim ? '[ TEMPEL LABEL / NAMA DEWAN HAKIM ]' : '[ TEMPEL LABEL / TULIS NAMA ]'}
             </span>
             <div className="w-3/4 h-[1px] bg-slate-300 my-0.5" />
             <span className="text-[5.5px] font-bold text-slate-500">

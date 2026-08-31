@@ -36,14 +36,14 @@ export const IdCardParticipant: React.FC<IdCardParticipantProps> = ({
   const rawLevel = category?.level || (participant.categoryId.includes('tka') ? 'TKA' : participant.categoryId.includes('tqa') ? 'TQA' : 'TPA');
   const levelText = rawLevel.toUpperCase().trim();
 
-  // Format Asal TPA & Kemantren
+  // Format Asal TPA & Rayon
   const rawKemantren = kemantrenName || (participant as any).kemantren || (participant as any).kemantrenName || '';
-  const kemantrenClean = rawKemantren ? rawKemantren.replace(/^Kemantren\s*/i, '').trim() : '';
+  const kemantrenClean = rawKemantren ? rawKemantren.replace(/^Kemantren\s*/i, '').replace(/^Rayon\s*/i, '').trim() : '';
   let displayTpaKemantren = participant.tpaUnitName || 'TPA Kontingen';
   if (participant.tpaUnitName && kemantrenClean) {
-    displayTpaKemantren = `${participant.tpaUnitName}, ${kemantrenClean}`;
+    displayTpaKemantren = `${participant.tpaUnitName}, Rayon ${kemantrenClean}`;
   } else if (kemantrenClean) {
-    displayTpaKemantren = `Kemantren ${kemantrenClean}`;
+    displayTpaKemantren = `Rayon ${kemantrenClean}`;
   }
 
   // Format Gender / Grup

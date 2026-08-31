@@ -592,21 +592,32 @@ export async function fetchBeritaAcaraFromSupabase(): Promise<BeritaAcaraKejuara
 
     if (!data) return [];
 
-    return data.map((row: any): BeritaAcaraKejuaraan => ({
-      id: row.id,
-      cabangId: row.cabang_id,
-      namaCabang: row.nama_cabang,
-      jenjang: row.jenjang,
-      golongan: row.golongan,
-      isCabangUtama: Boolean(row.is_cabang_utama),
-      tanggalPenetapan: row.tanggal_penetapan || new Date().toISOString().split('T')[0],
-      status: (row.status === 'Disahkan' ? 'Disahkan' : 'Draft') as 'Draft' | 'Disahkan',
-      namaKetuaJuri: row.nama_ketua_juri || '',
-      namaSekretarisJuri: row.nama_sekretaris_juri || '',
-      catatan: row.catatan || '',
-      pemenang: row.pemenang || {},
-      updatedAt: row.updated_at || new Date().toISOString(),
-    }));
+    return data.map((row: any): BeritaAcaraKejuaraan => {
+      const juri1 = row.juri_satu || row.nama_ketua_juri || '';
+      const juri2 = row.juri_dua || row.nama_anggota_juri || row.nama_sekretaris_juri || '';
+      const catatanVal = row.catatan || row.catatan_juri || '';
+
+      return {
+        id: row.id,
+        cabangId: row.cabang_id,
+        namaCabang: row.nama_cabang,
+        cabangNama: row.nama_cabang,
+        jenjang: row.jenjang,
+        golongan: row.golongan,
+        isCabangUtama: Boolean(row.is_cabang_utama),
+        tanggalPenetapan: row.tanggal_penetapan || new Date().toISOString().split('T')[0],
+        status: (row.status === 'Disahkan' ? 'Disahkan' : 'Draft') as 'Draft' | 'Disahkan',
+        juriSatu: juri1,
+        juriDua: juri2,
+        namaKetuaJuri: juri1,
+        namaAnggotaJuri: juri2,
+        namaSekretarisJuri: juri2,
+        catatan: catatanVal,
+        catatanJuri: catatanVal,
+        pemenang: row.pemenang || {},
+        updatedAt: row.updated_at || new Date().toISOString(),
+      };
+    });
   } catch (error: any) {
     console.warn('Exception fetchBeritaAcaraFromSupabase:', error?.message || error);
     return null;
@@ -616,39 +627,67 @@ export async function fetchBeritaAcaraFromSupabase(): Promise<BeritaAcaraKejuara
 /**
  * Menyimpan / Upsert satu Berita Acara ke Supabase
  */
-export async function upsertBeritaAcaraToSupabase(ba: BeritaAcaraKejuaraan): Promise<boolean> {
+export async function upsertBeritaAcaraToSupabase(ba: BeritaAcaraKejuaraan): Promise<{ success: boolean; error?: string }> {
   const client = getSupabaseClient();
-  if (!client) return false;
+  if (!client) return { success: false, error: 'Klien Supabase belum aktif atau belum terkonfigurasi' };
+
+  const juri1 = ba.juriSatu || ba.namaKetuaJuri || null;
+  const juri2 = ba.juriDua || ba.namaAnggotaJuri || ba.namaSekretarisJuri || null;
+  const catatanVal = ba.catatanJuri || ba.catatan || null;
 
   try {
-    const payload = {
+    // Primary payload using requested new columns: juri_satu & juri_dua
+    const payload: Record<string, any> = {
       id: ba.id,
       cabang_id: ba.cabangId,
-      nama_cabang: ba.namaCabang,
+      nama_cabang: ba.cabangNama || ba.namaCabang || '',
       jenjang: ba.jenjang,
       golongan: ba.golongan,
       is_cabang_utama: ba.isCabangUtama,
       tanggal_penetapan: ba.tanggalPenetapan || new Date().toISOString().split('T')[0],
       status: ba.status,
-      nama_ketua_juri: ba.namaKetuaJuri || null,
-      nama_sekretaris_juri: ba.namaSekretarisJuri || null,
-      catatan: ba.catatan || null,
+      juri_satu: juri1,
+      juri_dua: juri2,
+      catatan: catatanVal,
       pemenang: ba.pemenang || {},
       updated_at: new Date().toISOString(),
     };
 
-    const { error } = await client
+    let { error } = await client
       .from('berita_acara_kejuaraan')
       .upsert(payload, { onConflict: 'id' });
 
+    // Fallback: If table in Supabase still has old column names (nama_ketua_juri / nama_anggota_juri)
+    if (error && (error.message?.includes('juri_satu') || error.message?.includes('juri_dua') || error.code === 'PGRST204')) {
+      const fallbackPayload: Record<string, any> = {
+        id: ba.id,
+        cabang_id: ba.cabangId,
+        nama_cabang: ba.cabangNama || ba.namaCabang || '',
+        jenjang: ba.jenjang,
+        golongan: ba.golongan,
+        is_cabang_utama: ba.isCabangUtama,
+        tanggal_penetapan: ba.tanggalPenetapan || new Date().toISOString().split('T')[0],
+        status: ba.status,
+        nama_ketua_juri: juri1,
+        nama_anggota_juri: juri2,
+        catatan: catatanVal,
+        pemenang: ba.pemenang || {},
+        updated_at: new Date().toISOString(),
+      };
+      const fallbackRes = await client
+        .from('berita_acara_kejuaraan')
+        .upsert(fallbackPayload, { onConflict: 'id' });
+      error = fallbackRes.error;
+    }
+
     if (error) {
       console.error('Error upserting berita acara to Supabase:', error);
-      return false;
+      return { success: false, error: error.message };
     }
-    return true;
+    return { success: true };
   } catch (error: any) {
     console.error('Exception upsertBeritaAcaraToSupabase:', error?.message || error);
-    return false;
+    return { success: false, error: error?.message || 'Terjadi kesalahan sistem saat menyimpan ke Supabase' };
   }
 }
 

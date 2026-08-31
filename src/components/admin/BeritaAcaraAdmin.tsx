@@ -26,16 +26,37 @@ import {
   ArrowRight,
   RefreshCw,
   Star,
+  Layers,
+  User,
 } from 'lucide-react';
 import { Participant, BeritaAcaraKejuaraan, WinnerSlot, Jenjang, CompetitionCategory } from '../../types/fasi';
 import { CATEGORIES_LIST, KEMANTREN_LIST } from '../../data/fasiMasterData';
 import { getStoredBeritaAcara, saveBeritaAcaraList } from '../../utils/storage';
-import { upsertBeritaAcaraToSupabase, deleteBeritaAcaraFromSupabase, isSupabaseConfigured } from '../../lib/supabase';
+import {
+  upsertBeritaAcaraToSupabase,
+  deleteBeritaAcaraFromSupabase,
+  fetchBeritaAcaraFromSupabase,
+  isSupabaseConfigured,
+} from '../../lib/supabase';
 import { showToast, showConfirmDialog } from '../../utils/sweetalert';
+
+const LOGO_BADKO_URL = 'https://gigluvvkswjaiwxpnqet.supabase.co/storage/v1/object/public/public-assets/logobadko.png';
+const LOGO_FASI_URL = 'https://gigluvvkswjaiwxpnqet.supabase.co/storage/v1/object/public/public-assets/logofasi.png';
 
 interface BeritaAcaraAdminProps {
   participants: Participant[];
   onDataChanged?: () => void;
+}
+
+export interface CategoryGroup {
+  groupId: string;
+  kemantrenId: string;
+  kemantrenName: string;
+  unitTpa: string;
+  members: Participant[];
+  memberNames: string[];
+  formattedName: string;
+  averageScore: number;
 }
 
 // Menentukan apakah suatu cabang lomba merupakan Cabang Utama (Bobot 7-5-3)
@@ -43,7 +64,7 @@ export function checkIsCabangUtama(categoryName: string, level: Jenjang): boolea
   const normalized = categoryName.toLowerCase();
   if (level === 'TKA' && normalized.includes('tartil')) return true;
   if (level === 'TPA' && normalized.includes('tartil')) return true;
-  if (level === 'TQA' && normalized.includes('tilawah')) return true;
+  if (level === 'TQA' && (normalized.includes('tilawah') || normalized.includes('tilawati'))) return true;
   return false;
 }
 
@@ -53,14 +74,14 @@ export const BeritaAcaraAdmin: React.FC<BeritaAcaraAdminProps> = ({ participants
   const [filterJenjang, setFilterJenjang] = useState<'ALL' | Jenjang>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-  const [isPrinting, setIsPrinting] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // Form State untuk Cabang terpilih
   const [tanggalPenetapan, setTanggalPenetapan] = useState<string>(
     new Date().toISOString().split('T')[0]
   );
-  const [namaKetuaJuri, setNamaKetuaJuri] = useState<string>('');
-  const [namaAnggotaJuri, setNamaAnggotaJuri] = useState<string>('');
+  const [juriSatu, setJuriSatu] = useState<string>('');
+  const [juriDua, setJuriDua] = useState<string>('');
   const [catatanJuri, setCatatanJuri] = useState<string>('');
   const [status, setStatus] = useState<'Draft' | 'Disahkan'>('Draft');
 
@@ -81,19 +102,106 @@ export const BeritaAcaraAdmin: React.FC<BeritaAcaraAdminProps> = ({ participants
     return checkIsCabangUtama(currentCategory.name, currentCategory.level as Jenjang);
   }, [currentCategory]);
 
-  // Peserta yang terdaftar di cabang lomba aktif (untuk pilihan auto-complete)
+  const isGroupCategory = Boolean(currentCategory?.isGroup);
+  const groupMemberCount = currentCategory?.groupMemberCount || 3;
+
+  // Peserta yang terdaftar di cabang lomba aktif
   const categoryParticipants = useMemo(() => {
     return participants.filter((p) => p.categoryId === currentCategory.id);
   }, [participants, currentCategory]);
+
+  // Kelompokkan regu jika cabang lomba adalah kategori grup / beregu (3 santri per regu)
+  const categoryGroups = useMemo<CategoryGroup[]>(() => {
+    if (!currentCategory || !currentCategory.isGroup) return [];
+
+    const byKemantren: Record<string, Participant[]> = {};
+    categoryParticipants.forEach((p) => {
+      if (!byKemantren[p.kemantrenId]) {
+        byKemantren[p.kemantrenId] = [];
+      }
+      byKemantren[p.kemantrenId].push(p);
+    });
+
+    const groups: CategoryGroup[] = [];
+    const memberCount = currentCategory.groupMemberCount || 3;
+
+    Object.keys(byKemantren).forEach((kemId) => {
+      const parts = byKemantren[kemId];
+      const kem = KEMANTREN_LIST.find((k) => k.id === kemId);
+      const kemName = kem ? kem.name : kemId;
+
+      for (let i = 0; i < parts.length; i += memberCount) {
+        const chunk = parts.slice(i, i + memberCount);
+        const groupIndex = Math.floor(i / memberCount) + 1;
+        const memberNames = chunk.map((m) => m.fullName);
+        const unitTpa = chunk[0]?.tpaUnitName || '';
+        const avgScore = chunk.length > 0
+          ? chunk.reduce((sum, m) => sum + (m.totalScore || 0), 0) / chunk.length
+          : 0;
+
+        const groupLabel = parts.length > memberCount
+          ? `Regu ${groupIndex} Rayon ${kemName}`
+          : `Regu Rayon ${kemName}`;
+
+        groups.push({
+          groupId: `${kemId}-grp-${groupIndex}`,
+          kemantrenId: kemId,
+          kemantrenName: kemName,
+          unitTpa: unitTpa,
+          members: chunk,
+          memberNames: memberNames,
+          formattedName: `${groupLabel} (${memberNames.join(', ')})`,
+          averageScore: parseFloat(avgScore.toFixed(1)),
+        });
+      }
+    });
+
+    return groups;
+  }, [categoryParticipants, currentCategory]);
+
+  // Sinkronisasi data Berita Acara dari Supabase secara langsung saat mount
+  const handleSyncFromSupabase = async (showSuccessToast = false) => {
+    if (!isSupabaseConfigured()) {
+      if (showSuccessToast) {
+        showToast('info', 'Supabase belum dikonfigurasi. Menggunakan penyimpanan lokal.');
+      }
+      return;
+    }
+
+    setIsSyncing(true);
+    try {
+      const remoteList = await fetchBeritaAcaraFromSupabase();
+      if (remoteList && remoteList.length > 0) {
+        setBeritaAcaraList(remoteList);
+        saveBeritaAcaraList(remoteList);
+        if (showSuccessToast) {
+          showToast('success', `Berhasil memuat ${remoteList.length} Berita Acara dari database Supabase.`);
+        }
+      } else if (showSuccessToast) {
+        showToast('info', 'Database Supabase aktif. Belum ada data berita acara tersimpan.');
+      }
+    } catch (err) {
+      console.warn('Gagal memuat berita acara dari Supabase:', err);
+      if (showSuccessToast) {
+        showToast('error', 'Gagal menyinkronkan data dengan Supabase.');
+      }
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  useEffect(() => {
+    handleSyncFromSupabase(false);
+  }, []);
 
   // Load existing Berita Acara when selectedCabangId changes
   useEffect(() => {
     const existing = beritaAcaraList.find((b) => b.cabangId === selectedCabangId);
     if (existing) {
       setTanggalPenetapan(existing.tanggalPenetapan || new Date().toISOString().split('T')[0]);
-      setNamaKetuaJuri(existing.namaKetuaJuri || '');
-      setNamaAnggotaJuri(existing.namaAnggotaJuri || (existing as any).namaSekretarisJuri || '');
-      setCatatanJuri(existing.catatanJuri || (existing as any).catatan || '');
+      setJuriSatu(existing.juriSatu || existing.namaKetuaJuri || '');
+      setJuriDua(existing.juriDua || existing.namaAnggotaJuri || (existing as any).namaSekretarisJuri || '');
+      setCatatanJuri(existing.catatanJuri || existing.catatan || '');
       setStatus(existing.status);
       setJuara1(existing.pemenang.juara1 || { nama: '', kemantren: '', unitTpa: '', totalNilai: 0 });
       setJuara2(existing.pemenang.juara2 || { nama: '', kemantren: '', unitTpa: '', totalNilai: 0 });
@@ -103,8 +211,8 @@ export const BeritaAcaraAdmin: React.FC<BeritaAcaraAdminProps> = ({ participants
     } else {
       // Reset form default
       setTanggalPenetapan(new Date().toISOString().split('T')[0]);
-      setNamaKetuaJuri('');
-      setNamaAnggotaJuri('');
+      setJuriSatu('');
+      setJuriDua('');
       setCatatanJuri('');
       setStatus('Draft');
       setJuara1({ nama: '', kemantren: '', unitTpa: '', totalNilai: 0 });
@@ -115,8 +223,11 @@ export const BeritaAcaraAdmin: React.FC<BeritaAcaraAdminProps> = ({ participants
     }
   }, [selectedCabangId, beritaAcaraList]);
 
-  // Helper autofill from participant select
-  const handleSelectParticipant = (slotKey: 'juara1' | 'juara2' | 'juara3' | 'harapan1' | 'harapan2', participantId: string) => {
+  // Helper autofill from individual participant select
+  const handleSelectIndividual = (
+    slotKey: 'juara1' | 'juara2' | 'juara3' | 'harapan1' | 'harapan2',
+    participantId: string
+  ) => {
     if (!participantId) return;
     const p = participants.find((item) => item.id === participantId);
     if (!p) return;
@@ -139,10 +250,34 @@ export const BeritaAcaraAdmin: React.FC<BeritaAcaraAdminProps> = ({ participants
     if (slotKey === 'harapan2') setHarapan2(updatedSlot);
   };
 
+  // Helper autofill from group/regu select (3 santri per regu)
+  const handleSelectGroup = (
+    slotKey: 'juara1' | 'juara2' | 'juara3' | 'harapan1' | 'harapan2',
+    groupId: string
+  ) => {
+    if (!groupId) return;
+    const g = categoryGroups.find((item) => item.groupId === groupId);
+    if (!g) return;
+
+    const updatedSlot: WinnerSlot = {
+      nama: g.formattedName,
+      kemantren: g.kemantrenName,
+      unitTpa: g.unitTpa,
+      totalNilai: g.averageScore,
+      anggota: g.memberNames,
+    };
+
+    if (slotKey === 'juara1') setJuara1(updatedSlot);
+    if (slotKey === 'juara2') setJuara2(updatedSlot);
+    if (slotKey === 'juara3') setJuara3(updatedSlot);
+    if (slotKey === 'harapan1') setHarapan1(updatedSlot);
+    if (slotKey === 'harapan2') setHarapan2(updatedSlot);
+  };
+
   // Simpan Berita Acara
   const handleSave = async (targetStatus: 'Draft' | 'Disahkan') => {
     if (targetStatus === 'Disahkan') {
-      if (!namaKetuaJuri.trim()) {
+      if (!juriSatu.trim()) {
         showToast('warning', 'Mohon isi nama Juri I sebelum mengesahkan berita acara.');
         return;
       }
@@ -161,14 +296,18 @@ export const BeritaAcaraAdmin: React.FC<BeritaAcaraAdminProps> = ({ participants
         id: baId,
         cabangId: currentCategory.id,
         cabangNama: currentCategory.name,
+        namaCabang: currentCategory.name,
         jenjang: currentCategory.level as Jenjang,
         golongan: currentCategory.genderRequirement === 'L' ? 'Putra' : currentCategory.genderRequirement === 'P' ? 'Putri' : 'Campuran / Beregu',
         isCabangUtama: isCabangUtama,
         status: targetStatus,
         tanggalPenetapan: tanggalPenetapan,
-        namaKetuaJuri: namaKetuaJuri.trim(),
-        namaAnggotaJuri: namaAnggotaJuri.trim(),
+        juriSatu: juriSatu.trim(),
+        juriDua: juriDua.trim(),
+        namaKetuaJuri: juriSatu.trim(),
+        namaAnggotaJuri: juriDua.trim(),
         catatanJuri: catatanJuri.trim(),
+        catatan: catatanJuri.trim(),
         pemenang: {
           juara1: juara1.nama.trim() ? juara1 : undefined,
           juara2: juara2.nama.trim() ? juara2 : undefined,
@@ -188,20 +327,33 @@ export const BeritaAcaraAdmin: React.FC<BeritaAcaraAdminProps> = ({ participants
       setStatus(targetStatus);
 
       // Sinkronkan ke Supabase jika aktif
+      let supabaseSuccess = true;
+      let supabaseErrorMsg = '';
       if (isSupabaseConfigured()) {
-        await upsertBeritaAcaraToSupabase(newBa);
+        const syncRes = await upsertBeritaAcaraToSupabase(newBa);
+        if (!syncRes.success) {
+          supabaseSuccess = false;
+          supabaseErrorMsg = syncRes.error || '';
+        }
       }
 
       if (onDataChanged) {
         onDataChanged();
       }
 
-      showToast(
-        'success',
-        targetStatus === 'Disahkan'
-          ? `Berita Acara ${currentCategory.name} berhasil disahkan & masuk ke Live Scoreboard!`
-          : `Draft Berita Acara ${currentCategory.name} berhasil disimpan.`
-      );
+      if (supabaseSuccess) {
+        showToast(
+          'success',
+          targetStatus === 'Disahkan'
+            ? `Berita Acara ${currentCategory.name} berhasil disahkan & disinkronkan ke Supabase!`
+            : `Draft Berita Acara ${currentCategory.name} berhasil disimpan & disinkronkan ke Supabase.`
+        );
+      } else {
+        showToast(
+          'warning',
+          `Data berhasil disimpan di perangkat lokal, namun Supabase belum tersimpan: ${supabaseErrorMsg}. Silakan cek kolom tabel Supabase.`
+        );
+      }
     } catch (err) {
       console.error('Gagal menyimpan berita acara:', err);
       showToast('error', 'Gagal menyimpan berita acara ke sistem.');
@@ -277,26 +429,35 @@ export const BeritaAcaraAdmin: React.FC<BeritaAcaraAdminProps> = ({ participants
 
   return (
     <div className="space-y-6">
-      {/* Printable Sheet (Hanya Muncul Saat Print) */}
+      {/* Printable Sheet (Hanya Muncul Saat Print Berita Acara A4) */}
       <div className="hidden print:block font-serif text-black p-8 max-w-4xl mx-auto bg-white">
-        {/* Kop Surat */}
-        <div className="text-center border-b-2 border-black pb-4 mb-6">
-          <div className="text-xs uppercase tracking-widest font-sans font-bold">BADKO LPPTKA - BKPRMI KOTA YOGYAKARTA</div>
-          <h1 className="text-xl font-bold uppercase tracking-wide mt-1">
-            FESTIVAL ANAK SHOLEH INDONESIA (FASI) XIII
-          </h1>
-          <p className="text-sm font-sans italic text-slate-700">
-            Tingkat Kota Yogyakarta &bull; Tahun 2024 / 1445 H
-          </p>
+        {/* Kop Surat Resmi FASI XIII */}
+        <div className="flex items-center justify-between border-b-2 border-black pb-3 mb-4">
+          <img src={LOGO_BADKO_URL} alt="BADKO LPPTKA" className="h-16 w-auto object-contain" />
+          <div className="text-center flex-1 px-4">
+            <h3 className="text-xs font-bold font-sans tracking-wide uppercase">
+              BADAN KOORDINASI LEMBAGA PENDIDIKAN DAN PENGEMBANGAN AL-QUR'AN
+            </h3>
+            <h3 className="text-xs font-bold font-sans tracking-wide uppercase">
+              BADKO TKA-TPA KOTA YOGYAKARTA
+            </h3>
+            <h2 className="text-base font-black font-sans tracking-wider uppercase mt-0.5">
+              FESTIVAL ANAK SHOLEH INDONESIA (FASI) XIII
+            </h2>
+            <p className="text-[10px] font-sans text-slate-700">
+              Sekretariat: Kompleks Masjid Pangeran Diponegoro Balaikota Yogyakarta, Jl. Kenari No. 56
+            </p>
+          </div>
+          <img src={LOGO_FASI_URL} alt="FASI XIII" className="h-16 w-auto object-contain" />
         </div>
 
         {/* Judul Berita Acara */}
-        <div className="text-center mb-6">
-          <h2 className="text-base font-bold uppercase tracking-wider underline">
+        <div className="text-center mb-4">
+          <h2 className="text-sm font-bold uppercase tracking-wider underline font-sans">
             BERITA ACARA PENETAPAN HASIL KEJUARAAN
           </h2>
-          <div className="text-xs font-sans mt-1">
-            Nomor: BA-FASI-XIII/{currentCategory.code}/{new Date(tanggalPenetapan).getFullYear()}
+          <div className="text-xs font-sans mt-0.5 font-medium">
+            Cabang Lomba: {currentCategory.name} ({currentCategory.level}) &bull; Nomor: BA-FASI-XIII/{currentCategory.code}/{new Date(tanggalPenetapan).getFullYear()}
           </div>
         </div>
 
@@ -311,7 +472,7 @@ export const BeritaAcaraAdmin: React.FC<BeritaAcaraAdminProps> = ({ participants
             <tr className="bg-slate-100">
               <th className="border border-black px-2 py-1.5 text-center w-24">Peringkat</th>
               <th className="border border-black px-2 py-1.5 text-left">Nama Santri / Regu</th>
-              <th className="border border-black px-2 py-1.5 text-left w-40">Kemantren</th>
+              <th className="border border-black px-2 py-1.5 text-left w-40">Rayon / Kemantren</th>
               <th className="border border-black px-2 py-1.5 text-left w-40">Unit TPA</th>
               <th className="border border-black px-2 py-1.5 text-center w-20">Total Nilai</th>
             </tr>
@@ -370,22 +531,22 @@ export const BeritaAcaraAdmin: React.FC<BeritaAcaraAdminProps> = ({ participants
         {/* Tanda Tangan Juri I & Juri II */}
         <div className="grid grid-cols-2 gap-8 text-center text-xs font-sans mt-8">
           <div>
-            <div className="font-bold text-slate-800">Juri I,</div>
+            <div className="font-bold text-slate-800">Dewan Juri I,</div>
             <div className="h-20 flex items-end justify-center">
               <span className="text-[10px] text-slate-400 italic">( Tanda Tangan )</span>
             </div>
             <div className="font-bold underline uppercase tracking-wide mt-2">
-              {namaKetuaJuri || '( ........................................ )'}
+              {juriSatu || '( ........................................ )'}
             </div>
           </div>
 
           <div>
-            <div className="font-bold text-slate-800">Juri II,</div>
+            <div className="font-bold text-slate-800">Dewan Juri II,</div>
             <div className="h-20 flex items-end justify-center">
               <span className="text-[10px] text-slate-400 italic">( Tanda Tangan )</span>
             </div>
             <div className="font-bold underline uppercase tracking-wide mt-2">
-              {namaAnggotaJuri || '( ........................................ )'}
+              {juriDua || '( ........................................ )'}
             </div>
           </div>
         </div>
@@ -411,19 +572,31 @@ export const BeritaAcaraAdmin: React.FC<BeritaAcaraAdminProps> = ({ participants
             </p>
           </div>
 
-          {/* Quick Stats Grid */}
-          <div className="flex items-center gap-2 bg-emerald-900/60 p-2.5 rounded-xl border border-emerald-700/60 text-center">
-            <div className="px-3 py-1 bg-emerald-800/80 rounded-lg">
-              <div className="text-lg font-black text-white">{stats.disahkan}</div>
-              <div className="text-[10px] text-emerald-300 font-semibold uppercase">Disahkan</div>
-            </div>
-            <div className="px-3 py-1 bg-amber-950/60 rounded-lg border border-amber-500/30">
-              <div className="text-lg font-black text-amber-300">{stats.draft}</div>
-              <div className="text-[10px] text-amber-300/80 font-semibold uppercase">Draft</div>
-            </div>
-            <div className="px-3 py-1 bg-slate-800/60 rounded-lg">
-              <div className="text-lg font-black text-slate-300">{stats.belum}</div>
-              <div className="text-[10px] text-slate-400 font-semibold uppercase">Belum Diisi</div>
+          {/* Quick Stats Grid & Sync Button */}
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => handleSyncFromSupabase(true)}
+              disabled={isSyncing}
+              title="Sinkronkan data dari Supabase"
+              className="px-3 py-2 bg-emerald-900/80 hover:bg-emerald-800 rounded-xl border border-emerald-700 text-xs font-bold text-emerald-200 hover:text-white transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-amber-400 ${isSyncing ? 'animate-spin' : ''}`} />
+              <span>{isSyncing ? 'Sinkron...' : 'Sinkron Supabase'}</span>
+            </button>
+
+            <div className="flex items-center gap-2 bg-emerald-900/60 p-2.5 rounded-xl border border-emerald-700/60 text-center">
+              <div className="px-3 py-1 bg-emerald-800/80 rounded-lg">
+                <div className="text-lg font-black text-white">{stats.disahkan}</div>
+                <div className="text-[10px] text-emerald-300 font-semibold uppercase">Disahkan</div>
+              </div>
+              <div className="px-3 py-1 bg-amber-950/60 rounded-lg border border-amber-500/30">
+                <div className="text-lg font-black text-amber-300">{stats.draft}</div>
+                <div className="text-[10px] text-amber-300/80 font-semibold uppercase">Draft</div>
+              </div>
+              <div className="px-3 py-1 bg-slate-800/60 rounded-lg">
+                <div className="text-lg font-black text-slate-300">{stats.belum}</div>
+                <div className="text-[10px] text-slate-400 font-semibold uppercase">Belum Diisi</div>
+              </div>
             </div>
           </div>
         </div>
@@ -491,13 +664,18 @@ export const BeritaAcaraAdmin: React.FC<BeritaAcaraAdminProps> = ({ participants
                     }`}
                   >
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex flex-wrap items-center gap-1.5">
                         <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-slate-200 text-slate-700 font-mono">
                           {cat.code}
                         </span>
                         <span className="text-[10px] font-bold text-slate-500 uppercase">
                           {cat.level}
                         </span>
+                        {cat.isGroup && (
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
+                            Beregu ({cat.groupMemberCount || 3})
+                          </span>
+                        )}
                         {isUtama && (
                           <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300">
                             Utama (7-5-3)
@@ -536,21 +714,28 @@ export const BeritaAcaraAdmin: React.FC<BeritaAcaraAdminProps> = ({ participants
             {/* Header Form */}
             <div className="p-5 border-b border-slate-200 bg-slate-50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="px-2 py-0.5 bg-emerald-800 text-white rounded text-[11px] font-bold">
                     {currentCategory.code}
                   </span>
                   <span className="px-2 py-0.5 bg-slate-200 text-slate-700 rounded text-[11px] font-bold">
                     Jenjang {currentCategory.level}
                   </span>
-                  {isCabangUtama ? (
+                  {currentCategory.isGroup ? (
+                    <span className="px-2 py-0.5 bg-purple-100 text-purple-900 border border-purple-300 rounded text-[11px] font-bold flex items-center gap-1">
+                      <Users className="w-3 h-3 text-purple-700" />
+                      <span>Cabang Beregu ({currentCategory.groupMemberCount || 3} Santri / Regu)</span>
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 bg-sky-100 text-sky-900 border border-sky-300 rounded text-[11px] font-bold flex items-center gap-1">
+                      <User className="w-3 h-3 text-sky-700" />
+                      <span>Cabang Individu (Perorangan)</span>
+                    </span>
+                  )}
+                  {isCabangUtama && (
                     <span className="px-2 py-0.5 bg-amber-400 text-emerald-950 rounded text-[11px] font-extrabold flex items-center gap-1">
                       <Star className="w-3 h-3 fill-emerald-950" />
                       <span>Cabang Utama (Poin 7 - 5 - 3)</span>
-                    </span>
-                  ) : (
-                    <span className="px-2 py-0.5 bg-slate-200 text-slate-700 rounded text-[11px] font-medium">
-                      Cabang Umum (Poin 5 - 3 - 1)
                     </span>
                   )}
                 </div>
@@ -575,7 +760,7 @@ export const BeritaAcaraAdmin: React.FC<BeritaAcaraAdminProps> = ({ participants
 
             {/* Form Inputs */}
             <div className="p-5 space-y-6">
-              {/* Header Details (Dewan Juri & Tanggal) */}
+              {/* Header Details (Dewan Juri I, Juri II & Tanggal) */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-slate-50/80 rounded-xl border border-slate-200">
                 <div>
                   <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
@@ -596,8 +781,8 @@ export const BeritaAcaraAdmin: React.FC<BeritaAcaraAdminProps> = ({ participants
                   <input
                     type="text"
                     placeholder="Nama lengkap Juri I (Contoh: Ust. H. Ahmad Fauzi, S.Pd.I)"
-                    value={namaKetuaJuri}
-                    onChange={(e) => setNamaKetuaJuri(e.target.value)}
+                    value={juriSatu}
+                    onChange={(e) => setJuriSatu(e.target.value)}
                     className="w-full px-3 py-2 text-xs bg-white rounded-lg border border-slate-200 focus:ring-2 focus:ring-emerald-700 focus:outline-none"
                   />
                 </div>
@@ -609,24 +794,36 @@ export const BeritaAcaraAdmin: React.FC<BeritaAcaraAdminProps> = ({ participants
                   <input
                     type="text"
                     placeholder="Nama lengkap Juri II (Contoh: Ustz. Siti Maryam, M.Pd)"
-                    value={namaAnggotaJuri}
-                    onChange={(e) => setNamaAnggotaJuri(e.target.value)}
+                    value={juriDua}
+                    onChange={(e) => setJuriDua(e.target.value)}
                     className="w-full px-3 py-2 text-xs bg-white rounded-lg border border-slate-200 focus:ring-2 focus:ring-emerald-700 focus:outline-none"
                   />
                 </div>
               </div>
 
-              {/* Quick Select Tool (Pilih dari Peserta Terdaftar) */}
-              {categoryParticipants.length > 0 && (
-                <div className="p-3 bg-emerald-50/70 rounded-xl border border-emerald-200/60 text-xs">
-                  <div className="flex items-center gap-1.5 text-emerald-900 font-bold mb-1">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                    <span>Autofill dari Peserta Terdaftar ({categoryParticipants.length} Santri):</span>
+              {/* Quick Guidance for Group vs Individual */}
+              {isGroupCategory ? (
+                <div className="p-3 bg-purple-50/80 rounded-xl border border-purple-200 text-xs">
+                  <div className="flex items-center gap-1.5 text-purple-950 font-bold mb-1">
+                    <Sparkles className="w-4 h-4 text-purple-600" />
+                    <span>Lomba Kategori Beregu (3 Orang per Regu):</span>
                   </div>
-                  <p className="text-[11px] text-emerald-700 mb-2">
-                    Gunakan pemilih di bawah masing-masing baris juara untuk mengisi otomatis nama, kemantren, dan unit TPA.
+                  <p className="text-[11px] text-purple-800 leading-relaxed">
+                    Setiap rayon mengirimkan 1 atau beberapa regu (masing-masing 3 santri). Anda dapat memilih langsung nama Regu dari menu dropdown di bawah, yang akan otomatis mengisi nama regu beserta nama ke-3 santri anggotanya, asal rayon, dan unit TPA.
                   </p>
                 </div>
+              ) : (
+                categoryParticipants.length > 0 && (
+                  <div className="p-3 bg-emerald-50/70 rounded-xl border border-emerald-200/60 text-xs">
+                    <div className="flex items-center gap-1.5 text-emerald-900 font-bold mb-1">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                      <span>Autofill dari Peserta Terdaftar ({categoryParticipants.length} Santri):</span>
+                    </div>
+                    <p className="text-[11px] text-emerald-700">
+                      Gunakan pemilih di bawah masing-masing baris juara untuk mengisi otomatis nama santri, rayon, dan unit TPA.
+                    </p>
+                  </div>
+                )
               )}
 
               {/* 5 Winner Slots Form */}
@@ -643,8 +840,11 @@ export const BeritaAcaraAdmin: React.FC<BeritaAcaraAdminProps> = ({ participants
                   points={isCabangUtama ? 7 : 5}
                   slot={juara1}
                   onChange={setJuara1}
-                  onAutofill={(pid) => handleSelectParticipant('juara1', pid)}
+                  isGroupCategory={isGroupCategory}
                   availableParticipants={categoryParticipants}
+                  availableGroups={categoryGroups}
+                  onAutofillIndividual={(pid) => handleSelectIndividual('juara1', pid)}
+                  onAutofillGroup={(gid) => handleSelectGroup('juara1', gid)}
                 />
 
                 {/* SLOT 2: JUARA 2 */}
@@ -654,8 +854,11 @@ export const BeritaAcaraAdmin: React.FC<BeritaAcaraAdminProps> = ({ participants
                   points={isCabangUtama ? 5 : 3}
                   slot={juara2}
                   onChange={setJuara2}
-                  onAutofill={(pid) => handleSelectParticipant('juara2', pid)}
+                  isGroupCategory={isGroupCategory}
                   availableParticipants={categoryParticipants}
+                  availableGroups={categoryGroups}
+                  onAutofillIndividual={(pid) => handleSelectIndividual('juara2', pid)}
+                  onAutofillGroup={(gid) => handleSelectGroup('juara2', gid)}
                 />
 
                 {/* SLOT 3: JUARA 3 */}
@@ -665,8 +868,11 @@ export const BeritaAcaraAdmin: React.FC<BeritaAcaraAdminProps> = ({ participants
                   points={isCabangUtama ? 3 : 1}
                   slot={juara3}
                   onChange={setJuara3}
-                  onAutofill={(pid) => handleSelectParticipant('juara3', pid)}
+                  isGroupCategory={isGroupCategory}
                   availableParticipants={categoryParticipants}
+                  availableGroups={categoryGroups}
+                  onAutofillIndividual={(pid) => handleSelectIndividual('juara3', pid)}
+                  onAutofillGroup={(gid) => handleSelectGroup('juara3', gid)}
                 />
 
                 {/* SLOT 4: HARAPAN 1 */}
@@ -676,8 +882,11 @@ export const BeritaAcaraAdmin: React.FC<BeritaAcaraAdminProps> = ({ participants
                   points={0}
                   slot={harapan1}
                   onChange={setHarapan1}
-                  onAutofill={(pid) => handleSelectParticipant('harapan1', pid)}
+                  isGroupCategory={isGroupCategory}
                   availableParticipants={categoryParticipants}
+                  availableGroups={categoryGroups}
+                  onAutofillIndividual={(pid) => handleSelectIndividual('harapan1', pid)}
+                  onAutofillGroup={(gid) => handleSelectGroup('harapan1', gid)}
                 />
 
                 {/* SLOT 5: HARAPAN 2 */}
@@ -687,8 +896,11 @@ export const BeritaAcaraAdmin: React.FC<BeritaAcaraAdminProps> = ({ participants
                   points={0}
                   slot={harapan2}
                   onChange={setHarapan2}
-                  onAutofill={(pid) => handleSelectParticipant('harapan2', pid)}
+                  isGroupCategory={isGroupCategory}
                   availableParticipants={categoryParticipants}
+                  availableGroups={categoryGroups}
+                  onAutofillIndividual={(pid) => handleSelectIndividual('harapan2', pid)}
+                  onAutofillGroup={(gid) => handleSelectGroup('harapan2', gid)}
                 />
               </div>
 
@@ -724,7 +936,7 @@ export const BeritaAcaraAdmin: React.FC<BeritaAcaraAdminProps> = ({ participants
                     className="px-3.5 py-2 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl border border-slate-200 transition-colors flex items-center gap-1.5 cursor-pointer"
                   >
                     <Printer className="w-3.5 h-3.5" />
-                    <span>Cetak Form</span>
+                    <span>Cetak Berita Acara A4</span>
                   </button>
                 </div>
 
@@ -763,8 +975,11 @@ interface WinnerRowProps {
   points: number;
   slot: WinnerSlot;
   onChange: (updated: WinnerSlot) => void;
-  onAutofill: (participantId: string) => void;
+  isGroupCategory: boolean;
   availableParticipants: Participant[];
+  availableGroups: CategoryGroup[];
+  onAutofillIndividual: (participantId: string) => void;
+  onAutofillGroup: (groupId: string) => void;
 }
 
 const WinnerRow: React.FC<WinnerRowProps> = ({
@@ -773,8 +988,11 @@ const WinnerRow: React.FC<WinnerRowProps> = ({
   points,
   slot,
   onChange,
-  onAutofill,
+  isGroupCategory,
   availableParticipants,
+  availableGroups,
+  onAutofillIndividual,
+  onAutofillGroup,
 }) => {
   return (
     <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
@@ -788,28 +1006,56 @@ const WinnerRow: React.FC<WinnerRowProps> = ({
           </span>
         </div>
 
-        {/* Quick Autofill Dropdown */}
-        {availableParticipants.length > 0 && (
-          <div className="flex items-center gap-1">
-            <span className="text-[10px] text-slate-400">Pilih Santri:</span>
-            <select
-              defaultValue=""
-              onChange={(e) => {
-                if (e.target.value) {
-                  onAutofill(e.target.value);
-                  e.target.value = '';
-                }
-              }}
-              className="text-[11px] py-1 px-2 rounded-lg border border-slate-200 bg-white text-slate-700 max-w-[200px]"
-            >
-              <option value="">-- Pilih dari pendaftar --</option>
-              {availableParticipants.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.fullName} ({p.tpaUnitName})
-                </option>
-              ))}
-            </select>
-          </div>
+        {/* Quick Autofill Dropdown (Regu 3 Santri vs Individu) */}
+        {isGroupCategory ? (
+          availableGroups.length > 0 && (
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] text-purple-700 font-bold">Pilih Regu (3 Santri):</span>
+              <select
+                defaultValue=""
+                onChange={(e) => {
+                  if (e.target.value) {
+                    onAutofillGroup(e.target.value);
+                    e.target.value = '';
+                  }
+                }}
+                className="text-[11px] py-1 px-2 rounded-lg border border-purple-200 bg-white text-purple-900 max-w-[280px]"
+              >
+                <option value="">-- Pilih Regu Terdaftar --</option>
+                {availableGroups.map((g) => (
+                  <option key={g.groupId} value={g.groupId}>
+                    Rayon {g.kemantrenName} ({g.memberNames.join(', ')})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )
+        ) : (
+          availableParticipants.length > 0 && (
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] text-slate-500 font-bold">Pilih Santri:</span>
+              <select
+                defaultValue=""
+                onChange={(e) => {
+                  if (e.target.value) {
+                    onAutofillIndividual(e.target.value);
+                    e.target.value = '';
+                  }
+                }}
+                className="text-[11px] py-1 px-2 rounded-lg border border-slate-200 bg-white text-slate-700 max-w-[220px]"
+              >
+                <option value="">-- Pilih dari pendaftar --</option>
+                {availableParticipants.map((p) => {
+                  const kem = KEMANTREN_LIST.find((k) => k.id === p.kemantrenId);
+                  return (
+                    <option key={p.id} value={p.id}>
+                      {p.fullName} (Rayon {kem ? kem.name : p.kemantrenId})
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+          )
         )}
       </div>
 
@@ -817,25 +1063,27 @@ const WinnerRow: React.FC<WinnerRowProps> = ({
       <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
         {/* Nama Santri / Regu */}
         <div className="sm:col-span-4">
-          <label className="block text-[10px] font-bold text-slate-600 mb-0.5">Nama Santri / Regu</label>
+          <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
+            {isGroupCategory ? 'Nama Regu & Anggota (3 Santri)' : 'Nama Santri Lengkap'}
+          </label>
           <input
             type="text"
-            placeholder="Nama lengkap santri / Regu A"
+            placeholder={isGroupCategory ? 'Contoh: Regu Rayon Danurejan (Ahmad, Budi, Citra)' : 'Nama lengkap santri'}
             value={slot.nama}
             onChange={(e) => onChange({ ...slot, nama: e.target.value })}
             className="w-full px-2.5 py-1.5 text-xs bg-white rounded-lg border border-slate-200 focus:ring-1 focus:ring-emerald-700 focus:outline-none"
           />
         </div>
 
-        {/* Asal Kemantren */}
+        {/* Asal Kemantren / Rayon */}
         <div className="sm:col-span-3">
-          <label className="block text-[10px] font-bold text-slate-600 mb-0.5">Kemantren (14 Wilayah)</label>
+          <label className="block text-[10px] font-bold text-slate-600 mb-0.5">Rayon</label>
           <select
             value={slot.kemantren}
             onChange={(e) => onChange({ ...slot, kemantren: e.target.value })}
             className="w-full px-2.5 py-1.5 text-xs bg-white rounded-lg border border-slate-200 focus:ring-1 focus:ring-emerald-700 focus:outline-none"
           >
-            <option value="">-- Pilih Kemantren --</option>
+            <option value="">-- Pilih Rayon --</option>
             {KEMANTREN_LIST.map((k) => (
               <option key={k.id} value={k.name}>
                 {k.name}
@@ -871,6 +1119,18 @@ const WinnerRow: React.FC<WinnerRowProps> = ({
           />
         </div>
       </div>
+
+      {/* Helper Anggota Regu (Jika ada anggota yang terpilih) */}
+      {isGroupCategory && slot.anggota && slot.anggota.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 pt-1 text-[10px] text-purple-900">
+          <span className="font-bold text-slate-500">Anggota Regu ({slot.anggota.length} Orang):</span>
+          {slot.anggota.map((m, idx) => (
+            <span key={idx} className="px-2 py-0.5 bg-purple-100 border border-purple-200 rounded-md font-medium">
+              {idx + 1}. {m}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
