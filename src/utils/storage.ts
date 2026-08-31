@@ -170,6 +170,7 @@ export function getStoredParticipants(): Participant[] {
 export function saveParticipants(participants: Participant[]): void {
   try {
     localStorage.setItem(PARTICIPANTS_KEY, JSON.stringify(participants));
+    window.dispatchEvent(new CustomEvent('fasi_participants_updated'));
     if (isSupabaseConfigured()) {
       bulkSyncParticipantsToSupabase(participants).catch((err) =>
         console.warn('Gagal sinkronisasi background ke Supabase:', err)

@@ -35,7 +35,13 @@ import {
   getStoredSettings,
   saveBeritaAcaraList,
 } from './utils/storage';
-import { isSupabaseConfigured, fetchParticipantsFromSupabase, fetchBeritaAcaraFromSupabase } from './lib/supabase';
+import {
+  isSupabaseConfigured,
+  fetchParticipantsFromSupabase,
+  fetchBeritaAcaraFromSupabase,
+  subscribeToParticipantsRealtime,
+  subscribeToBeritaAcaraRealtime,
+} from './lib/supabase';
 import { showToast, showConfirmDialog } from './utils/sweetalert';
 import { AppRoute, getCurrentRouteFromURL, navigateToRoute } from './utils/router';
 import { getThemeConfig } from './utils/theme';
@@ -141,7 +147,7 @@ export default function App() {
     const storedSettings = getStoredSettings();
     setSettings(storedSettings);
 
-    // Listener jika pengaturan (tema/nama event) diubah dari Backoffice
+    // Listener jika pengaturan (tema/nama event) atau data diubah
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'fasi_settings') {
         setSettings(getStoredSettings());
@@ -156,21 +162,40 @@ export default function App() {
       setSettings(getStoredSettings());
     };
 
+    const handleLocalParticipantsUpdate = () => {
+      setParticipants(getStoredParticipants());
+    };
+
     window.addEventListener('storage', handleStorageChange);
     window.addEventListener('fasi_settings_updated', handleLocalSettingsUpdate);
+    window.addEventListener('fasi_participants_updated', handleLocalParticipantsUpdate);
 
-    // Jika Supabase aktif, lakukan sinkronisasi awal
+    let unsubscribeParticipants: (() => void) | null = null;
+    let unsubscribeBeritaAcara: (() => void) | null = null;
+
+    // Jika Supabase aktif, lakukan sinkronisasi awal dan subscribe realtime
     if (isSupabaseConfigured()) {
       fetchParticipantsFromSupabase().then((remoteData) => {
-        if (remoteData && remoteData.length > 0) {
+        if (remoteData !== null) {
           setParticipants(remoteData);
-          saveParticipants(remoteData);
+          localStorage.setItem('fasi_participants', JSON.stringify(remoteData));
         }
       });
+
       fetchBeritaAcaraFromSupabase().then((remoteBA) => {
-        if (remoteBA && remoteBA.length > 0) {
+        if (remoteBA !== null) {
           saveBeritaAcaraList(remoteBA);
         }
+      });
+
+      // Pasang Realtime Subscription agar perubahan dari device lain langsung sinkron seketika
+      unsubscribeParticipants = subscribeToParticipantsRealtime((updatedList) => {
+        setParticipants(updatedList);
+        localStorage.setItem('fasi_participants', JSON.stringify(updatedList));
+      });
+
+      unsubscribeBeritaAcara = subscribeToBeritaAcaraRealtime((updatedBA) => {
+        saveBeritaAcaraList(updatedBA);
       });
     }
 
@@ -190,8 +215,11 @@ export default function App() {
     return () => {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('fasi_settings_updated', handleLocalSettingsUpdate);
+      window.removeEventListener('fasi_participants_updated', handleLocalParticipantsUpdate);
       window.removeEventListener('popstate', handlePopState);
       window.removeEventListener('hashchange', handlePopState);
+      if (unsubscribeParticipants) unsubscribeParticipants();
+      if (unsubscribeBeritaAcara) unsubscribeBeritaAcara();
     };
   }, []);
 

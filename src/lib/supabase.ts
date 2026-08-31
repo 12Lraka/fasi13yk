@@ -370,11 +370,18 @@ export async function deleteParticipantFromSupabase(participantId: string): Prom
  */
 export async function bulkSyncParticipantsToSupabase(participants: Participant[]): Promise<{ success: boolean; count: number; error?: string }> {
   const client = getSupabaseClient();
-  if (!client || participants.length === 0) {
-    return { success: false, count: 0, error: 'Supabase tidak aktif atau tidak ada peserta' };
+  if (!client) {
+    return { success: false, count: 0, error: 'Supabase tidak aktif' };
   }
 
   try {
+    if (participants.length === 0) {
+      // Jika peserta kosong, hapus semua data di tabel Supabase
+      const { error } = await client.from('participants').delete().neq('id', 'dummy-never-match');
+      if (error) throw error;
+      return { success: true, count: 0 };
+    }
+
     const payloads = participants.map(mapParticipantToDb);
     const { error } = await client.from('participants').upsert(payloads, { onConflict: 'id' });
     if (error) throw error;
@@ -382,6 +389,89 @@ export async function bulkSyncParticipantsToSupabase(participants: Participant[]
   } catch (error: any) {
     console.error('Gagal sinkronisasi data peserta ke Supabase:', error);
     return { success: false, count: 0, error: error?.message || 'Gagal sync ke Supabase' };
+  }
+}
+
+/**
+ * Menghapus seluruh data peserta dari Supabase
+ */
+export async function deleteAllParticipantsFromSupabase(): Promise<boolean> {
+  const client = getSupabaseClient();
+  if (!client) return false;
+
+  try {
+    const { error } = await client.from('participants').delete().neq('id', 'dummy-never-match');
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Gagal menghapus semua peserta di Supabase:', error);
+    return false;
+  }
+}
+
+/**
+ * Langganan Realtime Postgres Changes untuk Tabel Participants
+ */
+export function subscribeToParticipantsRealtime(
+  onUpdate: (participants: Participant[]) => void
+): (() => void) | null {
+  const client = getSupabaseClient();
+  if (!client) return null;
+
+  try {
+    const channel = client
+      .channel('realtime_participants_changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'participants' },
+        async () => {
+          const freshData = await fetchParticipantsFromSupabase();
+          if (freshData !== null) {
+            onUpdate(freshData);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      client.removeChannel(channel);
+    };
+  } catch (error) {
+    console.warn('Gagal mengaktifkan Realtime Supabase untuk participants:', error);
+    return null;
+  }
+}
+
+/**
+ * Langganan Realtime Postgres Changes untuk Tabel Berita Acara
+ */
+export function subscribeToBeritaAcaraRealtime(
+  onUpdate: (beritaAcara: BeritaAcaraKejuaraan[]) => void
+): (() => void) | null {
+  const client = getSupabaseClient();
+  if (!client) return null;
+
+  try {
+    const channel = client
+      .channel('realtime_berita_acara_changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'berita_acara_kejuaraan' },
+        async () => {
+          const freshData = await fetchBeritaAcaraFromSupabase();
+          if (freshData !== null) {
+            onUpdate(freshData);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      client.removeChannel(channel);
+    };
+  } catch (error) {
+    console.warn('Gagal mengaktifkan Realtime Supabase untuk berita acara:', error);
+    return null;
   }
 }
 

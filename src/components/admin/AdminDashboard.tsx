@@ -44,6 +44,7 @@ import {
   getStoredCategories,
   getStoredSettings
 } from '../../utils/storage';
+import { deleteParticipantFromSupabase } from '../../lib/supabase';
 import { exportParticipantsToExcel } from '../../utils/excelExport';
 import { showToast, showConfirmDialog, showSuccessAlert } from '../../utils/sweetalert';
 import { RekapPesertaAdmin } from './RekapPesertaAdmin';
@@ -196,6 +197,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       const updated = participants.filter((p) => p.id !== participant.id);
       onUpdateParticipants(updated);
       saveParticipants(updated);
+      
+      // Hapus langsung dari Supabase database
+      deleteParticipantFromSupabase(participant.id).catch((err) =>
+        console.warn('Gagal menghapus santri dari Supabase:', err)
+      );
+
       logAuditEvent(
         session.name,
         'HAPUS_SANTRI',
