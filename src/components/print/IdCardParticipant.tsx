@@ -47,13 +47,17 @@ export const IdCardParticipant: React.FC<IdCardParticipantProps> = ({
   }
 
   // Format Gender / Grup
-  const isGroup = category?.isGroup || (category?.name && /cerdas cermat|nasyid|ikrar|peragaan/i.test(category.name));
+  // Catatan: Cabang Peragaan Shalat/Sholat adalah perorangan (Putra / Putri), bukan Grup
+  const isGroup = typeof category?.isGroup === 'boolean'
+    ? category.isGroup
+    : Boolean(category?.name && /cerdas cermat|nasyid|ikrar/i.test(category.name));
+
   let genderDisplay = '';
   if (isGroup) {
     genderDisplay = 'Grup';
-  } else if (participant.gender === 'L') {
+  } else if (participant.gender === 'L' || category?.genderRequirement === 'L' || /\(Putra\)/i.test(category?.name || '')) {
     genderDisplay = 'Putra';
-  } else if (participant.gender === 'P') {
+  } else if (participant.gender === 'P' || category?.genderRequirement === 'P' || /\(Putri\)/i.test(category?.name || '')) {
     genderDisplay = 'Putri';
   }
 
