@@ -35,7 +35,10 @@ import {
   Check,
   ExternalLink,
   ShieldCheck,
-  X
+  X,
+  FlaskConical,
+  Trash,
+  AlertTriangle
 } from 'lucide-react';
 import { AppSettings, CompetitionCategory, Kemantren, UserSession } from '../../types/fasi';
 import {
@@ -49,14 +52,19 @@ import {
   resetCategories,
   getStoredParticipants,
   logAuditEvent,
-  DEFAULT_SETTINGS
+  DEFAULT_SETTINGS,
+  addDummyParticipantsToStorage,
+  removeDummyParticipantsFromStorage
 } from '../../utils/storage';
 import {
   isSupabaseConfigured,
   syncCategoriesToSupabase,
   syncKemantrenToSupabase,
-  bulkSyncParticipantsToSupabase
+  bulkSyncParticipantsToSupabase,
+  bulkInsertDummyParticipantsToSupabase,
+  deleteDummyParticipantsFromSupabase
 } from '../../lib/supabase';
+import { generateDummyParticipantsList } from '../../utils/dummyGenerator';
 import { showToast, showConfirmDialog, showSuccessAlert, showErrorAlert } from '../../utils/sweetalert';
 
 interface PengaturanAdminProps {
@@ -127,6 +135,25 @@ export const PengaturanAdmin: React.FC<PengaturanAdminProps> = ({
     maxParticipantsPerKemantren: 1,
     description: '',
   });
+
+  // 4. Dummy Data Generator & Cleaner State
+  const [selectedGenerateCount, setSelectedGenerateCount] = useState<number>(50);
+  const [isGeneratingDummy, setIsGeneratingDummy] = useState<boolean>(false);
+  const [generateProgress, setGenerateProgress] = useState<{ current: number; total: number } | null>(null);
+  const [isDeletingDummy, setIsDeletingDummy] = useState<boolean>(false);
+  const [currentDummyCount, setCurrentDummyCount] = useState<number>(() => {
+    const parts = getStoredParticipants();
+    return parts.filter((p) => p.id.startsWith('dummy-') || p.notes?.includes('[DUMMY_DATA]')).length;
+  });
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      const parts = getStoredParticipants();
+      setCurrentDummyCount(parts.filter((p) => p.id.startsWith('dummy-') || p.notes?.includes('[DUMMY_DATA]')).length);
+    };
+    window.addEventListener('fasi_participants_updated', handleUpdate);
+    return () => window.removeEventListener('fasi_participants_updated', handleUpdate);
+  }, []);
 
   // Save Main Settings
   const handleSaveGeneralSettings = (e: React.FormEvent) => {
@@ -380,6 +407,116 @@ export const PengaturanAdmin: React.FC<PengaturanAdminProps> = ({
       showToast('error', `Error: ${err?.message || 'Gagal terhubung ke Supabase'}`);
     } finally {
       setIsSyncingKemantren(false);
+    }
+  };
+
+  // Generate Dummy Data Handler
+  const handleGenerateDummy = async () => {
+    if (selectedGenerateCount <= 0) return;
+
+    const confirm = await showConfirmDialog(
+      `Generate ${selectedGenerateCount} Data Dummy Santri?`,
+      `Data santri simulasi akan dibuat lengkap dengan kalkulasi umur valid (TKA, TPA, TQA), asal TPA di 14 Kemantren, nomor undian, dan otomatis disinkronkan ke Supabase & LocalStorage.`
+    );
+    if (!confirm) return;
+
+    setIsGeneratingDummy(true);
+    setGenerateProgress({ current: 0, total: selectedGenerateCount });
+
+    try {
+      const dummies = generateDummyParticipantsList(
+        selectedGenerateCount,
+        categoriesList,
+        kemantrenList
+      );
+
+      // 1. Simpan ke LocalStorage
+      addDummyParticipantsToStorage(dummies);
+
+      // 2. Simpan ke Supabase jika terhubung
+      let supabaseMsg = '';
+      if (isSupabaseConfigured()) {
+        const sbResult = await bulkInsertDummyParticipantsToSupabase(
+          dummies,
+          (inserted, total) => {
+            setGenerateProgress({ current: inserted, total });
+          }
+        );
+        if (sbResult.success) {
+          supabaseMsg = ` (${sbResult.count} santri tersinkron ke Supabase)`;
+        } else {
+          supabaseMsg = ` (Catatan Supabase: ${sbResult.error})`;
+        }
+      }
+
+      logAuditEvent(
+        session.name,
+        'GENERATE_DUMMY_PARTICIPANTS',
+        `Menghasilkan ${dummies.length} data dummy santri FASI XIII`
+      );
+
+      const all = getStoredParticipants();
+      setCurrentDummyCount(all.filter((p) => p.id.startsWith('dummy-') || p.notes?.includes('[DUMMY_DATA]')).length);
+
+      await showSuccessAlert(
+        'Berhasil Generate Data Dummy!',
+        `Berhasil membuat ${dummies.length} data santri simulasi${supabaseMsg}. Data langsung aktif di Rekap Peserta, ID Card, dan Undian Tampil.`
+      );
+    } catch (error: any) {
+      console.error('Error generating dummy:', error);
+      showErrorAlert('Gagal', error?.message || 'Terjadi kesalahan saat generate data dummy.');
+    } finally {
+      setIsGeneratingDummy(false);
+      setGenerateProgress(null);
+    }
+  };
+
+  // Delete Dummy Data Handler
+  const handleDeleteDummy = async () => {
+    const currentCount = currentDummyCount;
+    if (currentCount === 0) {
+      showToast('info', 'Saat ini tidak ada data dummy santri di dalam sistem.');
+      return;
+    }
+
+    const confirm = await showConfirmDialog(
+      'Hapus Semua Data Dummy?',
+      `Tindakan ini akan menghapus ${currentCount} data dummy simulasi dari sistem & Supabase. Data riil santri kontingen TIDAK AKAN terhapus.`
+    );
+    if (!confirm) return;
+
+    setIsDeletingDummy(true);
+    try {
+      // 1. Hapus dari LocalStorage
+      const { deletedCount } = removeDummyParticipantsFromStorage();
+
+      // 2. Hapus dari Supabase jika terhubung
+      let sbDeleted = 0;
+      if (isSupabaseConfigured()) {
+        const sbRes = await deleteDummyParticipantsFromSupabase();
+        if (sbRes.success) {
+          sbDeleted = sbRes.count;
+        }
+      }
+
+      logAuditEvent(
+        session.name,
+        'DELETE_DUMMY_PARTICIPANTS',
+        `Membersihkan data dummy santri (${deletedCount} dari storage, ${sbDeleted} dari Supabase)`
+      );
+
+      const all = getStoredParticipants();
+      setCurrentDummyCount(all.filter((p) => p.id.startsWith('dummy-') || p.notes?.includes('[DUMMY_DATA]')).length);
+
+      await showSuccessAlert(
+        'Data Dummy Berhasil Dihapus!',
+        `Seluruh data simulasi (${deletedCount} data) telah dibersihkan dari sistem dan database Supabase. Sistem kini bersih dan siap untuk data riil kontingen.`
+      );
+    } catch (error: any) {
+      console.error('Error deleting dummy:', error);
+      showErrorAlert('Gagal', error?.message || 'Terjadi kesalahan saat membersihkan data dummy.');
+    } finally {
+      setIsDeletingDummy(false);
     }
   };
 
@@ -1346,6 +1483,119 @@ export const PengaturanAdmin: React.FC<PengaturanAdminProps> = ({
                   {isSyncingParticipants ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <CloudUpload className="w-3.5 h-3.5" />}
                   <span>{isSyncingParticipants ? 'Sedang Sinkron...' : 'Sinkronkan Data Santri'}</span>
                 </button>
+              </div>
+            </div>
+
+            {/* DUMMY DATA GENERATOR & CLEANER SECTION */}
+            <div className="p-5 bg-linear-to-br from-indigo-50/80 via-white to-slate-50 border border-indigo-200/90 rounded-2xl space-y-4 shadow-2xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-indigo-100">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-indigo-600 text-white rounded-xl shadow-xs">
+                    <FlaskConical className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                      <span>Generator & Pembersih Data Dummy</span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 bg-indigo-100 text-indigo-800 rounded-full">
+                        Mode Testing FASI
+                      </span>
+                    </h4>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Buat data simulasi santri untuk uji coba sistem, atau bersihkan seluruh data dummy dengan 1 klik sebelum peluncuran resmi.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-xs font-medium text-slate-500">Status saat ini:</span>
+                  <span className={`px-2.5 py-1 rounded-lg text-xs font-bold font-mono border ${
+                    currentDummyCount > 0 
+                      ? 'bg-amber-50 text-amber-900 border-amber-300' 
+                      : 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                  }`}>
+                    {currentDummyCount} Data Dummy
+                  </span>
+                </div>
+              </div>
+
+              {/* Controls */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-center">
+                <div className="lg:col-span-4">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600 block mb-1">
+                    Pilih Jumlah Santri Simulasi:
+                  </label>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {[50, 200, 500, 1000].map((count) => (
+                      <button
+                        key={count}
+                        type="button"
+                        onClick={() => setSelectedGenerateCount(count)}
+                        className={`py-1.5 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+                          selectedGenerateCount === count
+                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        {count}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="lg:col-span-8 flex flex-col sm:flex-row gap-2 justify-end pt-1 sm:pt-0">
+                  {/* Button Generate */}
+                  <button
+                    type="button"
+                    onClick={handleGenerateDummy}
+                    disabled={isGeneratingDummy || isDeletingDummy}
+                    className="flex-1 sm:flex-initial px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    {isGeneratingDummy ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin text-indigo-200" />
+                        <span>
+                          {generateProgress 
+                            ? `Menyimpan ${generateProgress.current}/${generateProgress.total}...` 
+                            : 'Membuat Data...'}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4 text-amber-300" />
+                        <span>Generate {selectedGenerateCount} Santri Dummy</span>
+                      </>
+                    )}
+                  </button>
+
+                  {/* Button Delete Dummy */}
+                  <button
+                    type="button"
+                    onClick={handleDeleteDummy}
+                    disabled={isDeletingDummy || isGeneratingDummy || currentDummyCount === 0}
+                    className="flex-1 sm:flex-initial px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                    title={currentDummyCount === 0 ? 'Tidak ada data dummy untuk dihapus' : 'Hapus semua data dummy dari Supabase & Storage'}
+                  >
+                    {isDeletingDummy ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin text-rose-500" />
+                        <span>Menghapus Dummy...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Trash className="w-4 h-4 text-rose-600" />
+                        <span>Hapus Semua Data Dummy</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Safe Note */}
+              <div className="flex items-start gap-2 pt-1 text-[11px] text-slate-500">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                <span>
+                  <strong className="text-slate-700 font-semibold">Keamanan Terjamin:</strong> Tombol <em>Hapus Semua Data Dummy</em> hanya akan menghapus santri yang berlabel dummy simulasi. Data pendaftaran riil yang diinput oleh kontingen 14 Kemantren tidak akan terhapus.
+                </span>
               </div>
             </div>
 

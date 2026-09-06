@@ -220,6 +220,43 @@ export function clearDrafts(): void {
 }
 
 /**
+ * Menambahkan peserta dummy ke LocalStorage dan memancarkan event pembaruan
+ */
+export function addDummyParticipantsToStorage(dummies: Participant[]): Participant[] {
+  try {
+    const current = getStoredParticipants();
+    const existingIds = new Set(current.map((p) => p.id));
+    const newItems = dummies.filter((d) => !existingIds.has(d.id));
+    const updated = [...current, ...newItems];
+    localStorage.setItem(PARTICIPANTS_KEY, JSON.stringify(updated));
+    window.dispatchEvent(new CustomEvent('fasi_participants_updated'));
+    return updated;
+  } catch (err) {
+    console.error('Gagal simpan dummy ke storage:', err);
+    return getStoredParticipants();
+  }
+}
+
+/**
+ * Menghapus seluruh data peserta dummy dari LocalStorage
+ */
+export function removeDummyParticipantsFromStorage(): { updated: Participant[]; deletedCount: number } {
+  try {
+    const current = getStoredParticipants();
+    const filtered = current.filter(
+      (p) => !p.id.startsWith('dummy-') && !p.notes?.includes('[DUMMY_DATA]')
+    );
+    const deletedCount = current.length - filtered.length;
+    localStorage.setItem(PARTICIPANTS_KEY, JSON.stringify(filtered));
+    window.dispatchEvent(new CustomEvent('fasi_participants_updated'));
+    return { updated: filtered, deletedCount };
+  } catch (err) {
+    console.error('Gagal menghapus dummy dari storage:', err);
+    return { updated: getStoredParticipants(), deletedCount: 0 };
+  }
+}
+
+/**
  * Aturan Bobot Poin Kejuaraan FASI XIII:
  * - Khusus cabang Tartil Al-Qur'an (TKA & TPA) dan Tilawati Al-Quran (TQA):
  *   Juara I = 7 Poin, Juara II = 5 Poin, Juara III = 3 Poin

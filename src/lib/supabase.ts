@@ -411,6 +411,71 @@ export async function deleteAllParticipantsFromSupabase(): Promise<boolean> {
 }
 
 /**
+ * Simpan massal peserta dummy ke Supabase dalam batch aman (100 per batch)
+ */
+export async function bulkInsertDummyParticipantsToSupabase(
+  dummyParticipants: Participant[],
+  onProgress?: (inserted: number, total: number) => void
+): Promise<{ success: boolean; count: number; error?: string }> {
+  const client = getSupabaseClient();
+  if (!client) {
+    return { success: false, count: 0, error: 'Supabase belum terhubung' };
+  }
+
+  try {
+    const payloads = dummyParticipants.map(mapParticipantToDb);
+    const BATCH_SIZE = 100;
+    let totalInserted = 0;
+
+    for (let i = 0; i < payloads.length; i += BATCH_SIZE) {
+      const batch = payloads.slice(i, i + BATCH_SIZE);
+      const { error } = await client.from('participants').upsert(batch, { onConflict: 'id' });
+      if (error) throw error;
+      totalInserted += batch.length;
+      if (onProgress) {
+        onProgress(totalInserted, payloads.length);
+      }
+    }
+
+    return { success: true, count: totalInserted };
+  } catch (error: any) {
+    console.error('Gagal simpan massal dummy ke Supabase:', error);
+    return { success: false, count: 0, error: error?.message || 'Gagal simpan data dummy ke Supabase' };
+  }
+}
+
+/**
+ * Menghapus seluruh data peserta dummy dari Supabase
+ * Kriteria: id berawalan dummy- atau notes mengandung [DUMMY_DATA]
+ */
+export async function deleteDummyParticipantsFromSupabase(): Promise<{ success: boolean; count: number; error?: string }> {
+  const client = getSupabaseClient();
+  if (!client) {
+    return { success: false, count: 0, error: 'Supabase belum terhubung' };
+  }
+
+  try {
+    const res1 = await client
+      .from('participants')
+      .delete({ count: 'exact' })
+      .like('id', 'dummy-%');
+
+    if (res1.error) throw res1.error;
+
+    const res2 = await client
+      .from('participants')
+      .delete({ count: 'exact' })
+      .like('notes', '%[DUMMY_DATA]%');
+
+    const totalDeleted = (res1.count || 0) + (res2.count || 0);
+    return { success: true, count: totalDeleted };
+  } catch (error: any) {
+    console.error('Gagal menghapus data dummy dari Supabase:', error);
+    return { success: false, count: 0, error: error?.message || 'Gagal menghapus data dummy dari Supabase' };
+  }
+}
+
+/**
  * Langganan Realtime Postgres Changes untuk Tabel Participants
  */
 export function subscribeToParticipantsRealtime(
