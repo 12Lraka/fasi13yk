@@ -79,7 +79,7 @@ export const ParticipantDirectory: React.FC<ParticipantDirectoryProps> = ({
               <h2 className="text-xl font-bold text-slate-900">Direktori Peserta FASI XIII</h2>
             </div>
             <p className="text-xs text-slate-500 mt-1">
-              Daftar resmi santri terverifikasi dari 14 Kemantren se-Kota Yogyakarta.
+              Daftar resmi santri terverifikasi dari 14 Rayon se-Kota Yogyakarta.
             </p>
           </div>
           <div className="flex items-center gap-2 text-xs font-semibold text-emerald-800 bg-emerald-50 px-3.5 py-1.5 rounded-full border border-emerald-200">
@@ -115,10 +115,10 @@ export const ParticipantDirectory: React.FC<ParticipantDirectoryProps> = ({
               }}
               className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:bg-white focus:outline-none font-medium"
             >
-              <option value="ALL">Semua Kemantren (14 Wilayah)</option>
+              <option value="ALL">Semua Rayon (14 Wilayah)</option>
               {KEMANTREN_LIST.map((k) => (
                 <option key={k.id} value={k.id}>
-                  Kemantren {k.name} ({k.code})
+                  Rayon {k.name} ({k.code})
                 </option>
               ))}
             </select>
@@ -172,7 +172,7 @@ export const ParticipantDirectory: React.FC<ParticipantDirectoryProps> = ({
                 <th className="py-3 px-4">No. Registrasi</th>
                 <th className="py-3 px-4">Nama Lengkap</th>
                 <th className="py-3 px-4 text-center">Jenis Kelamin</th>
-                <th className="py-3 px-4">Kemantren & Unit TPA</th>
+                <th className="py-3 px-4">Rayon & Unit TPA</th>
                 <th className="py-3 px-4">Cabang Lomba</th>
                 <th className="py-3 px-4 text-center">No. Undian</th>
                 <th className="py-3 px-4 text-center">Status</th>
@@ -212,7 +212,7 @@ export const ParticipantDirectory: React.FC<ParticipantDirectoryProps> = ({
                       <td className="py-3.5 px-4">
                         <div className="font-medium text-slate-800 flex items-center gap-1">
                           <MapPin className="w-3 h-3 text-emerald-600" />
-                          Kemantren {getKemantrenName(p.kemantrenId)}
+                          Rayon {getKemantrenName(p.kemantrenId)}
                         </div>
                         <div className="text-[11px] text-slate-500">{p.tpaUnitName}</div>
                       </td>

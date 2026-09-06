@@ -294,7 +294,7 @@ export const LiveScoreboard: React.FC<LiveScoreboardProps> = ({ participants, se
                 </div>
                 <div className="my-3">
                   <h3 className="text-lg font-bold text-slate-900 leading-tight">
-                    Kemantren {top2.nama}
+                    Rayon {top2.nama}
                   </h3>
                   <p className="text-xs text-slate-500 font-mono">
                     Total <strong>{top2.totalPoin} Poin</strong>
@@ -333,7 +333,7 @@ export const LiveScoreboard: React.FC<LiveScoreboardProps> = ({ participants, se
                 </div>
                 <div className="my-4">
                   <h3 className="text-2xl font-black text-slate-900 leading-tight">
-                    Kemantren {top1.nama}
+                    Rayon {top1.nama}
                   </h3>
                   <p className="text-sm font-extrabold text-amber-700 font-mono mt-0.5">
                     Total {top1.totalPoin} Poin Kejuaraan
@@ -369,7 +369,7 @@ export const LiveScoreboard: React.FC<LiveScoreboardProps> = ({ participants, se
                 </div>
                 <div className="my-3">
                   <h3 className="text-lg font-bold text-slate-900 leading-tight">
-                    Kemantren {top3.nama}
+                    Rayon {top3.nama}
                   </h3>
                   <p className="text-xs text-slate-500 font-mono">
                     Total <strong>{top3.totalPoin} Poin</strong>
@@ -399,7 +399,7 @@ export const LiveScoreboard: React.FC<LiveScoreboardProps> = ({ participants, se
             <div className="px-6 py-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div>
                 <h3 className="font-bold text-slate-900 text-sm">
-                  Klasemen Resmi 14 Kemantren ({activeTab === 'umum' ? 'Semua Jenjang' : `Jenjang ${activeTab.toUpperCase()}`})
+                  Klasemen Resmi 14 Rayon ({activeTab === 'umum' ? 'Semua Jenjang' : `Jenjang ${activeTab.toUpperCase()}`})
                 </h3>
                 <p className="text-xs text-slate-500">
                   Diurutkan berdasarkan Total Poin akumulasi Berita Acara yang telah disahkan.
@@ -412,7 +412,7 @@ export const LiveScoreboard: React.FC<LiveScoreboardProps> = ({ participants, se
                 <thead>
                   <tr className="bg-slate-50 text-slate-700 font-bold border-b border-slate-200">
                     <th className="py-3.5 px-4 w-14 text-center">Rank</th>
-                    <th className="py-3.5 px-4">Kontingen Kemantren</th>
+                    <th className="py-3.5 px-4">Kontingen Rayon</th>
                     <th className="py-3.5 px-4 text-center bg-amber-50/70 text-amber-950 font-bold w-24">🥇 Juara I</th>
                     <th className="py-3.5 px-4 text-center bg-slate-100/70 text-slate-800 font-bold w-24">🥈 Juara II</th>
                     <th className="py-3.5 px-4 text-center bg-amber-900/10 text-amber-950 font-bold w-24">🥉 Juara III</th>
@@ -446,7 +446,7 @@ export const LiveScoreboard: React.FC<LiveScoreboardProps> = ({ participants, se
                         )}
                       </td>
                       <td className="py-3 px-4 font-semibold text-slate-900">
-                        Kemantren {tally.nama}
+                        Rayon {tally.nama}
                       </td>
                       <td className="py-3 px-4 text-center font-bold text-amber-700 bg-amber-50/30">
                         {tally.emas}
