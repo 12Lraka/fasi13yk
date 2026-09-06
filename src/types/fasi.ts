@@ -147,6 +147,27 @@ export interface ParticipantDraft {
   createdAt: string;
 }
 
+export interface IdCardOfficialData {
+  id: string;
+  name: string;
+  role: string;
+  kemantrenName: string;
+  kemantrenCode?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface IdCardCommitteeData {
+  id: string;
+  name?: string;
+  division: string;
+  accessLevel?: string;
+  cardCategory?: 'panitia' | 'dewan_hakim';
+  customBadge?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface MedalTally {
   kemantrenId: string;
   kemantrenName: string;

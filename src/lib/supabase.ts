@@ -7,7 +7,17 @@
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { Participant, CompetitionCategory, Kemantren, AppSettings, AuditLog, FasiLevel, BeritaAcaraKejuaraan } from '../types/fasi';
+import {
+  Participant,
+  CompetitionCategory,
+  Kemantren,
+  AppSettings,
+  AuditLog,
+  FasiLevel,
+  BeritaAcaraKejuaraan,
+  IdCardOfficialData,
+  IdCardCommitteeData,
+} from '../types/fasi';
 import { KEMANTREN_LIST } from '../data/fasiMasterData';
 import { unescapeHtml } from '../utils/security';
 
@@ -938,4 +948,179 @@ export async function deleteBeritaAcaraFromSupabase(id: string): Promise<boolean
     return false;
   }
 }
+
+/**
+ * ============================================================================
+ * MANAJEMEN ID CARD OFFICIAL KONTINGEN (Tabel: id_card_officials)
+ * ============================================================================
+ */
+
+export async function fetchOfficialsFromSupabase(): Promise<IdCardOfficialData[]> {
+  const client = getSupabaseClient();
+  if (!client) return [];
+
+  try {
+    const { data, error } = await client
+      .from('id_card_officials')
+      .select('*')
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching officials from Supabase:', error);
+      return [];
+    }
+
+    return (data || []).map((row: any) => ({
+      id: row.id,
+      name: row.name || '',
+      role: row.role || 'Official',
+      kemantrenName: row.kemantren_name || '',
+      kemantrenCode: row.kemantren_code || undefined,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }));
+  } catch (err: any) {
+    console.error('Exception fetchOfficialsFromSupabase:', err?.message || err);
+    return [];
+  }
+}
+
+export async function upsertOfficialToSupabase(official: IdCardOfficialData): Promise<{ success: boolean; error?: string }> {
+  const client = getSupabaseClient();
+  if (!client) return { success: false, error: 'Klien Supabase belum terhubung' };
+
+  try {
+    const payload = {
+      id: official.id,
+      name: official.name,
+      role: official.role,
+      kemantren_name: official.kemantrenName,
+      kemantren_code: official.kemantrenCode || null,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error } = await client
+      .from('id_card_officials')
+      .upsert(payload, { onConflict: 'id' });
+
+    if (error) {
+      console.error('Error upserting official to Supabase:', error);
+      return { success: false, error: error.message };
+    }
+    return { success: true };
+  } catch (err: any) {
+    console.error('Exception upsertOfficialToSupabase:', err?.message || err);
+    return { success: false, error: err?.message || 'Gagal menyimpan data official ke Supabase' };
+  }
+}
+
+export async function deleteOfficialFromSupabase(id: string): Promise<boolean> {
+  const client = getSupabaseClient();
+  if (!client) return false;
+
+  try {
+    const { error } = await client
+      .from('id_card_officials')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error deleting official from Supabase:', error);
+      return false;
+    }
+    return true;
+  } catch (err: any) {
+    console.error('Exception deleteOfficialFromSupabase:', err?.message || err);
+    return false;
+  }
+}
+
+/**
+ * ============================================================================
+ * MANAJEMEN ID CARD PANITIA & DEWAN HAKIM (Tabel: id_card_committees)
+ * ============================================================================
+ */
+
+export async function fetchCommitteesFromSupabase(): Promise<IdCardCommitteeData[]> {
+  const client = getSupabaseClient();
+  if (!client) return [];
+
+  try {
+    const { data, error } = await client
+      .from('id_card_committees')
+      .select('*')
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching committees from Supabase:', error);
+      return [];
+    }
+
+    return (data || []).map((row: any) => ({
+      id: row.id,
+      name: row.name || '',
+      division: row.division || 'Panitia Pelaksana',
+      accessLevel: row.access_level || 'ALL ACCESS',
+      cardCategory: row.card_category === 'dewan_hakim' ? 'dewan_hakim' : 'panitia',
+      customBadge: row.custom_badge || (row.card_category === 'dewan_hakim' ? 'DEWAN HAKIM' : 'PANITIA'),
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }));
+  } catch (err: any) {
+    console.error('Exception fetchCommitteesFromSupabase:', err?.message || err);
+    return [];
+  }
+}
+
+export async function upsertCommitteeToSupabase(committee: IdCardCommitteeData): Promise<{ success: boolean; error?: string }> {
+  const client = getSupabaseClient();
+  if (!client) return { success: false, error: 'Klien Supabase belum terhubung' };
+
+  try {
+    const payload = {
+      id: committee.id,
+      name: committee.name || '',
+      division: committee.division,
+      access_level: committee.accessLevel || 'ALL ACCESS',
+      card_category: committee.cardCategory || 'panitia',
+      custom_badge: committee.customBadge || (committee.cardCategory === 'dewan_hakim' ? 'DEWAN HAKIM' : 'PANITIA'),
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error } = await client
+      .from('id_card_committees')
+      .upsert(payload, { onConflict: 'id' });
+
+    if (error) {
+      console.error('Error upserting committee to Supabase:', error);
+      return { success: false, error: error.message };
+    }
+    return { success: true };
+  } catch (err: any) {
+    console.error('Exception upsertCommitteeToSupabase:', err?.message || err);
+    return { success: false, error: err?.message || 'Gagal menyimpan data panitia ke Supabase' };
+  }
+}
+
+export async function deleteCommitteeFromSupabase(id: string): Promise<boolean> {
+  const client = getSupabaseClient();
+  if (!client) return false;
+
+  try {
+    const { error } = await client
+      .from('id_card_committees')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error deleting committee from Supabase:', error);
+      return false;
+    }
+    return true;
+  } catch (err: any) {
+    console.error('Exception deleteCommitteeFromSupabase:', err?.message || err);
+    return false;
+  }
+}
+
 

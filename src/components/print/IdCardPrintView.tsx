@@ -40,7 +40,18 @@ import {
 } from 'lucide-react';
 import { Participant, UserSession, CompetitionCategory, Kemantren } from '../../types/fasi';
 import { CATEGORIES_LIST, KEMANTREN_LIST } from '../../data/fasiMasterData';
-import { getStoredKemantren, getStoredCategories } from '../../utils/storage';
+import {
+  getStoredKemantren,
+  getStoredCategories,
+  getStoredOfficials,
+  persistOfficial,
+  removeOfficial,
+  syncOfficialsFromCloud,
+  getStoredCommittees,
+  persistCommittee,
+  removeCommittee,
+  syncCommitteesFromCloud,
+} from '../../utils/storage';
 import { ID_CARD_THEMES, IdCardTheme } from './idCardThemes';
 import { IdCardParticipant } from './IdCardParticipant';
 import { IdCardOfficial, OfficialCardData } from './IdCardOfficial';
@@ -112,22 +123,9 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
     isAdminRayon && session?.kemantrenId ? session.kemantrenId : 'ALL'
   );
 
-  const [customOfficials, setCustomOfficials] = useState<OfficialCardData[]>([
-    {
-      id: 'off-1',
-      name: 'Ust. H. Ahmad Fauzi, S.Pd.I',
-      role: 'Ketua Kontingen',
-      kemantrenName: 'Rayon Danurejan',
-      kemantrenCode: 'DN',
-    },
-    {
-      id: 'off-2',
-      name: 'Usth. Siti Nurjanah, S.Ag',
-      role: 'Official Pendamping',
-      kemantrenName: 'Rayon Danurejan',
-      kemantrenCode: 'DN',
-    },
-  ]);
+  const [customOfficials, setCustomOfficials] = useState<OfficialCardData[]>(() => {
+    return getStoredOfficials();
+  });
   const [newOffName, setNewOffName] = useState('');
   const [newOffRole, setNewOffRole] = useState('Official Pendamping');
   const [newOffKemId, setNewOffKemId] = useState(
@@ -140,22 +138,44 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
   const [blankoType, setBlankoType] = useState<'panitia' | 'dewan_hakim' | 'campuran'>('campuran');
   const [blankoCount, setBlankoCount] = useState<number>(18);
 
-  const [customCommittees, setCustomCommittees] = useState<CommitteeCardData[]>([
-    { id: 'com-1', name: 'Dr. H. Muhammad Asrori, M.Ag', division: 'Ketua Panitia FASI XIII', accessLevel: 'ALL ACCESS', cardCategory: 'panitia', customBadge: 'PANITIA' },
-    { id: 'com-2', name: 'Ustadz Ridwan Hakim, S.T', division: 'Sekretaris Panitia', accessLevel: 'ALL ACCESS', cardCategory: 'panitia', customBadge: 'PANITIA' },
-    { id: 'com-3', name: 'Ustadzah Hj. Maryam, S.E', division: 'Bendahara Panitia', accessLevel: 'ALL ACCESS', cardCategory: 'panitia', customBadge: 'PANITIA' },
-    { id: 'com-4', name: 'Ustadz Farhan Al-Ghifari, S.Pd', division: 'Koordinator Sie Acara & Lomba', accessLevel: 'STAGE & LOMBA', cardCategory: 'panitia', customBadge: 'PANITIA' },
-    { id: 'com-5', name: 'Ustadz Ilham Ramadhan, S.Kom', division: 'Koordinator Sie IT & Registrasi', accessLevel: 'ALL ACCESS', cardCategory: 'panitia', customBadge: 'PANITIA' },
-    { id: 'com-6', name: 'K.H. Ahmad Syukri, M.S.I', division: 'Koordinator Dewan Hakim', accessLevel: 'RUANG HAKIM & JURI', cardCategory: 'dewan_hakim', customBadge: 'DEWAN HAKIM' },
-    { id: 'com-7', name: 'Ustadz M. Qasim, S.Th.I', division: 'Sekretaris Dewan Hakim', accessLevel: 'RUANG HAKIM & JURI', cardCategory: 'dewan_hakim', customBadge: 'DEWAN HAKIM' },
-    { id: 'com-8', name: 'Dewan Hakim Tilawah Al-Qur\'an', division: 'Cabang Tilawah (TKA, TPA, TQA)', accessLevel: 'RUANG HAKIM & JURI', cardCategory: 'dewan_hakim', customBadge: 'DEWAN HAKIM' },
-    { id: 'com-9', name: 'Dewan Hakim Tahfidz Juz \'Amma', division: 'Cabang Tahfidz (TPA & TQA)', accessLevel: 'RUANG HAKIM & JURI', cardCategory: 'dewan_hakim', customBadge: 'DEWAN HAKIM' },
-  ]);
+  const [customCommittees, setCustomCommittees] = useState<CommitteeCardData[]>(() => {
+    return getStoredCommittees();
+  });
 
   const [newComName, setNewComName] = useState('');
   const [newComType, setNewComType] = useState<'panitia' | 'dewan_hakim'>('panitia');
   const [newComDivision, setNewComDivision] = useState('Sie Acara & Lomba');
   const [newComAccess, setNewComAccess] = useState('ALL ACCESS');
+
+  // Background sync data Officials & Committees dari cloud Supabase saat halaman dibuka
+  useEffect(() => {
+    syncOfficialsFromCloud().then((cloudOfficials) => {
+      if (cloudOfficials && cloudOfficials.length > 0) {
+        setCustomOfficials(cloudOfficials);
+      }
+    });
+
+    syncCommitteesFromCloud().then((cloudCommittees) => {
+      if (cloudCommittees && cloudCommittees.length > 0) {
+        setCustomCommittees(cloudCommittees);
+      }
+    });
+
+    const handleOfficialsUpdate = (e: any) => {
+      if (e.detail) setCustomOfficials(e.detail);
+    };
+    const handleCommitteesUpdate = (e: any) => {
+      if (e.detail) setCustomCommittees(e.detail);
+    };
+
+    window.addEventListener('fasi_officials_updated', handleOfficialsUpdate);
+    window.addEventListener('fasi_committees_updated', handleCommitteesUpdate);
+
+    return () => {
+      window.removeEventListener('fasi_officials_updated', handleOfficialsUpdate);
+      window.removeEventListener('fasi_committees_updated', handleCommitteesUpdate);
+    };
+  }, []);
 
   // Generate QR Codes untuk Peserta
   useEffect(() => {
@@ -420,7 +440,7 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
   }, [committeeMode, customCommittees, blankoType, blankoCount, PRESET_PANITIA, PRESET_DEWAN_HAKIM, committeeSubCategory]);
 
   // Handle Tambah Custom Official
-  const handleAddCustomOfficial = () => {
+  const handleAddCustomOfficial = async () => {
     if (!newOffName.trim()) return;
     const kem = kemantrenList.find((k) => k.id === newOffKemId);
     const newOff: OfficialCardData = {
@@ -430,12 +450,21 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
       kemantrenName: kem ? `Rayon ${kem.name}` : 'Rayon Kota Yogyakarta',
       kemantrenCode: kem?.code,
     };
+    await persistOfficial(newOff);
     setCustomOfficials((prev) => [...prev, newOff]);
     setNewOffName('');
+    showToast('success', `Official "${newOff.name}" berhasil disimpan!`);
+  };
+
+  // Handle Hapus Custom Official
+  const handleDeleteOfficial = async (off: OfficialCardData) => {
+    await removeOfficial(off.id);
+    setCustomOfficials((prev) => prev.filter((o) => o.id !== off.id));
+    showToast('success', `Official "${off.name}" dihapus.`);
   };
 
   // Handle Tambah Custom Committee / Dewan Hakim
-  const handleAddCustomCommittee = () => {
+  const handleAddCustomCommittee = async () => {
     if (!newComName.trim()) return;
     const newCom: CommitteeCardData = {
       id: `com-c-${Date.now()}`,
@@ -445,8 +474,17 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
       cardCategory: newComType,
       customBadge: newComType === 'dewan_hakim' ? 'DEWAN HAKIM' : 'PANITIA',
     };
+    await persistCommittee(newCom);
     setCustomCommittees((prev) => [...prev, newCom]);
     setNewComName('');
+    showToast('success', `Kartu "${newCom.name}" berhasil disimpan!`);
+  };
+
+  // Handle Hapus Custom Committee / Dewan Hakim
+  const handleDeleteCommittee = async (com: CommitteeCardData) => {
+    await removeCommittee(com.id);
+    setCustomCommittees((prev) => prev.filter((c) => c.id !== com.id));
+    showToast('success', `Kartu "${com.name || com.division}" dihapus.`);
   };
 
   const handlePrint = () => {
@@ -1054,7 +1092,7 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
                         {off.kemantrenName} ({off.role})
                       </span>
                       <button
-                        onClick={() => setCustomOfficials((prev) => prev.filter((_, i) => i !== idx))}
+                        onClick={() => handleDeleteOfficial(off)}
                         className="text-red-500 hover:text-red-700 cursor-pointer ml-1"
                         title="Hapus"
                       >
@@ -1258,7 +1296,7 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
                         {com.customBadge || (com.cardCategory === 'dewan_hakim' ? 'DEWAN HAKIM' : 'PANITIA')} - {com.division} ({com.accessLevel})
                       </span>
                       <button
-                        onClick={() => setCustomCommittees((prev) => prev.filter((_, i) => i !== idx))}
+                        onClick={() => handleDeleteCommittee(com)}
                         className="text-red-500 hover:text-red-700 cursor-pointer ml-1"
                         title="Hapus"
                       >

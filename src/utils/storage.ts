@@ -7,7 +7,19 @@
  * (Local Persistence, RBAC Session, Medal Calculator, Lottery Engine)
  */
 
-import { Participant, ParticipantDraft, MedalTally, UserSession, AuditLog, AppSettings, CompetitionCategory, Kemantren, BeritaAcaraKejuaraan } from '../types/fasi';
+import {
+  Participant,
+  ParticipantDraft,
+  MedalTally,
+  UserSession,
+  AuditLog,
+  AppSettings,
+  CompetitionCategory,
+  Kemantren,
+  BeritaAcaraKejuaraan,
+  IdCardOfficialData,
+  IdCardCommitteeData,
+} from '../types/fasi';
 import { KEMANTREN_LIST, CATEGORIES_LIST, INITIAL_PARTICIPANTS } from '../data/fasiMasterData';
 import { createAuditLog, unescapeHtml } from './security';
 import {
@@ -16,6 +28,12 @@ import {
   upsertParticipantToSupabase,
   deleteParticipantFromSupabase,
   insertAuditLogToSupabase,
+  fetchOfficialsFromSupabase,
+  upsertOfficialToSupabase,
+  deleteOfficialFromSupabase,
+  fetchCommitteesFromSupabase,
+  upsertCommitteeToSupabase,
+  deleteCommitteeFromSupabase,
 } from '../lib/supabase';
 
 const PARTICIPANTS_KEY = 'fasi13_participants_data';
@@ -26,6 +44,8 @@ const SETTINGS_KEY = 'fasi13_app_settings';
 const CATEGORIES_KEY = 'fasi13_categories_data';
 const KEMANTREN_KEY = 'fasi13_kemantren_data';
 const BERITA_ACARA_KEY = 'fasi13_berita_acara_data';
+const OFFICIALS_KEY = 'fasi13_id_card_officials';
+const COMMITTEES_KEY = 'fasi13_id_card_committees';
 
 export const DEFAULT_SETTINGS: AppSettings = {
   tagline: 'Santri Hebat, Hebat Prestasi, Hebat Mengaji, & Berakhlakul Karimah.',
@@ -532,3 +552,183 @@ export function saveBeritaAcaraList(list: BeritaAcaraKejuaraan[]): void {
     console.error('Gagal menyimpan berita acara:', err);
   }
 }
+
+/**
+ * ============================================================================
+ * MANAJEMEN PERSISTENSI ID CARD OFFICIAL
+ * ============================================================================
+ */
+
+export const DEFAULT_OFFICIALS: IdCardOfficialData[] = [
+  {
+    id: 'off-1',
+    name: 'Ust. H. Ahmad Fauzi, S.Pd.I',
+    role: 'Ketua Kontingen',
+    kemantrenName: 'Danurejan',
+    kemantrenCode: 'DN',
+  },
+  {
+    id: 'off-2',
+    name: 'Usth. Siti Nurjanah, S.Ag',
+    role: 'Official Pendamping',
+    kemantrenName: 'Danurejan',
+    kemantrenCode: 'DN',
+  },
+];
+
+export function getStoredOfficials(): IdCardOfficialData[] {
+  try {
+    const raw = localStorage.getItem(OFFICIALS_KEY);
+    if (!raw) return DEFAULT_OFFICIALS;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_OFFICIALS;
+  } catch (err) {
+    console.error('Gagal mengambil data stored officials:', err);
+    return DEFAULT_OFFICIALS;
+  }
+}
+
+export function saveOfficialsList(list: IdCardOfficialData[]): void {
+  try {
+    localStorage.setItem(OFFICIALS_KEY, JSON.stringify(list));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('fasi_officials_updated', { detail: list }));
+    }
+  } catch (err) {
+    console.error('Gagal menyimpan data officials:', err);
+  }
+}
+
+export async function persistOfficial(official: IdCardOfficialData): Promise<void> {
+  const current = getStoredOfficials();
+  const existingIdx = current.findIndex((o) => o.id === official.id);
+  let updated: IdCardOfficialData[];
+  if (existingIdx >= 0) {
+    updated = [...current];
+    updated[existingIdx] = official;
+  } else {
+    updated = [...current, official];
+  }
+  saveOfficialsList(updated);
+
+  if (isSupabaseConfigured()) {
+    upsertOfficialToSupabase(official).catch((err) => {
+      console.warn('Gagal background sync official ke Supabase:', err);
+    });
+  }
+}
+
+export async function removeOfficial(id: string): Promise<void> {
+  const current = getStoredOfficials();
+  const updated = current.filter((o) => o.id !== id);
+  saveOfficialsList(updated);
+
+  if (isSupabaseConfigured()) {
+    deleteOfficialFromSupabase(id).catch((err) => {
+      console.warn('Gagal background delete official dari Supabase:', err);
+    });
+  }
+}
+
+export async function syncOfficialsFromCloud(): Promise<IdCardOfficialData[]> {
+  if (!isSupabaseConfigured()) return getStoredOfficials();
+  try {
+    const cloudData = await fetchOfficialsFromSupabase();
+    if (cloudData && cloudData.length > 0) {
+      saveOfficialsList(cloudData);
+      return cloudData;
+    }
+    return getStoredOfficials();
+  } catch (err) {
+    console.warn('Gagal sync officials dari cloud:', err);
+    return getStoredOfficials();
+  }
+}
+
+/**
+ * ============================================================================
+ * MANAJEMEN PERSISTENSI ID CARD PANITIA & DEWAN HAKIM
+ * ============================================================================
+ */
+
+export const DEFAULT_COMMITTEES: IdCardCommitteeData[] = [
+  { id: 'com-1', name: 'Dr. H. Muhammad Asrori, M.Ag', division: 'Ketua Panitia FASI XIII', accessLevel: 'ALL ACCESS', cardCategory: 'panitia', customBadge: 'PANITIA' },
+  { id: 'com-2', name: 'Ustadz Ridwan Hakim, S.T', division: 'Sekretaris Panitia', accessLevel: 'ALL ACCESS', cardCategory: 'panitia', customBadge: 'PANITIA' },
+  { id: 'com-3', name: 'Ustadzah Hj. Maryam, S.E', division: 'Bendahara Panitia', accessLevel: 'ALL ACCESS', cardCategory: 'panitia', customBadge: 'PANITIA' },
+  { id: 'com-4', name: 'Ustadz Farhan Al-Ghifari, S.Pd', division: 'Koordinator Sie Acara & Lomba', accessLevel: 'STAGE & LOMBA', cardCategory: 'panitia', customBadge: 'PANITIA' },
+  { id: 'com-5', name: 'Ustadz Ilham Ramadhan, S.Kom', division: 'Koordinator Sie IT & Registrasi', accessLevel: 'ALL ACCESS', cardCategory: 'panitia', customBadge: 'PANITIA' },
+  { id: 'com-6', name: 'K.H. Ahmad Syukri, M.S.I', division: 'Koordinator Dewan Hakim', accessLevel: 'RUANG HAKIM & JURI', cardCategory: 'dewan_hakim', customBadge: 'DEWAN HAKIM' },
+  { id: 'com-7', name: 'Ustadz M. Qasim, S.Th.I', division: 'Sekretaris Dewan Hakim', accessLevel: 'RUANG HAKIM & JURI', cardCategory: 'dewan_hakim', customBadge: 'DEWAN HAKIM' },
+  { id: 'com-8', name: 'Dewan Hakim Tilawah Al-Qur\'an', division: 'Cabang Tilawah (TKA, TPA, TQA)', accessLevel: 'RUANG HAKIM & JURI', cardCategory: 'dewan_hakim', customBadge: 'DEWAN HAKIM' },
+  { id: 'com-9', name: 'Dewan Hakim Tahfidz Juz \'Amma', division: 'Cabang Tahfidz (TPA & TQA)', accessLevel: 'RUANG HAKIM & JURI', cardCategory: 'dewan_hakim', customBadge: 'DEWAN HAKIM' },
+];
+
+export function getStoredCommittees(): IdCardCommitteeData[] {
+  try {
+    const raw = localStorage.getItem(COMMITTEES_KEY);
+    if (!raw) return DEFAULT_COMMITTEES;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_COMMITTEES;
+  } catch (err) {
+    console.error('Gagal mengambil data stored committees:', err);
+    return DEFAULT_COMMITTEES;
+  }
+}
+
+export function saveCommitteesList(list: IdCardCommitteeData[]): void {
+  try {
+    localStorage.setItem(COMMITTEES_KEY, JSON.stringify(list));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('fasi_committees_updated', { detail: list }));
+    }
+  } catch (err) {
+    console.error('Gagal menyimpan data committees:', err);
+  }
+}
+
+export async function persistCommittee(committee: IdCardCommitteeData): Promise<void> {
+  const current = getStoredCommittees();
+  const existingIdx = current.findIndex((c) => c.id === committee.id);
+  let updated: IdCardCommitteeData[];
+  if (existingIdx >= 0) {
+    updated = [...current];
+    updated[existingIdx] = committee;
+  } else {
+    updated = [...current, committee];
+  }
+  saveCommitteesList(updated);
+
+  if (isSupabaseConfigured()) {
+    upsertCommitteeToSupabase(committee).catch((err) => {
+      console.warn('Gagal background sync committee ke Supabase:', err);
+    });
+  }
+}
+
+export async function removeCommittee(id: string): Promise<void> {
+  const current = getStoredCommittees();
+  const updated = current.filter((c) => c.id !== id);
+  saveCommitteesList(updated);
+
+  if (isSupabaseConfigured()) {
+    deleteCommitteeFromSupabase(id).catch((err) => {
+      console.warn('Gagal background delete committee dari Supabase:', err);
+    });
+  }
+}
+
+export async function syncCommitteesFromCloud(): Promise<IdCardCommitteeData[]> {
+  if (!isSupabaseConfigured()) return getStoredCommittees();
+  try {
+    const cloudData = await fetchCommitteesFromSupabase();
+    if (cloudData && cloudData.length > 0) {
+      saveCommitteesList(cloudData);
+      return cloudData;
+    }
+    return getStoredCommittees();
+  } catch (err) {
+    console.warn('Gagal sync committees dari cloud:', err);
+    return getStoredCommittees();
+  }
+}
+
