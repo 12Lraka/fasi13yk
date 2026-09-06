@@ -731,7 +731,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                             {/* Attendance */}
                             <td className="py-3 px-3 text-center">
-                              {participant.attendance === 'hadir' || participant.attendance === 'siap_tampil' || participant.attendance === 'sudah_tampil' ? (
+                              {participant.attendance === 'hadir' ? (
                                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-emerald-100 text-emerald-800 rounded-full text-[10px] font-bold">
                                   <CheckCircle2 className="w-3 h-3" />
                                   <span>Hadir</span>

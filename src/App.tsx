@@ -41,6 +41,8 @@ import {
   fetchBeritaAcaraFromSupabase,
   subscribeToParticipantsRealtime,
   subscribeToBeritaAcaraRealtime,
+  upsertParticipantToSupabase,
+  bulkSyncParticipantsToSupabase,
 } from './lib/supabase';
 import { showToast, showConfirmDialog } from './utils/sweetalert';
 import { AppRoute, getCurrentRouteFromURL, navigateToRoute } from './utils/router';
@@ -253,11 +255,23 @@ export default function App() {
     }
 
     handleUpdateParticipants(updated);
+
+    if (isSupabaseConfigured()) {
+      upsertParticipantToSupabase(savedParticipant).catch((err) =>
+        console.warn('Gagal menyimpan santri ke Supabase:', err)
+      );
+    }
   };
 
   const handleSaveMultipleParticipants = (newBatch: Participant[]) => {
     const updated = [...newBatch, ...participants];
     handleUpdateParticipants(updated);
+
+    if (isSupabaseConfigured()) {
+      bulkSyncParticipantsToSupabase(newBatch).catch((err) =>
+        console.warn('Gagal menyimpan batch santri ke Supabase:', err)
+      );
+    }
   };
 
   const handleLoginSuccess = (newSession: UserSession) => {

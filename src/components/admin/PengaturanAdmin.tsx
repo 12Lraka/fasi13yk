@@ -62,7 +62,9 @@ import {
   syncKemantrenToSupabase,
   bulkSyncParticipantsToSupabase,
   bulkInsertDummyParticipantsToSupabase,
-  deleteDummyParticipantsFromSupabase
+  deleteDummyParticipantsFromSupabase,
+  fetchParticipantsFromSupabase,
+  getRemoteParticipantCounts
 } from '../../lib/supabase';
 import { generateDummyParticipantsList } from '../../utils/dummyGenerator';
 import { showToast, showConfirmDialog, showSuccessAlert, showErrorAlert } from '../../utils/sweetalert';
@@ -416,7 +418,7 @@ export const PengaturanAdmin: React.FC<PengaturanAdminProps> = ({
 
     const confirm = await showConfirmDialog(
       `Generate ${selectedGenerateCount} Data Dummy Santri?`,
-      `Data santri simulasi akan dibuat lengkap dengan kalkulasi umur valid (TKA, TPA, TQA), asal TPA di 14 Kemantren, nomor undian, dan otomatis disinkronkan ke Supabase & LocalStorage.`
+      `Data santri simulasi akan dibuat dan langsung disimpan ke database Supabase secara real-time. LocalStorage akan otomatis tersinkronisasi sebagai cache.`
     );
     if (!confirm) return;
 
@@ -430,11 +432,7 @@ export const PengaturanAdmin: React.FC<PengaturanAdminProps> = ({
         kemantrenList
       );
 
-      // 1. Simpan ke LocalStorage
-      addDummyParticipantsToStorage(dummies);
-
-      // 2. Simpan ke Supabase jika terhubung
-      let supabaseMsg = '';
+      // LANGSUNG SIMPAN KE SUPABASE (DATABASE UTAMA)
       if (isSupabaseConfigured()) {
         const sbResult = await bulkInsertDummyParticipantsToSupabase(
           dummies,
@@ -442,29 +440,53 @@ export const PengaturanAdmin: React.FC<PengaturanAdminProps> = ({
             setGenerateProgress({ current: inserted, total });
           }
         );
-        if (sbResult.success) {
-          supabaseMsg = ` (${sbResult.count} santri tersinkron ke Supabase)`;
-        } else {
-          supabaseMsg = ` (Catatan Supabase: ${sbResult.error})`;
+
+        if (!sbResult.success) {
+          throw new Error(sbResult.error || 'Gagal menyimpan data dummy ke database Supabase.');
         }
+
+        // Ambil data terbaru langsung dari Supabase sebagai satu-satunya sumber data resmi
+        const remoteParticipants = await fetchParticipantsFromSupabase();
+        if (remoteParticipants) {
+          localStorage.setItem('fasi_participants', JSON.stringify(remoteParticipants));
+          window.dispatchEvent(new CustomEvent('fasi_participants_updated'));
+          setCurrentDummyCount(
+            remoteParticipants.filter((p) => p.id.startsWith('dummy-') || p.registrationNumber?.startsWith('DMY-') || p.notes?.includes('[DUMMY_DATA]')).length
+          );
+        }
+
+        logAuditEvent(
+          session.name,
+          'GENERATE_DUMMY_PARTICIPANTS',
+          `Menghasilkan ${dummies.length} data dummy santri langsung ke Supabase`
+        );
+
+        await showSuccessAlert(
+          'Tersimpan di Supabase!',
+          `Berhasil menyimpan ${sbResult.count} data santri simulasi langsung ke database Supabase (PostgreSQL). Data otomatis aktif di Rekap Peserta, ID Card, dan Undian Tampil.`
+        );
+      } else {
+        // Fallback jika Supabase belum dihubungkan
+        addDummyParticipantsToStorage(dummies);
+        const all = getStoredParticipants();
+        setCurrentDummyCount(
+          all.filter((p) => p.id.startsWith('dummy-') || p.registrationNumber?.startsWith('DMY-') || p.notes?.includes('[DUMMY_DATA]')).length
+        );
+
+        logAuditEvent(
+          session.name,
+          'GENERATE_DUMMY_PARTICIPANTS_LOCAL',
+          `Menghasilkan ${dummies.length} data dummy santri ke LocalStorage`
+        );
+
+        await showSuccessAlert(
+          'Berhasil (Mode Offline)',
+          `Supabase belum aktif. ${dummies.length} data santri simulasi disimpan di LocalStorage browser.`
+        );
       }
-
-      logAuditEvent(
-        session.name,
-        'GENERATE_DUMMY_PARTICIPANTS',
-        `Menghasilkan ${dummies.length} data dummy santri FASI XIII`
-      );
-
-      const all = getStoredParticipants();
-      setCurrentDummyCount(all.filter((p) => p.id.startsWith('dummy-') || p.notes?.includes('[DUMMY_DATA]')).length);
-
-      await showSuccessAlert(
-        'Berhasil Generate Data Dummy!',
-        `Berhasil membuat ${dummies.length} data santri simulasi${supabaseMsg}. Data langsung aktif di Rekap Peserta, ID Card, dan Undian Tampil.`
-      );
     } catch (error: any) {
       console.error('Error generating dummy:', error);
-      showErrorAlert('Gagal', error?.message || 'Terjadi kesalahan saat generate data dummy.');
+      showErrorAlert('Gagal Menyimpan ke Supabase', error?.message || 'Terjadi kesalahan saat generate data dummy.');
     } finally {
       setIsGeneratingDummy(false);
       setGenerateProgress(null);
@@ -473,50 +495,84 @@ export const PengaturanAdmin: React.FC<PengaturanAdminProps> = ({
 
   // Delete Dummy Data Handler
   const handleDeleteDummy = async () => {
-    const currentCount = currentDummyCount;
-    if (currentCount === 0) {
-      showToast('info', 'Saat ini tidak ada data dummy santri di dalam sistem.');
-      return;
-    }
-
     const confirm = await showConfirmDialog(
       'Hapus Semua Data Dummy?',
-      `Tindakan ini akan menghapus ${currentCount} data dummy simulasi dari sistem & Supabase. Data riil santri kontingen TIDAK AKAN terhapus.`
+      `Tindakan ini akan menghapus semua data dummy simulasi langsung dari database Supabase dan sistem. Data riil santri kontingen 14 Kemantren TIDAK AKAN terhapus.`
     );
     if (!confirm) return;
 
     setIsDeletingDummy(true);
     try {
-      // 1. Hapus dari LocalStorage
-      const { deletedCount } = removeDummyParticipantsFromStorage();
-
-      // 2. Hapus dari Supabase jika terhubung
       let sbDeleted = 0;
       if (isSupabaseConfigured()) {
         const sbRes = await deleteDummyParticipantsFromSupabase();
-        if (sbRes.success) {
-          sbDeleted = sbRes.count;
+        if (!sbRes.success) {
+          throw new Error(sbRes.error || 'Gagal menghapus data dummy dari database Supabase.');
         }
+        sbDeleted = sbRes.count;
+      }
+
+      // Bersihkan juga dari LocalStorage agar cache bersih
+      const { deletedCount } = removeDummyParticipantsFromStorage();
+
+      // Sinkronkan data peserta resmi yang tersisa langsung dari Supabase
+      if (isSupabaseConfigured()) {
+        const remoteParticipants = await fetchParticipantsFromSupabase();
+        if (remoteParticipants) {
+          localStorage.setItem('fasi_participants', JSON.stringify(remoteParticipants));
+          window.dispatchEvent(new CustomEvent('fasi_participants_updated'));
+          setCurrentDummyCount(
+            remoteParticipants.filter((p) => p.id.startsWith('dummy-') || p.registrationNumber?.startsWith('DMY-') || p.notes?.includes('[DUMMY_DATA]')).length
+          );
+        }
+      } else {
+        const all = getStoredParticipants();
+        setCurrentDummyCount(
+          all.filter((p) => p.id.startsWith('dummy-') || p.registrationNumber?.startsWith('DMY-') || p.notes?.includes('[DUMMY_DATA]')).length
+        );
       }
 
       logAuditEvent(
         session.name,
         'DELETE_DUMMY_PARTICIPANTS',
-        `Membersihkan data dummy santri (${deletedCount} dari storage, ${sbDeleted} dari Supabase)`
+        `Membersihkan data dummy santri (${sbDeleted} dari database Supabase, ${deletedCount} dari cache storage)`
       );
-
-      const all = getStoredParticipants();
-      setCurrentDummyCount(all.filter((p) => p.id.startsWith('dummy-') || p.notes?.includes('[DUMMY_DATA]')).length);
 
       await showSuccessAlert(
         'Data Dummy Berhasil Dihapus!',
-        `Seluruh data simulasi (${deletedCount} data) telah dibersihkan dari sistem dan database Supabase. Sistem kini bersih dan siap untuk data riil kontingen.`
+        `Semua data simulasi telah dibersihkan langsung dari database Supabase (${sbDeleted} baris dihapus). Sistem kini bersih dan hanya berisi data riil kontingen.`
       );
     } catch (error: any) {
       console.error('Error deleting dummy:', error);
-      showErrorAlert('Gagal', error?.message || 'Terjadi kesalahan saat membersihkan data dummy.');
+      showErrorAlert('Gagal Menghapus dari Supabase', error?.message || 'Terjadi kesalahan saat membersihkan data dummy.');
     } finally {
       setIsDeletingDummy(false);
+    }
+  };
+
+  // Handler Sinkronisasi Ulang dari Supabase (Reset Cache Lokal ke Data Supabase)
+  const handleRefreshFromSupabase = async () => {
+    if (!isSupabaseConfigured()) {
+      showToast('error', 'Supabase belum dikonfigurasi.');
+      return;
+    }
+    try {
+      showToast('info', 'Mengambil data terbaru langsung dari database Supabase...');
+      const remote = await fetchParticipantsFromSupabase();
+      if (remote !== null) {
+        localStorage.setItem('fasi_participants', JSON.stringify(remote));
+        window.dispatchEvent(new CustomEvent('fasi_participants_updated'));
+        const dummyC = remote.filter((p) => p.id.startsWith('dummy-') || p.registrationNumber?.startsWith('DMY-') || p.notes?.includes('[DUMMY_DATA]')).length;
+        setCurrentDummyCount(dummyC);
+        showSuccessAlert(
+          'Sinkronisasi Berhasil!',
+          `Data cache lokal telah disamakan dengan database Supabase (${remote.length} santri: ${remote.length - dummyC} riil, ${dummyC} dummy).`
+        );
+      } else {
+        showErrorAlert('Gagal', 'Tidak dapat mengambil data dari database Supabase.');
+      }
+    } catch (err: any) {
+      showErrorAlert('Error', err?.message || 'Gagal sinkronisasi');
     }
   };
 
@@ -1506,7 +1562,18 @@ export const PengaturanAdmin: React.FC<PengaturanAdminProps> = ({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                  {isSupabaseConfigured() && (
+                    <button
+                      type="button"
+                      onClick={handleRefreshFromSupabase}
+                      className="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-medium rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
+                      title="Perbarui cache aplikasi langsung dari database Supabase"
+                    >
+                      <RefreshCw className="w-3 h-3 text-emerald-700" />
+                      <span>Sync dari Supabase</span>
+                    </button>
+                  )}
                   <span className="text-xs font-medium text-slate-500">Status saat ini:</span>
                   <span className={`px-2.5 py-1 rounded-lg text-xs font-bold font-mono border ${
                     currentDummyCount > 0 

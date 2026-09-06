@@ -13,7 +13,7 @@ export type Gender = 'L' | 'P';
 
 export type ParticipantStatus = 'verified' | 'pending' | 'rejected';
 
-export type AttendanceStatus = 'belum_hadir' | 'hadir' | 'siap_tampil' | 'sudah_tampil';
+export type AttendanceStatus = 'belum_hadir' | 'hadir';
 
 export interface WinnerSlot {
   participantId?: string;

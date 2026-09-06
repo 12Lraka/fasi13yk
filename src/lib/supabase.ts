@@ -11,10 +11,18 @@ import { Participant, CompetitionCategory, Kemantren, AppSettings, AuditLog, Fas
 import { KEMANTREN_LIST } from '../data/fasiMasterData';
 import { unescapeHtml } from '../utils/security';
 
-// Environment variables via Vite import.meta.env
-const metaEnv = (import.meta as any).env || {};
-const rawSupabaseUrl = (metaEnv.VITE_SUPABASE_URL as string | undefined) || '';
-const rawSupabaseAnonKey = (metaEnv.VITE_SUPABASE_ANON_KEY as string | undefined) || '';
+// Environment variables via Vite import.meta.env and process.env fallback
+const metaEnv = (typeof import.meta !== 'undefined' && (import.meta as any).env) || {};
+const procEnv = (typeof process !== 'undefined' && (process as any).env) || {};
+
+const rawSupabaseUrl = 
+  (metaEnv.VITE_SUPABASE_URL as string | undefined) ||
+  (procEnv.VITE_SUPABASE_URL as string | undefined) ||
+  '';
+const rawSupabaseAnonKey = 
+  (metaEnv.VITE_SUPABASE_ANON_KEY as string | undefined) ||
+  (procEnv.VITE_SUPABASE_ANON_KEY as string | undefined) ||
+  '';
 
 /**
  * Sanitasi URL Supabase untuk mencegah error PGRST125 jika pengguna memasukkan
@@ -153,24 +161,14 @@ function formatDateToDisplay(dateStr: string): string {
 
 /**
  * Normalisasi status kehadiran untuk Supabase
- * Schema Supabase CHECK (attendance IN ('belum_tampil', 'siap_tampil', 'sudah_tampil'))
+ * Mendukung format sederhana ('belum_hadir', 'hadir') dan kompatibilitas ke belakang ('belum_tampil', 'siap_tampil', 'sudah_tampil')
  */
-function normalizeAttendanceForDb(attendance?: string): string {
-  if (!attendance) return 'belum_tampil';
-  const clean = attendance.trim().toLowerCase();
-  if (clean === 'belum_tampil' || clean === 'siap_tampil' || clean === 'sudah_tampil') {
-    return clean;
+function normalizeAttendanceForDb(attendance?: string, useLegacyDbEnum = false): string {
+  const isHadir = attendance === 'hadir' || attendance === 'siap_tampil' || attendance === 'sudah_tampil' || attendance === 'siap';
+  if (useLegacyDbEnum) {
+    return isHadir ? 'siap_tampil' : 'belum_tampil';
   }
-  if (clean === 'belum_hadir' || clean === 'belum' || clean === 'absent') {
-    return 'belum_tampil';
-  }
-  if (clean === 'hadir' || clean === 'siap') {
-    return 'siap_tampil';
-  }
-  if (clean === 'selesai') {
-    return 'sudah_tampil';
-  }
-  return 'belum_tampil';
+  return isHadir ? 'hadir' : 'belum_hadir';
 }
 
 /**
@@ -209,7 +207,7 @@ function formatTimestampToIso(timestampStr?: string): string {
   return new Date().toISOString();
 }
 
-function mapParticipantToDb(p: Participant): Record<string, any> {
+function mapParticipantToDb(p: Participant, useLegacyDbEnum = false): Record<string, any> {
   const points = p.rank === 1 ? 5 : p.rank === 2 ? 3 : p.rank === 3 ? 1 : 0;
   
   // Ambil fallback nama PJ dan Kontak berdasarkan Kemantren jika data peserta belum mengisinya
@@ -241,7 +239,7 @@ function mapParticipantToDb(p: Participant): Record<string, any> {
     document_url: p.documentUrl || null,
     lottery_number: p.lotteryNumber || null,
     status: normalizeStatusForDb(p.status),
-    attendance: normalizeAttendanceForDb(p.attendance),
+    attendance: normalizeAttendanceForDb(p.attendance, useLegacyDbEnum),
     score_jury1: p.scoreJury1 ?? null,
     score_jury2: p.scoreJury2 ?? null,
     score_jury3: p.scoreJury3 ?? null,
@@ -260,6 +258,8 @@ function mapDbToParticipant(row: Record<string, any>): Participant {
   else if (years <= 12) levelEligible = 'TPA';
   else if (years <= 15) levelEligible = 'TQA';
 
+  const isHadir = row.attendance === 'hadir' || row.attendance === 'siap_tampil' || row.attendance === 'sudah_tampil';
+
   return {
     id: row.id,
     registrationNumber: row.registration_number,
@@ -274,7 +274,7 @@ function mapDbToParticipant(row: Record<string, any>): Participant {
     pjName: unescapeHtml(row.pj_name),
     whatsappNumber: unescapeHtml(row.whatsapp_number),
     status: row.status || 'verified',
-    attendance: row.attendance || 'belum_hadir',
+    attendance: isHadir ? 'hadir' : 'belum_hadir',
     scoreJury1: row.score_jury1 !== null ? Number(row.score_jury1) : undefined,
     scoreJury2: row.score_jury2 !== null ? Number(row.score_jury2) : undefined,
     scoreJury3: row.score_jury3 !== null ? Number(row.score_jury3) : undefined,
@@ -340,7 +340,12 @@ export async function upsertParticipantToSupabase(participant: Participant): Pro
 
   try {
     const payload = mapParticipantToDb(participant);
-    const { error } = await client.from('participants').upsert(payload, { onConflict: 'id' });
+    let { error } = await client.from('participants').upsert(payload, { onConflict: 'id' });
+    if (error && error.message?.includes('participants_attendance_check')) {
+      const fallbackPayload = mapParticipantToDb(participant, true);
+      const retry = await client.from('participants').upsert(fallbackPayload, { onConflict: 'id' });
+      error = retry.error;
+    }
     if (error) throw error;
     return { success: true };
   } catch (error: any) {
@@ -383,8 +388,13 @@ export async function bulkSyncParticipantsToSupabase(participants: Participant[]
       return { success: true, count: 0 };
     }
 
-    const payloads = participants.map(mapParticipantToDb);
-    const { error } = await client.from('participants').upsert(payloads, { onConflict: 'id' });
+    let payloads = participants.map((p) => mapParticipantToDb(p, false));
+    let { error } = await client.from('participants').upsert(payloads, { onConflict: 'id' });
+    if (error && error.message?.includes('participants_attendance_check')) {
+      payloads = participants.map((p) => mapParticipantToDb(p, true));
+      const retry = await client.from('participants').upsert(payloads, { onConflict: 'id' });
+      error = retry.error;
+    }
     if (error) throw error;
     return { success: true, count: payloads.length };
   } catch (error: any) {
@@ -423,13 +433,20 @@ export async function bulkInsertDummyParticipantsToSupabase(
   }
 
   try {
-    const payloads = dummyParticipants.map(mapParticipantToDb);
+    let useLegacy = false;
+    let payloads = dummyParticipants.map((p) => mapParticipantToDb(p, false));
     const BATCH_SIZE = 100;
     let totalInserted = 0;
 
     for (let i = 0; i < payloads.length; i += BATCH_SIZE) {
-      const batch = payloads.slice(i, i + BATCH_SIZE);
-      const { error } = await client.from('participants').upsert(batch, { onConflict: 'id' });
+      let batch = payloads.slice(i, i + BATCH_SIZE);
+      let { error } = await client.from('participants').upsert(batch, { onConflict: 'id' });
+      if (error && error.message?.includes('participants_attendance_check')) {
+        useLegacy = true;
+        batch = dummyParticipants.slice(i, i + BATCH_SIZE).map((p) => mapParticipantToDb(p, true));
+        const retry = await client.from('participants').upsert(batch, { onConflict: 'id' });
+        error = retry.error;
+      }
       if (error) throw error;
       totalInserted += batch.length;
       if (onProgress) {
@@ -446,7 +463,7 @@ export async function bulkInsertDummyParticipantsToSupabase(
 
 /**
  * Menghapus seluruh data peserta dummy dari Supabase
- * Kriteria: id berawalan dummy- atau notes mengandung [DUMMY_DATA]
+ * Kriteria: id berawalan dummy- atau registration_number berawalan DMY- atau notes mengandung [DUMMY_DATA]
  */
 export async function deleteDummyParticipantsFromSupabase(): Promise<{ success: boolean; count: number; error?: string }> {
   const client = getSupabaseClient();
@@ -465,13 +482,44 @@ export async function deleteDummyParticipantsFromSupabase(): Promise<{ success: 
     const res2 = await client
       .from('participants')
       .delete({ count: 'exact' })
+      .like('registration_number', 'DMY-%');
+
+    if (res2.error) throw res2.error;
+
+    const res3 = await client
+      .from('participants')
+      .delete({ count: 'exact' })
       .like('notes', '%[DUMMY_DATA]%');
 
-    const totalDeleted = (res1.count || 0) + (res2.count || 0);
+    if (res3.error) throw res3.error;
+
+    const totalDeleted = (res1.count || 0) + (res2.count || 0) + (res3.count || 0);
     return { success: true, count: totalDeleted };
   } catch (error: any) {
     console.error('Gagal menghapus data dummy dari Supabase:', error);
     return { success: false, count: 0, error: error?.message || 'Gagal menghapus data dummy dari Supabase' };
+  }
+}
+
+/**
+ * Mendapatkan ringkasan jumlah peserta riil dan dummy langsung dari Supabase
+ */
+export async function getRemoteParticipantCounts(): Promise<{ total: number; dummy: number; real: number }> {
+  const client = getSupabaseClient();
+  if (!client) return { total: 0, dummy: 0, real: 0 };
+  try {
+    const { count: total, error } = await client.from('participants').select('*', { count: 'exact', head: true });
+    if (error) return { total: 0, dummy: 0, real: 0 };
+
+    const { count: dummyIdCount } = await client.from('participants').select('*', { count: 'exact', head: true }).like('id', 'dummy-%');
+    const { count: dummyRegCount } = await client.from('participants').select('*', { count: 'exact', head: true }).like('registration_number', 'DMY-%');
+
+    const dummyTotal = Math.max(dummyIdCount || 0, dummyRegCount || 0);
+    const totalCount = total || 0;
+    const realCount = Math.max(0, totalCount - dummyTotal);
+    return { total: totalCount, dummy: dummyTotal, real: realCount };
+  } catch {
+    return { total: 0, dummy: 0, real: 0 };
   }
 }
 

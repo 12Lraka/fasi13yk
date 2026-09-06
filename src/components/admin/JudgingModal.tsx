@@ -74,7 +74,7 @@ export const JudgingModal: React.FC<JudgingModalProps> = ({
       averageScore,
       rank: Number(rank) > 0 ? Number(rank) : undefined,
       notes,
-      attendance: 'sudah_tampil',
+      attendance: 'hadir',
       updatedAt: new Date().toISOString(),
     };
 

@@ -69,7 +69,6 @@ export const PublicPortal: React.FC<PublicPortalProps> = ({
 
         <div className="relative z-10 max-w-3xl space-y-4">
           <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full ${theme.badgeBg} ${theme.badgeText} border ${theme.badgeBorder} text-xs font-semibold`}>
-            <Sparkles className="w-3.5 h-3.5" />
             <span>{settings?.eventTitle ? `${settings.eventTitle} ${settings.eventYear || '2026'}` : 'FESTIVAL ANAK SHOLEH INDONESIA (FASI) XIII TAHUN 2026'}</span>
           </div>
 

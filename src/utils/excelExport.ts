@@ -65,9 +65,7 @@ export function exportParticipantsToExcel(
     const cat = getCategory(p.categoryId);
     const kemName = getKemantrenName(p.kemantrenId);
 
-    let kehadiran = 'Belum Hadir';
-    if (p.attendance === 'sudah_tampil') kehadiran = 'Sudah Tampil';
-    else if (p.attendance === 'siap_tampil' || p.attendance === 'hadir') kehadiran = 'Hadir';
+    const kehadiran = p.attendance === 'hadir' ? 'Hadir' : 'Belum Hadir';
 
     const birthAndAge = p.birthDate
       ? `${p.birthDate} (${p.ageOnCutoff.years}th ${p.ageOnCutoff.months}bln)`

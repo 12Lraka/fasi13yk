@@ -453,7 +453,7 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
                 <div>
                   <span className="text-slate-400 block text-[11px]">Status Kehadiran Saat Ini:</span>
                   <strong className="capitalize text-emerald-800 font-semibold">
-                    {scannedResult.attendance === 'hadir' || scannedResult.attendance === 'siap_tampil' || scannedResult.attendance === 'sudah_tampil'
+                    {scannedResult.attendance === 'hadir'
                       ? '✅ Hadir'
                       : '❌ Belum Hadir'}
                   </strong>

@@ -82,7 +82,7 @@ export const RekapPesertaAdmin: React.FC<RekapPesertaAdminProps> = ({
       if (selectedStatus !== 'ALL' && p.status !== selectedStatus) return false;
 
       if (selectedAttendance !== 'ALL') {
-        const isHadir = p.attendance === 'hadir' || p.attendance === 'siap_tampil' || p.attendance === 'sudah_tampil';
+        const isHadir = p.attendance === 'hadir';
         if (selectedAttendance === 'hadir' && !isHadir) return false;
         if (selectedAttendance === 'belum' && isHadir) return false;
       }
@@ -125,9 +125,7 @@ export const RekapPesertaAdmin: React.FC<RekapPesertaAdminProps> = ({
     const total = accessibleParticipants.length;
     const totalPutra = accessibleParticipants.filter((p) => p.gender === 'L').length;
     const totalPutri = accessibleParticipants.filter((p) => p.gender === 'P').length;
-    const hadir = accessibleParticipants.filter(
-      (p) => p.attendance === 'hadir' || p.attendance === 'siap_tampil' || p.attendance === 'sudah_tampil'
-    ).length;
+    const hadir = accessibleParticipants.filter((p) => p.attendance === 'hadir').length;
     const verified = accessibleParticipants.filter((p) => p.status === 'verified').length;
 
     return { total, totalPutra, totalPutri, hadir, verified };
@@ -361,7 +359,7 @@ export const RekapPesertaAdmin: React.FC<RekapPesertaAdminProps> = ({
               className="w-full py-2 px-3 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:bg-white focus:outline-none cursor-pointer"
             >
               <option value="ALL">Semua Kehadiran</option>
-              <option value="hadir">Hadir / Sudah Tampil</option>
+              <option value="hadir">Hadir</option>
               <option value="belum">Belum Hadir</option>
             </select>
           </div>
@@ -480,8 +478,7 @@ export const RekapPesertaAdmin: React.FC<RekapPesertaAdminProps> = ({
                   const cat = getCat(p.categoryId);
                   const kem = getKem(p.kemantrenId);
                   const rowNum = (currentPage - 1) * pageSize + idx + 1;
-                  const isHadir =
-                    p.attendance === 'hadir' || p.attendance === 'siap_tampil' || p.attendance === 'sudah_tampil';
+                  const isHadir = p.attendance === 'hadir';
 
                   return (
                     <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
@@ -560,8 +557,7 @@ export const RekapPesertaAdmin: React.FC<RekapPesertaAdminProps> = ({
                 filteredParticipants.map((p, idx) => {
                   const cat = getCat(p.categoryId);
                   const kem = getKem(p.kemantrenId);
-                  const isHadir =
-                    p.attendance === 'hadir' || p.attendance === 'siap_tampil' || p.attendance === 'sudah_tampil';
+                  const isHadir = p.attendance === 'hadir';
 
                   return (
                     <tr key={p.id} className="border-b border-slate-300 break-inside-avoid">

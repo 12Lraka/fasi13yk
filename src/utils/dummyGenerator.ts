@@ -7,7 +7,7 @@
  * Mematuhi kalkulasi batasan usia per 1 Juli 2027 & kuota kemantren
  */
 
-import { CompetitionCategory, Kemantren, Participant } from '../types/fasi';
+import { CompetitionCategory, Kemantren, Participant, AttendanceStatus } from '../types/fasi';
 import { evaluateFasiAge } from './ageCalculator';
 
 const FIRST_NAMES_MALE = [
@@ -121,9 +121,8 @@ export function generateDummyParticipantsList(
     const { dateStr } = generateValidBirthDate(category.level);
     const ageResult = evaluateFasiAge(dateStr);
 
-    // Nomor urut peserta per cabang & kemantren
-    const indexInBranch = Math.floor(i / (kemantrenList.length * categories.length)) + 1;
-    const regNumber = `${kemantren.code}-${category.code}-${pad2(indexInBranch)}`;
+    // Nomor pendaftaran unik untuk data dummy (mencegah duplikasi pada PostgreSQL UNIQUE constraint)
+    const regNumber = `DMY-${kemantren.code}-${String(i + 1).padStart(4, '0')}`;
 
     const tpaName = `${pickRandom(TPA_PREFIXES)} ${kemantren.name}`;
     const dummyId = `dummy-${timestamp}-${i + 1}`;
@@ -148,6 +147,11 @@ export function generateDummyParticipantsList(
     const lotteryNumber = (i % 14) + 1;
     const nowIso = new Date().toISOString();
 
+    // Status kehadiran santri simulasi: default 'belum_hadir', jika dinilai maka 'hadir'
+    const attendanceVal: AttendanceStatus = isScored 
+      ? 'hadir' 
+      : (Math.random() > 0.75 ? 'hadir' : 'belum_hadir');
+
     participants.push({
       id: dummyId,
       registrationNumber: regNumber,
@@ -167,7 +171,7 @@ export function generateDummyParticipantsList(
       pjName: kemantren.adminName,
       whatsappNumber: kemantren.contactPerson,
       status: 'verified',
-      attendance: Math.random() > 0.15 ? 'hadir' : 'belum_hadir',
+      attendance: attendanceVal,
       lotteryNumber,
       scoreJury1: score1,
       scoreJury2: score2,
