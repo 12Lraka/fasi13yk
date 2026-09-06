@@ -214,9 +214,7 @@ export async function renderBranchToPdfPage({
     },
   });
 
-  // 4. BLOK TANDA TANGAN RESMI
-  // Sisi Kiri: Mengetahui, Ketua Umum BADKO TKA-TPA Kota (Dicky Artanto, S.Pd., M.Pd.)
-  // Sisi Kanan: Yogyakarta, [Tanggal] Ketua Panitia FASI XIII (Andry Sunny, S.E.)
+  // 4. BLOK TANDA TANGAN RESMI (3 Kolom: Panitera, Juri I, Juri II - manual signature & name)
   const lastTableY = (pdfDoc as any).lastAutoTable?.finalY || startTableY + 40;
   const pageHeight = 297;
   let signatureY = lastTableY + 8;
@@ -227,43 +225,37 @@ export async function renderBranchToPdfPage({
     signatureY = 20;
   }
 
-  const colWidth = contentWidth / 2;
-  const colLeftX = marginX + (colWidth / 2);
-  const colRightX = marginX + colWidth + (colWidth / 2);
+  const colWidth = contentWidth / 3;
+  const col1X = marginX + (colWidth * 0.5);
+  const col2X = marginX + (colWidth * 1.5);
+  const col3X = marginX + (colWidth * 2.5);
 
-  pdfDoc.setFont('helvetica', 'normal');
-  pdfDoc.setFontSize(8.5);
-  pdfDoc.setTextColor(71, 85, 105);
-
-  // Kiri: Mengetahui, Ketua Umum BADKO TKA-TPA Kota
-  pdfDoc.text('Mengetahui,', colLeftX, signatureY, { align: 'center' });
   pdfDoc.setFont('helvetica', 'bold');
+  pdfDoc.setFontSize(9);
   pdfDoc.setTextColor(15, 23, 42);
-  pdfDoc.text('Ketua Umum BADKO TKA-TPA Kota', colLeftX, signatureY + 4.5, { align: 'center' });
 
-  // Kanan: Tanggal & Ketua Panitia FASI XIII
-  const dateStr = `Yogyakarta, ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`;
-  pdfDoc.setFont('helvetica', 'normal');
-  pdfDoc.setTextColor(71, 85, 105);
-  pdfDoc.text(dateStr, colRightX, signatureY, { align: 'center' });
-  pdfDoc.setFont('helvetica', 'bold');
-  pdfDoc.setTextColor(15, 23, 42);
-  pdfDoc.text('Ketua Panitia FASI XIII', colRightX, signatureY + 4.5, { align: 'center' });
+  // Label Header TTD
+  pdfDoc.text('Panitera', col1X, signatureY, { align: 'center' });
+  pdfDoc.text('Juri I', col2X, signatureY, { align: 'center' });
+  pdfDoc.text('Juri II', col3X, signatureY, { align: 'center' });
 
-  // Nama Pejabat Bertandatangan
-  const lineSignY = signatureY + 24;
-  pdfDoc.setFont('helvetica', 'bold');
-  pdfDoc.setFontSize(9.5);
-  pdfDoc.text('Dicky Artanto, S.Pd., M.Pd.', colLeftX, lineSignY, { align: 'center' });
-  pdfDoc.text('Andry Sunny, S.E.', colRightX, lineSignY, { align: 'center' });
+  // Garis tempat tanda tangan dan nama manual
+  const lineSignY = signatureY + 22;
+  const lineWidth = 38;
 
-  // Garis bawah nama
   pdfDoc.setLineWidth(0.3);
   pdfDoc.setDrawColor(15, 23, 42);
-  const leftTextWidth = pdfDoc.getTextWidth('Dicky Artanto, S.Pd., M.Pd.');
-  const rightTextWidth = pdfDoc.getTextWidth('Andry Sunny, S.E.');
-  pdfDoc.line(colLeftX - (leftTextWidth / 2), lineSignY + 0.8, colLeftX + (leftTextWidth / 2), lineSignY + 0.8);
-  pdfDoc.line(colRightX - (rightTextWidth / 2), lineSignY + 0.8, colRightX + (rightTextWidth / 2), lineSignY + 0.8);
+  pdfDoc.line(col1X - (lineWidth / 2), lineSignY, col1X + (lineWidth / 2), lineSignY);
+  pdfDoc.line(col2X - (lineWidth / 2), lineSignY, col2X + (lineWidth / 2), lineSignY);
+  pdfDoc.line(col3X - (lineWidth / 2), lineSignY, col3X + (lineWidth / 2), lineSignY);
+
+  // Petunjuk halus di bawah garis
+  pdfDoc.setFont('helvetica', 'italic');
+  pdfDoc.setFontSize(7.5);
+  pdfDoc.setTextColor(100, 116, 139);
+  pdfDoc.text('( Nama Terang & TTD )', col1X, lineSignY + 4, { align: 'center' });
+  pdfDoc.text('( Nama Terang & TTD )', col2X, lineSignY + 4, { align: 'center' });
+  pdfDoc.text('( Nama Terang & TTD )', col3X, lineSignY + 4, { align: 'center' });
 
   return pdfDoc;
 }

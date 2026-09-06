@@ -493,33 +493,35 @@ export const RekapCabangLombaAdmin: React.FC<RekapCabangLombaAdminProps> = ({
           </table>
         </div>
 
-        {/* BLOK TANDA TANGAN RESMI DI BAGIAN BAWAH DOKUMEN */}
-        <div className="mt-10 pt-4 grid grid-cols-2 gap-8 text-center text-xs break-inside-avoid">
-          {/* Sisi Kiri: Ketua Umum BADKO TKA-TPA Kota */}
-          <div className="flex flex-col items-center justify-between min-h-[100px]">
+        {/* BLOK TANDA TANGAN RESMI DI BAGIAN BAWAH DOKUMEN (3 Kolom: Panitera, Juri I, Juri II) */}
+        <div className="mt-10 pt-4 grid grid-cols-3 gap-6 text-center text-xs break-inside-avoid">
+          {/* Kolom 1: Panitera */}
+          <div className="flex flex-col items-center justify-between min-h-[120px]">
             <div>
-              <p className="text-slate-600 font-medium">Mengetahui,</p>
-              <p className="font-bold text-slate-900 mt-0.5">Ketua Umum BADKO TKA-TPA Kota</p>
+              <p className="font-bold text-slate-900">Panitera</p>
             </div>
-            <div className="mt-14">
-              <p className="font-extrabold text-slate-950 underline tracking-wide text-xs sm:text-sm">
-                Dicky Artanto, S.Pd., M.Pd.
-              </p>
+            <div className="mt-16 w-36 sm:w-44 border-b border-slate-900 pb-1">
+              <p className="text-[10px] text-slate-400 italic">( Nama Terang & TTD )</p>
             </div>
           </div>
 
-          {/* Sisi Kanan: Ketua Panitia FASI XIII */}
-          <div className="flex flex-col items-center justify-between min-h-[100px]">
+          {/* Kolom 2: Juri I */}
+          <div className="flex flex-col items-center justify-between min-h-[120px]">
             <div>
-              <p className="text-slate-600 font-medium">
-                Yogyakarta, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
-              </p>
-              <p className="font-bold text-slate-900 mt-0.5">Ketua Panitia FASI XIII</p>
+              <p className="font-bold text-slate-900">Juri I</p>
             </div>
-            <div className="mt-14">
-              <p className="font-extrabold text-slate-950 underline tracking-wide text-xs sm:text-sm">
-                Andry Sunny, S.E.
-              </p>
+            <div className="mt-16 w-36 sm:w-44 border-b border-slate-900 pb-1">
+              <p className="text-[10px] text-slate-400 italic">( Nama Terang & TTD )</p>
+            </div>
+          </div>
+
+          {/* Kolom 3: Juri II */}
+          <div className="flex flex-col items-center justify-between min-h-[120px]">
+            <div>
+              <p className="font-bold text-slate-900">Juri II</p>
+            </div>
+            <div className="mt-16 w-36 sm:w-44 border-b border-slate-900 pb-1">
+              <p className="text-[10px] text-slate-400 italic">( Nama Terang & TTD )</p>
             </div>
           </div>
         </div>

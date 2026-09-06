@@ -90,18 +90,16 @@ export function exportBranchToExcel({
     ];
   });
 
-  // Footer signature rows in Excel
-  const dateStrId = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+  // Footer signature rows in Excel (3 Kolom: Panitera, Juri I, Juri II)
   const footerRows = [
     [],
     [],
-    ['', '', '', '', '', '', '', '', '', 'Yogyakarta, ' + dateStrId],
-    ['Mengetahui,', '', '', '', '', '', '', '', '', 'Ketua Panitia FASI XIII'],
-    ['Ketua Umum BADKO TKA-TPA Kota', '', '', '', '', '', '', '', '', ''],
+    ['', 'Panitera', '', '', 'Juri I', '', '', '', 'Juri II', ''],
     [],
     [],
     [],
-    ['Dicky Artanto, S.Pd., M.Pd.', '', '', '', '', '', '', '', '', 'Andry Sunny, S.E.'],
+    ['', '(....................................)', '', '', '(....................................)', '', '', '', '(....................................)', ''],
+    ['', 'Nama Terang & TTD', '', '', 'Nama Terang & TTD', '', '', '', 'Nama Terang & TTD', ''],
   ];
 
   // Combine sheet data
