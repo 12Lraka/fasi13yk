@@ -7,7 +7,7 @@
  * Mematuhi kalkulasi batasan usia per 1 Juli 2027 & kuota kemantren
  */
 
-import { CompetitionCategory, Kemantren, Participant, AttendanceStatus } from '../types/fasi';
+import { CompetitionCategory, Kemantren, Participant } from '../types/fasi';
 import { evaluateFasiAge } from './ageCalculator';
 
 const FIRST_NAMES_MALE = [
@@ -127,30 +127,9 @@ export function generateDummyParticipantsList(
     const tpaName = `${pickRandom(TPA_PREFIXES)} ${kemantren.name}`;
     const dummyId = `dummy-${timestamp}-${i + 1}`;
 
-    // Skor acak untuk simulasi live score & ranking (sebagian sudah dinilai)
-    const isScored = Math.random() > 0.4;
-    let score1: number | undefined;
-    let score2: number | undefined;
-    let score3: number | undefined;
-    let totalScore: number | undefined;
-    let average: number | undefined;
-
-    if (isScored) {
-      score1 = randomInt(75, 96);
-      score2 = randomInt(74, 97);
-      score3 = randomInt(76, 95);
-      totalScore = score1 + score2 + score3;
-      average = Number((totalScore / 3).toFixed(2));
-    }
-
     // Undian nomor tampil (acak 1 s.d. 14)
     const lotteryNumber = (i % 14) + 1;
     const nowIso = new Date().toISOString();
-
-    // Status kehadiran santri simulasi: default 'belum_hadir', jika dinilai maka 'hadir'
-    const attendanceVal: AttendanceStatus = isScored 
-      ? 'hadir' 
-      : (Math.random() > 0.75 ? 'hadir' : 'belum_hadir');
 
     participants.push({
       id: dummyId,
@@ -171,14 +150,15 @@ export function generateDummyParticipantsList(
       pjName: kemantren.adminName,
       whatsappNumber: kemantren.contactPerson,
       status: 'verified',
-      attendance: attendanceVal,
+      attendance: 'belum_hadir',
       lotteryNumber,
-      scoreJury1: score1,
-      scoreJury2: score2,
-      scoreJury3: score3,
-      totalScore,
-      averageScore: average,
-      notes: '[DUMMY_DATA] Data simulasi sistem FASI XIII Kota Yogyakarta',
+      scoreJury1: undefined,
+      scoreJury2: undefined,
+      scoreJury3: undefined,
+      totalScore: undefined,
+      averageScore: undefined,
+      rank: undefined,
+      notes: '[DUMMY_DATA] Data simulasi santri FASI XIII Kota Yogyakarta',
       createdAt: nowIso,
       updatedAt: nowIso,
     });

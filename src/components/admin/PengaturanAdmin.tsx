@@ -1697,18 +1697,21 @@ ALTER TABLE IF EXISTS categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS participants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS app_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS audit_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS berita_acara_kejuaraan ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Public full access on kemantren" ON kemantren;
 DROP POLICY IF EXISTS "Public full access on categories" ON categories;
 DROP POLICY IF EXISTS "Public full access on participants" ON participants;
 DROP POLICY IF EXISTS "Public full access on app_settings" ON app_settings;
 DROP POLICY IF EXISTS "Public full access on audit_logs" ON audit_logs;
+DROP POLICY IF EXISTS "Public full access on berita_acara_kejuaraan" ON berita_acara_kejuaraan;
 
 CREATE POLICY "Public full access on kemantren" ON kemantren FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Public full access on categories" ON categories FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Public full access on participants" ON participants FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Public full access on app_settings" ON app_settings FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Public full access on audit_logs" ON audit_logs FOR ALL USING (true) WITH CHECK (true);`}
+CREATE POLICY "Public full access on audit_logs" ON audit_logs FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Public full access on berita_acara_kejuaraan" ON berita_acara_kejuaraan FOR ALL USING (true) WITH CHECK (true);`}
               </pre>
             </div>
           </div>

@@ -840,11 +840,10 @@ export async function upsertBeritaAcaraToSupabase(ba: BeritaAcaraKejuaraan): Pro
   const catatanVal = ba.catatanJuri || ba.catatan || null;
 
   try {
-    // Primary payload using requested new columns: juri_satu & juri_dua
+    // Primary payload: mencakup kedua varian kolom catatan (catatan_juri & catatan) serta juri (juri_satu & juri_dua)
     const payload: Record<string, any> = {
       id: ba.id,
       cabang_id: ba.cabangId,
-      nama_cabang: ba.cabangNama || ba.namaCabang || '',
       jenjang: ba.jenjang,
       golongan: ba.golongan,
       is_cabang_utama: ba.isCabangUtama,
@@ -852,6 +851,7 @@ export async function upsertBeritaAcaraToSupabase(ba: BeritaAcaraKejuaraan): Pro
       status: ba.status,
       juri_satu: juri1,
       juri_dua: juri2,
+      catatan_juri: catatanVal,
       catatan: catatanVal,
       pemenang: ba.pemenang || {},
       updated_at: new Date().toISOString(),
@@ -861,12 +861,31 @@ export async function upsertBeritaAcaraToSupabase(ba: BeritaAcaraKejuaraan): Pro
       .from('berita_acara_kejuaraan')
       .upsert(payload, { onConflict: 'id' });
 
-    // Fallback: If table in Supabase still has old column names (nama_ketua_juri / nama_anggota_juri)
+    // Fallback 1: Jika tabel di Supabase tidak memiliki kolom 'catatan'
+    if (error && (error.message?.includes("'catatan'") || error.message?.includes('catatan'))) {
+      const fallbackPayloadWithoutCatatan = { ...payload };
+      delete fallbackPayloadWithoutCatatan.catatan;
+      const res = await client
+        .from('berita_acara_kejuaraan')
+        .upsert(fallbackPayloadWithoutCatatan, { onConflict: 'id' });
+      error = res.error;
+    }
+
+    // Fallback 2: Jika tabel di Supabase tidak memiliki kolom 'catatan_juri'
+    if (error && (error.message?.includes("'catatan_juri'") || error.message?.includes('catatan_juri'))) {
+      const fallbackPayloadWithoutCatatanJuri = { ...payload };
+      delete fallbackPayloadWithoutCatatanJuri.catatan_juri;
+      const res = await client
+        .from('berita_acara_kejuaraan')
+        .upsert(fallbackPayloadWithoutCatatanJuri, { onConflict: 'id' });
+      error = res.error;
+    }
+
+    // Fallback 3: Jika tabel di Supabase masih menggunakan nama kolom lama (nama_ketua_juri / nama_anggota_juri)
     if (error && (error.message?.includes('juri_satu') || error.message?.includes('juri_dua') || error.code === 'PGRST204')) {
-      const fallbackPayload: Record<string, any> = {
+      const legacyPayload: Record<string, any> = {
         id: ba.id,
         cabang_id: ba.cabangId,
-        nama_cabang: ba.cabangNama || ba.namaCabang || '',
         jenjang: ba.jenjang,
         golongan: ba.golongan,
         is_cabang_utama: ba.isCabangUtama,
@@ -874,14 +893,15 @@ export async function upsertBeritaAcaraToSupabase(ba: BeritaAcaraKejuaraan): Pro
         status: ba.status,
         nama_ketua_juri: juri1,
         nama_anggota_juri: juri2,
+        catatan_juri: catatanVal,
         catatan: catatanVal,
         pemenang: ba.pemenang || {},
         updated_at: new Date().toISOString(),
       };
-      const fallbackRes = await client
+      const res = await client
         .from('berita_acara_kejuaraan')
-        .upsert(fallbackPayload, { onConflict: 'id' });
-      error = fallbackRes.error;
+        .upsert(legacyPayload, { onConflict: 'id' });
+      error = res.error;
     }
 
     if (error) {
