@@ -91,10 +91,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 }) => {
   const getInitialTab = (): 'peserta' | 'rekap-peserta' | 'rekap-cabang' | 'berita-acara' | 'pengaturan' | 'log' => {
     if (activeRoute === 'admin-rekap-peserta') return 'rekap-peserta';
-    if (activeRoute === 'admin-rekapcbg-lomba') return 'rekap-cabang';
-    if (activeRoute === 'berita-acara') return 'berita-acara';
-    if (activeRoute === 'pengaturan') return 'pengaturan';
-    if (activeRoute === 'log') return 'log';
+    if (activeRoute === 'admin-rekapcbg-lomba' && session.role === 'super_admin') return 'rekap-cabang';
+    if (activeRoute === 'berita-acara' && session.role === 'super_admin') return 'berita-acara';
+    if (activeRoute === 'pengaturan' && session.role === 'super_admin') return 'pengaturan';
+    if (activeRoute === 'log' && session.role === 'super_admin') return 'log';
     return 'peserta';
   };
 
@@ -102,12 +102,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   useEffect(() => {
     if (activeRoute === 'admin-rekap-peserta') setActiveAdminTab('rekap-peserta');
-    else if (activeRoute === 'admin-rekapcbg-lomba') setActiveAdminTab('rekap-cabang');
-    else if (activeRoute === 'berita-acara') setActiveAdminTab('berita-acara');
-    else if (activeRoute === 'pengaturan') setActiveAdminTab('pengaturan');
-    else if (activeRoute === 'log') setActiveAdminTab('log');
+    else if (activeRoute === 'admin-rekapcbg-lomba' && session.role === 'super_admin') setActiveAdminTab('rekap-cabang');
+    else if (activeRoute === 'berita-acara' && session.role === 'super_admin') setActiveAdminTab('berita-acara');
+    else if (activeRoute === 'pengaturan' && session.role === 'super_admin') setActiveAdminTab('pengaturan');
+    else if (activeRoute === 'log' && session.role === 'super_admin') setActiveAdminTab('log');
     else if (activeRoute === 'admin-data-peserta' || activeRoute === 'admin') setActiveAdminTab('peserta');
-  }, [activeRoute]);
+    else if (session.role !== 'super_admin' && (activeRoute === 'admin-rekapcbg-lomba' || activeRoute === 'berita-acara' || activeRoute === 'pengaturan' || activeRoute === 'log')) {
+      setActiveAdminTab('peserta');
+    }
+  }, [activeRoute, session.role]);
 
   const handleTabChange = (tab: 'peserta' | 'rekap-peserta' | 'rekap-cabang' | 'berita-acara' | 'pengaturan' | 'log') => {
     setActiveAdminTab(tab);
@@ -308,20 +311,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             )}
           </button>
 
-          {/* Rekap Cabang Lomba Tab */}
-          <button
-            onClick={() => handleTabChange('rekap-cabang')}
-            className={`w-full px-3 py-2 font-bold rounded-xl flex items-center justify-between transition-all cursor-pointer text-left ${
-              activeAdminTab === 'rekap-cabang'
-                ? 'bg-emerald-800 text-white shadow-xs'
-                : 'text-slate-700 hover:text-emerald-900 hover:bg-slate-100'
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <Award className="w-4 h-4 shrink-0 text-emerald-600" />
-              <span>Rekap Cabang Lomba</span>
-            </div>
-          </button>
+          {/* Rekap Cabang Lomba Tab (Superadmin Only) */}
+          {session.role === 'super_admin' && (
+            <button
+              onClick={() => handleTabChange('rekap-cabang')}
+              className={`w-full px-3 py-2 font-bold rounded-xl flex items-center justify-between transition-all cursor-pointer text-left ${
+                activeAdminTab === 'rekap-cabang'
+                  ? 'bg-emerald-800 text-white shadow-xs'
+                  : 'text-slate-700 hover:text-emerald-900 hover:bg-slate-100'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Award className="w-4 h-4 shrink-0 text-emerald-600" />
+                <span>Rekap Cabang Lomba</span>
+              </div>
+              <span className="px-1.5 py-0.2 bg-amber-400 text-emerald-950 text-[9px] font-extrabold rounded">
+                Super
+              </span>
+            </button>
+          )}
 
           {/* Berita Acara Kejuaraan Tab (Superadmin Only) */}
           {session.role === 'super_admin' && (
@@ -477,8 +485,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           />
         )}
 
-        {/* VIEW: REKAP CABANG LOMBA */}
-        {activeAdminTab === 'rekap-cabang' && (
+        {/* VIEW: REKAP CABANG LOMBA (SUPERADMIN ONLY) */}
+        {activeAdminTab === 'rekap-cabang' && session.role === 'super_admin' && (
           <RekapCabangLombaAdmin
             session={session}
             participants={participants}

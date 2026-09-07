@@ -123,7 +123,17 @@ export default function App() {
         setIsLoginOpen(true);
         setActiveTab('beranda');
       } else {
-        setActiveTab(route === 'admin' || route === 'superadmin' || route === 'adminkecamatan' ? 'admin-data-peserta' : route);
+        // Menu khusus Superadmin: jika admin kemantren mencoba membuka, alihkan ke admin-data-peserta
+        const isSuperOnly =
+          route === 'admin-rekapcbg-lomba' ||
+          route === 'berita-acara' ||
+          route === 'pengaturan' ||
+          route === 'log';
+        if (isSuperOnly && session.role !== 'super_admin') {
+          setActiveTab('admin-data-peserta');
+        } else {
+          setActiveTab(route === 'admin' || route === 'superadmin' || route === 'adminkecamatan' ? 'admin-data-peserta' : route);
+        }
       }
       return;
     }

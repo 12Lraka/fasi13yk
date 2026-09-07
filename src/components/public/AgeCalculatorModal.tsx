@@ -93,21 +93,21 @@ export const AgeCalculatorModal: React.FC<AgeCalculatorModalProps> = ({
                 onClick={() => handleApplyPreset('15/04/2022', 'Ahmad (TKA)')}
                 className="px-2.5 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-md hover:bg-emerald-100 font-medium"
               >
-                👶 TKA (5 Thn)
+                TKA (5 Thn)
               </button>
               <button
                 type="button"
                 onClick={() => handleApplyPreset('10/08/2017', 'Faris (TPA)')}
                 className="px-2.5 py-1 bg-sky-50 text-sky-800 border border-sky-200 rounded-md hover:bg-sky-100 font-medium"
               >
-                👦 TPA (10 Thn)
+                TPA (10 Thn)
               </button>
               <button
                 type="button"
                 onClick={() => handleApplyPreset('20/03/2014', 'Zahra (TQA)')}
                 className="px-2.5 py-1 bg-purple-50 text-purple-800 border border-purple-200 rounded-md hover:bg-purple-100 font-medium"
               >
-                🧕 TQA (13 Thn)
+                TQA (13 Thn)
               </button>
               <button
                 type="button"
@@ -237,7 +237,6 @@ export const AgeCalculatorModal: React.FC<AgeCalculatorModalProps> = ({
           {/* Reference Info Accordion */}
           <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-200 text-xs text-slate-600 space-y-1.5">
             <h5 className="font-bold text-slate-800 flex items-center gap-1.5 text-[11px] uppercase tracking-wider">
-              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
               Rentang Baku Kelahiran Juknis FASI XIII:
             </h5>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px]">

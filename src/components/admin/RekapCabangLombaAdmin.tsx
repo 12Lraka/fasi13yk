@@ -25,6 +25,7 @@ import {
   FileDown,
   FileSpreadsheet,
   Loader2,
+  ShieldAlert,
 } from 'lucide-react';
 import { Participant, UserSession, CompetitionCategory } from '../../types/fasi';
 import { getStoredKemantren, getStoredCategories } from '../../utils/storage';
@@ -49,6 +50,23 @@ export const RekapCabangLombaAdmin: React.FC<RekapCabangLombaAdminProps> = ({
 
   const isSuperAdmin = session.role === 'super_admin';
   const myKemantren = kemantrenList.find((k) => k.id === session.kemantrenId);
+
+  // Akses Terbatas: Hanya Superadmin yang berwenang membuka Rekap Cabang Lomba
+  if (!isSuperAdmin) {
+    return (
+      <div className="bg-white rounded-2xl p-8 border border-amber-200 shadow-sm text-center max-w-md mx-auto my-8 space-y-4">
+        <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mx-auto text-amber-700">
+          <ShieldAlert className="w-6 h-6" />
+        </div>
+        <div>
+          <h3 className="text-base font-bold text-slate-800">Akses Terbatas (Khusus Superadmin)</h3>
+          <p className="text-xs text-slate-600 mt-1">
+            Rekap Cabang Lomba memuat kerahasiaan rekapitulasi penilaian dewan hakim dan berita acara pengesahan juara. Fitur ini hanya dapat dibuka oleh Superadmin BADKO Kota Yogyakarta.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   // Filters
   const [selectedLevel, setSelectedLevel] = useState<'ALL' | 'TKA' | 'TPA' | 'TQA'>('TPA');
