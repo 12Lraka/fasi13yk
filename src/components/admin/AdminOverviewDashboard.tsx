@@ -366,7 +366,7 @@ export const AdminOverviewDashboard: React.FC<AdminOverviewDashboardProps> = ({
                 <div>
                   <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
                     <MapPin className="w-4 h-4 text-emerald-700" />
-                    Progres Pendaftaran 14 Kemantren se-Kota
+                    Progres Pendaftaran 14 Rayon se-Kota
                   </h3>
                   <p className="text-xs text-slate-500 mt-0.5">
                     Evaluasi keterisian cabang dan total pendaftar di setiap kontingen
@@ -381,7 +381,7 @@ export const AdminOverviewDashboard: React.FC<AdminOverviewDashboardProps> = ({
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200/80">
-                      <th className="py-2.5 px-3">Kemantren</th>
+                      <th className="py-2.5 px-3">Rayon</th>
                       <th className="py-2.5 px-3 text-center">Jml Santri</th>
                       <th className="py-2.5 px-3">Keterisian Cabang</th>
                       <th className="py-2.5 px-3 text-right">Berkas Drive</th>
@@ -547,13 +547,13 @@ export const AdminOverviewDashboard: React.FC<AdminOverviewDashboardProps> = ({
             </div>
             <p className="text-xs text-slate-300 leading-relaxed">
               {isSuperAdmin
-                ? 'Pilih kemantren untuk meninjau dokumen scan berkas (Akta, KK, Syahadah, Pasfoto) di Google Drive resmi.'
-                : `Akses folder Google Drive khusus Kemantren ${currentKemantren?.name} untuk mengunggah dan memverifikasi berkas santri.`}
+                ? 'Pilih kemantren untuk meninjau dokumen scan berkas (Akta) di Google Drive resmi.'
+                : `Akses folder Google Drive khusus Rayon ${currentKemantren?.name} untuk mengunggah dan memverifikasi berkas santri.`}
             </p>
 
             {isSuperAdmin && (
               <div className="space-y-1">
-                <label className="text-[11px] text-slate-400 font-semibold">Pilih Wilayah Kemantren:</label>
+                <label className="text-[11px] text-slate-400 font-semibold">Pilih Wilayah Rayon:</label>
                 <select
                   value={selectedDriveKemantrenId}
                   onChange={(e) => setSelectedDriveKemantrenId(e.target.value)}
@@ -561,7 +561,7 @@ export const AdminOverviewDashboard: React.FC<AdminOverviewDashboardProps> = ({
                 >
                   {kemantrenList.map((k) => (
                     <option key={k.id} value={k.id}>
-                      {k.code} - Kemantren {k.name}
+                      {k.code} - Rayon {k.name}
                     </option>
                   ))}
                 </select>
@@ -604,7 +604,7 @@ export const AdminOverviewDashboard: React.FC<AdminOverviewDashboardProps> = ({
                 </div>
                 <div>
                   <div className="text-xs font-bold text-slate-800">Batas Akhir Validasi & Berkas</div>
-                  <div className="text-[11px] text-slate-600 font-semibold">15 Oktober 2026</div>
+                  <div className="text-[11px] text-slate-600 font-semibold"> Oktober 2026</div>
                   <div className="text-[10px] text-slate-500 mt-0.5">Penutupan pendaftaran santri dan penguncian kuota kontingen.</div>
                 </div>
               </div>
@@ -615,7 +615,7 @@ export const AdminOverviewDashboard: React.FC<AdminOverviewDashboardProps> = ({
                 </div>
                 <div>
                   <div className="text-xs font-bold text-slate-800">Technical Meeting & Undian Tampil</div>
-                  <div className="text-[11px] text-slate-600 font-semibold">18 Oktober 2026</div>
+                  <div className="text-[11px] text-slate-600 font-semibold"> Oktober 2026</div>
                   <div className="text-[10px] text-slate-500 mt-0.5">Pengundian nomor urut tampil secara transparan dan terpusat.</div>
                 </div>
               </div>
@@ -626,8 +626,8 @@ export const AdminOverviewDashboard: React.FC<AdminOverviewDashboardProps> = ({
                 </div>
                 <div>
                   <div className="text-xs font-bold text-slate-800">Pelaksanaan FASI XIII Kota Yogyakarta</div>
-                  <div className="text-[11px] text-slate-600 font-semibold">25 Oktober 2026</div>
-                  <div className="text-[10px] text-slate-500 mt-0.5">Perlombaan di Kompleks Balai Kota Yogyakarta / Masjid Diponegoro.</div>
+                  <div className="text-[11px] text-slate-600 font-semibold">11 Oktober 2026</div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">Perlombaan di SMPN 1 Yogyakarta.</div>
                 </div>
               </div>
             </div>
