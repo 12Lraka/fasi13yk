@@ -15,19 +15,66 @@ import {
   CameraOff,
   SwitchCamera,
   CheckCircle2,
+  CheckCheck,
   AlertCircle,
+  AlertTriangle,
   Sparkles,
   UserCheck,
   Search,
   Upload,
   RefreshCw,
   Info,
+  Zap,
 } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { Participant, UserSession } from '../../types/fasi';
 import { CATEGORIES_LIST, KEMANTREN_LIST } from '../../data/fasiMasterData';
 import { logAuditEvent, logErrorEvent } from '../../utils/storage';
 import { showToast } from '../../utils/sweetalert';
+import { upsertParticipantToSupabase, isSupabaseConfigured } from '../../lib/supabase';
+
+// Helper audio tone untuk feedback instan scanner super pintar
+const playAudioTone = (type: 'success' | 'warning' | 'already_checked') => {
+  try {
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    if (type === 'success') {
+      // Dua nada naik merdu (C6 -> G6)
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(1046.5, ctx.currentTime);
+      osc.frequency.setValueAtTime(1567.98, ctx.currentTime + 0.08);
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.25);
+    } else if (type === 'already_checked') {
+      // Nada pengingat bahwa santri sudah hadir
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(659.25, ctx.currentTime); // E5
+      osc.frequency.setValueAtTime(523.25, ctx.currentTime + 0.1); // C5
+      gain.gain.setValueAtTime(0.25, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.25);
+    } else {
+      // Warning nada rendah
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(300, ctx.currentTime);
+      gain.gain.setValueAtTime(0.2, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.2);
+    }
+  } catch {
+    // Abaikan jika browser memblokir audio context otomatis
+  }
+};
 
 interface QrScannerModalProps {
   isOpen: boolean;
@@ -47,6 +94,7 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
   const [manualCode, setManualCode] = useState<string>('');
   const [scannedResult, setScannedResult] = useState<Participant | null>(null);
   const [errorMessage, setErrorMessage] = useState<string>('');
+  const [warningStatus, setWarningStatus] = useState<string>('');
   const [successStatus, setSuccessStatus] = useState<string>('');
   const [isCameraActive, setIsCameraActive] = useState<boolean>(false);
   const [cameraFacingMode, setCameraFacingMode] = useState<'environment' | 'user'>('environment');
@@ -57,6 +105,13 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
   const qrRegionId = 'html5qr-code-full-region';
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const lastScanTimestampRef = useRef<number>(0);
+  const lastScannedCodeRef = useRef<string>('');
+
+  // Ref peserta agar selalu sinkron dengan state terbaru di dalam closure scanner
+  const participantsRef = useRef<Participant[]>(participants);
+  useEffect(() => {
+    participantsRef.current = participants;
+  }, [participants]);
 
   // Stop camera helper safely without interfering with React's DOM
   const stopCamera = async () => {
@@ -78,6 +133,7 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
   const startCamera = async (facing: 'environment' | 'user') => {
     setCameraPermissionError(null);
     setErrorMessage('');
+    setWarningStatus('');
 
     try {
       await stopCamera();
@@ -99,11 +155,13 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
         { facingMode: facing },
         config,
         (decodedText) => {
-          // Debounce scan 1.5 detik agar tidak memicu re-render ganda saat kamera menyorot kartu
+          // Debounce scan 2 detik agar tidak spamming jika kamera diam di depan QR
           const now = Date.now();
-          if (now - lastScanTimestampRef.current > 1500) {
+          const isSameCode = lastScannedCodeRef.current === decodedText;
+          if (now - lastScanTimestampRef.current > 2000 || !isSameCode) {
             lastScanTimestampRef.current = now;
-            handleProcessCode(decodedText);
+            lastScannedCodeRef.current = decodedText;
+            handleProcessCode(decodedText, true);
           }
         },
         () => {
@@ -143,12 +201,13 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
     try {
       setIsProcessing(true);
       setErrorMessage('');
+      setWarningStatus('');
       const html5QrCode = scannerRef.current || new Html5Qrcode(qrRegionId);
       const decodedText = await html5QrCode.scanFile(file, true);
-      handleProcessCode(decodedText);
-      showToast('success', 'QR Code berhasil dipindai dari file foto!');
+      handleProcessCode(decodedText, true);
     } catch (err) {
       setErrorMessage('Tidak menemukan QR Code yang jelas pada foto tersebut.');
+      playAudioTone('warning');
     } finally {
       setIsProcessing(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -170,9 +229,66 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
     }
   }, [isOpen]);
 
-  const handleProcessCode = (code: string) => {
+  // Eksekusi kehadiran ke State, Supabase, dan Audit Log
+  const executeAttendance = async (
+    target: Participant,
+    attendanceType: 'hadir' | 'belum_hadir',
+    isAuto = false
+  ) => {
+    const timeString = new Date().toLocaleTimeString('id-ID', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+
+    const updated: Participant = {
+      ...target,
+      attendance: attendanceType,
+      checkInTime: attendanceType === 'hadir' ? (target.checkInTime || timeString) : undefined,
+      updatedAt: new Date().toISOString(),
+    };
+
+    // 1. Update state di parent React (dan LocalStorage)
+    onCheckInSuccess(updated);
+    setScannedResult(updated);
+
+    // 2. Simpan seketika ke database Supabase
+    if (isSupabaseConfigured()) {
+      upsertParticipantToSupabase(updated).catch((err) =>
+        console.warn('Gagal update kehadiran santri ke Supabase:', err)
+      );
+    }
+
+    // 3. Catat audit trail
+    logAuditEvent(
+      session.name,
+      'CHECK_IN_QR',
+      `Presensi santri ${updated.fullName} [${updated.registrationNumber}] status: ${attendanceType === 'hadir' ? 'Hadir' : 'Belum Hadir'}${attendanceType === 'hadir' ? ` (${updated.checkInTime || timeString} WIB)` : ''}.`
+    );
+
+    // 4. Feedback Suara & Notifikasi Visual
+    if (attendanceType === 'hadir') {
+      playAudioTone('success');
+      setWarningStatus('');
+      setErrorMessage('');
+      setSuccessStatus(
+        isAuto
+          ? `⚡ CHECK-IN OTOMATIS BERHASIL! ${updated.fullName} langsung tercatat HADIR (pukul ${updated.checkInTime || timeString} WIB) dan tersimpan ke Supabase.`
+          : `Berhasil check-in kehadiran ${updated.fullName} (Hadir) pukul ${updated.checkInTime || timeString} WIB.`
+      );
+      showToast('success', `✅ Hadir: ${updated.fullName} (${updated.checkInTime || timeString} WIB)`);
+    } else {
+      setSuccessStatus(`Status kehadiran ${updated.fullName} diatur kembali menjadi (Belum Hadir).`);
+      setWarningStatus('');
+      showToast('info', `Status presensi ${updated.fullName} diatur ke Belum Hadir.`);
+    }
+  };
+
+  // Proses scan atau pencarian santri
+  const handleProcessCode = (code: string, isAutoScan = false) => {
     setErrorMessage('');
     setSuccessStatus('');
+    setWarningStatus('');
     setScannedResult(null);
 
     const clean = code.trim();
@@ -191,8 +307,9 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
       // bukan json, pakai raw string
     }
 
-    // 2. Cari berdasarkan Registration Number, ID, atau nama
-    const found = participants.find((p) => {
+    // 2. Cari berdasarkan Registration Number, ID, atau nama dari participantsRef (terbaru)
+    const currentList = participantsRef.current.length > 0 ? participantsRef.current : participants;
+    const found = currentList.find((p) => {
       const regMatch =
         p.registrationNumber.toLowerCase() === searchReg.toLowerCase() ||
         p.registrationNumber.toLowerCase() === clean.toLowerCase() ||
@@ -209,42 +326,30 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
 
     if (!found) {
       setErrorMessage(`Data santri dengan kode/nama "${searchReg}" tidak ditemukan dalam sistem FASI XIII.`);
+      playAudioTone('warning');
       return;
     }
 
-    setScannedResult(found);
-  };
+    // 3. Evaluasi Status Kehadiran:
+    if (found.attendance === 'hadir') {
+      // SUDAH HADIR: Tampilkan status sudah hadir & kunci tombol tandai hadir
+      setScannedResult(found);
+      setWarningStatus(
+        `⚠️ Santri ${found.fullName} SUDAH TERCATAT HADIR sebelumnya ${found.checkInTime ? `(pukul ${found.checkInTime} WIB)` : ''}. Data kehadiran sudah tersimpan aman.`
+      );
+      playAudioTone('already_checked');
+      showToast('info', `${found.fullName} sudah berstatus HADIR.`);
+      return;
+    }
 
-  const handleConfirmAttendance = (attendanceType: 'hadir' | 'belum_hadir') => {
-    if (!scannedResult) return;
-
-    const timeString = new Date().toLocaleTimeString('id-ID', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    });
-
-    const updated: Participant = {
-      ...scannedResult,
-      attendance: attendanceType,
-      checkInTime: attendanceType === 'hadir' ? timeString : undefined,
-      updatedAt: new Date().toISOString(),
-    };
-
-    onCheckInSuccess(updated);
-    setScannedResult(updated);
-    setSuccessStatus(
-      attendanceType === 'hadir'
-        ? `Berhasil check-in kehadiran ${updated.fullName} (Hadir) pukul ${timeString} WIB.`
-        : `Status kehadiran ${updated.fullName} diatur kembali menjadi (Belum Hadir).`
-    );
-    showToast('success', `Status presensi ${updated.fullName}: ${attendanceType === 'hadir' ? 'HADIR' : 'BELUM HADIR'}`);
-
-    logAuditEvent(
-      session.name,
-      'CHECK_IN_QR',
-      `Presensi santri ${updated.fullName} [${updated.registrationNumber}] status: ${attendanceType === 'hadir' ? 'Hadir' : 'Belum Hadir'}${attendanceType === 'hadir' ? ` (${timeString} WIB)` : ''}.`
-    );
+    // BELUM HADIR:
+    if (isAutoScan) {
+      // FITUR SUPER PINTAR: Kamera otomatis langsung mengubah status ke Hadir & simpan ke Supabase!
+      executeAttendance(found, 'hadir', true);
+    } else {
+      // Pencarian manual via text box: tampilkan hasil santri
+      setScannedResult(found);
+    }
   };
 
   if (!isOpen) return null;
@@ -281,6 +386,18 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
         <div className="p-6 space-y-4">
           {/* Scanner Viewport */}
           <div className="relative rounded-2xl bg-slate-900 border-2 border-emerald-500/40 p-3 text-center text-white overflow-hidden">
+            {/* Auto Check-in Badge Header */}
+            <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800 text-[11px]">
+              <div className="flex items-center gap-1.5 text-amber-300 font-semibold">
+                <Zap className="w-3.5 h-3.5 text-amber-400 fill-amber-400 animate-pulse" />
+                <span>Auto Check-in Cerdas Aktif</span>
+              </div>
+              <span className="text-emerald-400 text-[10px] font-mono flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                Real-time Supabase
+              </span>
+            </div>
+
             {/* HTML5 QR Code Host Container - MUST BE EMPTY FOR REACT */}
             <div className="relative w-full max-w-[320px] mx-auto min-h-[250px] bg-slate-950 rounded-xl overflow-hidden flex items-center justify-center">
               {/* Dedicated pure DOM element for html5-qrcode, NO React children inside */}
@@ -372,43 +489,36 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
                 value={manualCode}
                 onChange={(e) => setManualCode(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleProcessCode(manualCode);
+                  if (e.key === 'Enter') handleProcessCode(manualCode, false);
                 }}
                 placeholder="Contoh: KG-TPA-01-01 atau nama santri..."
                 className="flex-1 px-3.5 py-2 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:bg-white font-mono"
               />
               <button
                 type="button"
-                onClick={() => handleProcessCode(manualCode)}
+                onClick={() => handleProcessCode(manualCode, false)}
                 className="px-4 py-2 bg-emerald-800 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
               >
                 <Search className="w-4 h-4" />
                 <span>Validasi</span>
               </button>
             </div>
-
-            {/* Quick Test Demo Chips */}
-            <div className="flex flex-wrap items-center gap-1.5 pt-1">
-              <span className="text-[11px] text-slate-400">Contoh Demo:</span>
-              {participants.slice(0, 3).map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => {
-                    setManualCode(p.registrationNumber);
-                    handleProcessCode(p.registrationNumber);
-                  }}
-                  className="px-2 py-0.5 text-[11px] font-mono bg-slate-100 text-slate-700 hover:bg-slate-200 rounded border border-slate-200 cursor-pointer"
-                >
-                  {p.registrationNumber}
-                </button>
-              ))}
-            </div>
           </div>
+
+          {/* Warning / Already Checked-In Feedback */}
+          {warningStatus && (
+            <div className="p-3 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-xs flex items-center gap-2.5 font-medium animate-in fade-in">
+              <AlertTriangle className="w-5 h-5 shrink-0 text-amber-600" />
+              <div>
+                <strong className="block font-bold text-amber-950">PERINGATAN: SANTRI SUDAH HADIR</strong>
+                <span>{warningStatus}</span>
+              </div>
+            </div>
+          )}
 
           {/* Error Feedback */}
           {errorMessage && (
-            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2">
+            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2 animate-in fade-in">
               <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
               <span>{errorMessage}</span>
             </div>
@@ -416,21 +526,36 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
 
           {/* Success Status */}
           {successStatus && (
-            <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs flex items-center gap-2 font-medium">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>{successStatus}</span>
+            <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-950 text-xs flex items-center gap-2.5 font-medium animate-in fade-in">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+              <div>
+                <strong className="block font-bold text-emerald-900">SISTEM PRESENSI REAL-TIME</strong>
+                <span>{successStatus}</span>
+              </div>
             </div>
           )}
 
           {/* Found Participant Card */}
           {scannedResult && (
-            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200 space-y-3 animate-in fade-in">
+            <div className={`rounded-2xl p-4 border space-y-3 animate-in fade-in ${
+              scannedResult.attendance === 'hadir'
+                ? 'bg-emerald-50/70 border-emerald-200'
+                : 'bg-slate-50 border-slate-200'
+            }`}>
               <div className="flex items-start justify-between">
                 <div>
-                  <span className="text-xs font-mono font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded">
-                    {scannedResult.registrationNumber}
-                  </span>
-                  <h4 className="font-bold text-base text-slate-900 mt-1">{scannedResult.fullName}</h4>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded">
+                      {scannedResult.registrationNumber}
+                    </span>
+                    {scannedResult.attendance === 'hadir' && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase bg-emerald-600 text-white px-2 py-0.5 rounded-full shadow-xs">
+                        <CheckCheck className="w-3 h-3" />
+                        <span>Hadir</span>
+                      </span>
+                    )}
+                  </div>
+                  <h4 className="font-bold text-base text-slate-900 mt-1.5">{scannedResult.fullName}</h4>
                   <p className="text-xs text-slate-500">
                     Kemantren {getKem(scannedResult.kemantrenId)?.name} • {scannedResult.tpaUnitName}
                   </p>
@@ -445,38 +570,62 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
                 )}
               </div>
 
-              <div className="pt-2 border-t border-slate-200 text-xs grid grid-cols-2 gap-2">
+              <div className="pt-2 border-t border-slate-200/80 text-xs grid grid-cols-2 gap-2">
                 <div>
                   <span className="text-slate-400 block text-[11px]">Cabang Lomba:</span>
                   <strong className="text-slate-800 font-semibold">{getCat(scannedResult.categoryId)?.name}</strong>
                 </div>
                 <div>
                   <span className="text-slate-400 block text-[11px]">Status Kehadiran Saat Ini:</span>
-                  <strong className="capitalize text-emerald-800 font-semibold">
-                    {scannedResult.attendance === 'hadir'
-                      ? '✅ Hadir'
-                      : '❌ Belum Hadir'}
-                  </strong>
+                  {scannedResult.attendance === 'hadir' ? (
+                    <strong className="text-emerald-800 font-bold inline-flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Hadir {scannedResult.checkInTime ? `(${scannedResult.checkInTime} WIB)` : ''}</span>
+                    </strong>
+                  ) : (
+                    <strong className="text-rose-600 font-semibold">
+                      ❌ Belum Hadir
+                    </strong>
+                  )}
                 </div>
               </div>
 
               {/* Check-in Actions */}
               <div className="grid grid-cols-2 gap-2 pt-2">
+                {scannedResult.attendance === 'hadir' ? (
+                  <button
+                    type="button"
+                    disabled={true}
+                    className="py-2.5 px-3 bg-emerald-100/90 border border-emerald-300 text-emerald-900 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 cursor-not-allowed opacity-90 shadow-none"
+                    title="Santri sudah tercatat hadir. Tidak dapat ditandai hadir ulang."
+                  >
+                    <CheckCheck className="w-4 h-4 text-emerald-700" />
+                    <span>Sudah Hadir ✅</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => executeAttendance(scannedResult, 'hadir', false)}
+                    className="py-2.5 px-3 bg-emerald-800 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+                  >
+                    <CheckCircle2 className="w-4 h-4 text-emerald-300" />
+                    <span>Tandai Hadir</span>
+                  </button>
+                )}
+
                 <button
                   type="button"
-                  onClick={() => handleConfirmAttendance('hadir')}
-                  className="py-2.5 px-3 bg-emerald-800 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-sm transition-colors cursor-pointer"
-                >
-                  <CheckCircle2 className="w-4 h-4 text-emerald-300" />
-                  <span>Tandai Hadir</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleConfirmAttendance('belum_hadir')}
-                  className="py-2.5 px-3 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+                  onClick={() => executeAttendance(scannedResult, 'belum_hadir', false)}
+                  disabled={scannedResult.attendance !== 'hadir'}
+                  className={`py-2.5 px-3 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors ${
+                    scannedResult.attendance === 'hadir'
+                      ? 'bg-slate-200 hover:bg-rose-100 hover:text-rose-800 text-slate-700 cursor-pointer shadow-sm'
+                      : 'bg-slate-100 text-slate-400 cursor-not-allowed opacity-50'
+                  }`}
+                  title={scannedResult.attendance === 'hadir' ? 'Klik untuk membatalkan jika terjadi kekeliruan scan' : 'Santri belum hadir'}
                 >
                   <UserCheck className="w-4 h-4 text-slate-500" />
-                  <span>Tandai Belum Hadir</span>
+                  <span>{scannedResult.attendance === 'hadir' ? 'Batalkan / Reset' : 'Belum Hadir'}</span>
                 </button>
               </div>
             </div>

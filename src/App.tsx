@@ -333,6 +333,12 @@ export default function App() {
   const handleCheckInSuccess = (updated: Participant) => {
     const list = participants.map((p) => (p.id === updated.id ? updated : p));
     handleUpdateParticipants(list);
+
+    if (isSupabaseConfigured()) {
+      upsertParticipantToSupabase(updated).catch((err) =>
+        console.warn('Gagal update kehadiran santri ke Supabase:', err)
+      );
+    }
   };
 
   const handleViewSingleCard = (p: Participant) => {
