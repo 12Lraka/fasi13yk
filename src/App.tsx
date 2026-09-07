@@ -110,6 +110,7 @@ export default function App() {
 
     if (
       route === 'admin' ||
+      route === 'admin-dashboard' ||
       route === 'admin-data-peserta' ||
       route === 'admin-rekap-peserta' ||
       route === 'admin-rekapcbg-lomba' ||
@@ -123,16 +124,16 @@ export default function App() {
         setIsLoginOpen(true);
         setActiveTab('beranda');
       } else {
-        // Menu khusus Superadmin: jika admin kemantren mencoba membuka, alihkan ke admin-data-peserta
+        // Menu khusus Superadmin: jika admin kemantren mencoba membuka, alihkan ke admin-dashboard
         const isSuperOnly =
           route === 'admin-rekapcbg-lomba' ||
           route === 'berita-acara' ||
           route === 'pengaturan' ||
           route === 'log';
         if (isSuperOnly && session.role !== 'super_admin') {
-          setActiveTab('admin-data-peserta');
+          setActiveTab('admin-dashboard');
         } else {
-          setActiveTab(route === 'admin' || route === 'superadmin' || route === 'adminkecamatan' ? 'admin-data-peserta' : route);
+          setActiveTab(route === 'admin' || route === 'superadmin' || route === 'adminkecamatan' ? 'admin-dashboard' : route);
         }
       }
       return;
@@ -388,6 +389,7 @@ export default function App() {
         {activeTab === 'lokasi' && <LocationMap />}
 
         {(activeTab === 'admin' ||
+          activeTab === 'admin-dashboard' ||
           activeTab === 'admin-data-peserta' ||
           activeTab === 'admin-rekap-peserta' ||
           activeTab === 'admin-rekapcbg-lomba' ||

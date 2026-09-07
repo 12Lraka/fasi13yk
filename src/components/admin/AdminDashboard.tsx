@@ -35,6 +35,7 @@ import {
   FileText,
   Layers,
   Lock,
+  LayoutDashboard,
 } from 'lucide-react';
 import { Participant, UserSession } from '../../types/fasi';
 import {
@@ -47,6 +48,7 @@ import {
 import { deleteParticipantFromSupabase } from '../../lib/supabase';
 import { exportParticipantsToExcel } from '../../utils/excelExport';
 import { showToast, showConfirmDialog, showSuccessAlert } from '../../utils/sweetalert';
+import { AdminOverviewDashboard } from './AdminOverviewDashboard';
 import { RekapPesertaAdmin } from './RekapPesertaAdmin';
 import { RekapCabangLombaAdmin } from './RekapCabangLombaAdmin';
 import { BeritaAcaraAdmin } from './BeritaAcaraAdmin';
@@ -86,36 +88,39 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onOpenPrintRecap,
   onViewSingleCard,
   onLogout,
-  activeRoute = 'admin-data-peserta',
+  activeRoute = 'admin-dashboard',
   onNavigateRoute,
 }) => {
-  const getInitialTab = (): 'peserta' | 'rekap-peserta' | 'rekap-cabang' | 'berita-acara' | 'pengaturan' | 'log' => {
+  const getInitialTab = (): 'dashboard' | 'peserta' | 'rekap-peserta' | 'rekap-cabang' | 'berita-acara' | 'pengaturan' | 'log' => {
+    if (activeRoute === 'admin-data-peserta') return 'peserta';
     if (activeRoute === 'admin-rekap-peserta') return 'rekap-peserta';
     if (activeRoute === 'admin-rekapcbg-lomba' && session.role === 'super_admin') return 'rekap-cabang';
     if (activeRoute === 'berita-acara' && session.role === 'super_admin') return 'berita-acara';
     if (activeRoute === 'pengaturan' && session.role === 'super_admin') return 'pengaturan';
     if (activeRoute === 'log' && session.role === 'super_admin') return 'log';
-    return 'peserta';
+    return 'dashboard';
   };
 
-  const [activeAdminTab, setActiveAdminTab] = useState<'peserta' | 'rekap-peserta' | 'rekap-cabang' | 'berita-acara' | 'pengaturan' | 'log'>(getInitialTab);
+  const [activeAdminTab, setActiveAdminTab] = useState<'dashboard' | 'peserta' | 'rekap-peserta' | 'rekap-cabang' | 'berita-acara' | 'pengaturan' | 'log'>(getInitialTab);
 
   useEffect(() => {
-    if (activeRoute === 'admin-rekap-peserta') setActiveAdminTab('rekap-peserta');
+    if (activeRoute === 'admin-dashboard' || activeRoute === 'admin') setActiveAdminTab('dashboard');
+    else if (activeRoute === 'admin-data-peserta') setActiveAdminTab('peserta');
+    else if (activeRoute === 'admin-rekap-peserta') setActiveAdminTab('rekap-peserta');
     else if (activeRoute === 'admin-rekapcbg-lomba' && session.role === 'super_admin') setActiveAdminTab('rekap-cabang');
     else if (activeRoute === 'berita-acara' && session.role === 'super_admin') setActiveAdminTab('berita-acara');
     else if (activeRoute === 'pengaturan' && session.role === 'super_admin') setActiveAdminTab('pengaturan');
     else if (activeRoute === 'log' && session.role === 'super_admin') setActiveAdminTab('log');
-    else if (activeRoute === 'admin-data-peserta' || activeRoute === 'admin') setActiveAdminTab('peserta');
     else if (session.role !== 'super_admin' && (activeRoute === 'admin-rekapcbg-lomba' || activeRoute === 'berita-acara' || activeRoute === 'pengaturan' || activeRoute === 'log')) {
-      setActiveAdminTab('peserta');
+      setActiveAdminTab('dashboard');
     }
   }, [activeRoute, session.role]);
 
-  const handleTabChange = (tab: 'peserta' | 'rekap-peserta' | 'rekap-cabang' | 'berita-acara' | 'pengaturan' | 'log') => {
+  const handleTabChange = (tab: 'dashboard' | 'peserta' | 'rekap-peserta' | 'rekap-cabang' | 'berita-acara' | 'pengaturan' | 'log') => {
     setActiveAdminTab(tab);
     if (onNavigateRoute) {
-      if (tab === 'peserta') onNavigateRoute('admin-data-peserta');
+      if (tab === 'dashboard') onNavigateRoute('admin-dashboard');
+      else if (tab === 'peserta') onNavigateRoute('admin-data-peserta');
       else if (tab === 'rekap-peserta') onNavigateRoute('admin-rekap-peserta');
       else if (tab === 'rekap-cabang') onNavigateRoute('admin-rekapcbg-lomba');
       else if (tab === 'berita-acara') onNavigateRoute('berita-acara');
@@ -261,6 +266,31 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           >
             <UserPlus className="w-4 h-4 shrink-0" />
             <span>+ Daftarkan Santri</span>
+          </button>
+
+          {/* Dashboard (Statistik & Progres) Tab */}
+          <button
+            onClick={() => handleTabChange('dashboard')}
+            id="tab-admin-dashboard"
+            className={`w-full px-3 py-2 font-bold rounded-xl flex items-center justify-between transition-all cursor-pointer text-left ${
+              activeAdminTab === 'dashboard'
+                ? 'bg-emerald-800 text-white shadow-xs'
+                : 'text-slate-700 hover:text-emerald-900 hover:bg-slate-100'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <LayoutDashboard className="w-4 h-4 shrink-0 text-amber-400" />
+              <span>Dashboard</span>
+            </div>
+            <span
+              className={`px-1.5 py-0.2 text-[9px] font-extrabold rounded ${
+                activeAdminTab === 'dashboard'
+                  ? 'bg-amber-400 text-emerald-950'
+                  : 'bg-slate-100 text-slate-500'
+              }`}
+            >
+              Statistik
+            </span>
           </button>
 
           {/* Data Peserta Tab */}
@@ -476,6 +506,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       {/* 2. MAIN CONTENT AREA */}
       <div className="flex-1 w-full space-y-4">
+        {/* VIEW: DASHBOARD (OVERVIEW & STATISTIK UTAMA) */}
+        {activeAdminTab === 'dashboard' && (
+          <AdminOverviewDashboard
+            session={session}
+            participants={participants}
+            kemantrenList={kemantrenList}
+            categoriesList={categoriesList}
+            appSettings={appSettings}
+            onOpenAddModal={onOpenAddModal}
+            onNavigateTab={handleTabChange}
+            onOpenLotteryModal={onOpenLotteryModal}
+            onOpenPrintCards={onOpenPrintCards}
+          />
+        )}
+
         {/* VIEW: REKAP PESERTA (SUPERADMIN) */}
         {activeAdminTab === 'rekap-peserta' && (
           <RekapPesertaAdmin

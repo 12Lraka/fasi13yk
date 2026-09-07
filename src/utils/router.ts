@@ -14,6 +14,7 @@ export type AppRoute =
   | 'kalkulator'
   | 'login'
   | 'admin'
+  | 'admin-dashboard'
   | 'admin-data-peserta'
   | 'admin-rekap-peserta'
   | 'admin-rekapcbg-lomba'
@@ -41,9 +42,10 @@ export const ROUTE_PATH_MAP: Record<string, AppRoute> = {
   '/login': 'login',
 
   // Admin Routes
-  '/admin': 'admin-data-peserta',
-  '/admin/admindashboard': 'admin-data-peserta',
-  '/admin/dashboard': 'admin-data-peserta',
+  '/admin': 'admin-dashboard',
+  '/admin/dashboard': 'admin-dashboard',
+  '/admin/admindashboard': 'admin-dashboard',
+  '/admin/overview': 'admin-dashboard',
   '/admin/data-peserta': 'admin-data-peserta',
   '/admin/peserta': 'admin-data-peserta',
   '/admin/rekap-peserta': 'admin-rekap-peserta',
@@ -97,13 +99,14 @@ export const CANONICAL_PATH_MAP: Record<AppRoute, string> = {
   lokasi: '/lokasi',
   kalkulator: '/kalkulator',
   login: '/login',
-  admin: '/admin/data-peserta',
+  admin: '/admin/dashboard',
+  'admin-dashboard': '/admin/dashboard',
   'admin-data-peserta': '/admin/data-peserta',
   'admin-rekap-peserta': '/admin/rekap-peserta',
   'admin-rekapcbg-lomba': '/admin/rekapcbg-lomba',
   'berita-acara': '/admin/berita-acara',
-  superadmin: '/admin/data-peserta',
-  adminkecamatan: '/admin/data-peserta',
+  superadmin: '/admin/dashboard',
+  adminkecamatan: '/admin/dashboard',
   undian: '/admin/undian',
   presensi: '/admin/checkin',
   penjurian: '/admin/penjurian',
@@ -134,6 +137,7 @@ export function getCurrentRouteFromURL(): AppRoute {
   // Prefix matching for any nested admin route
   if (pathname.startsWith('/admin/')) {
     const sub = pathname.replace(/^\/admin\//, '');
+    if (sub.includes('dashboard') || sub === '') return 'admin-dashboard';
     if (sub.includes('berita-acara') || sub.includes('kejuaraan')) return 'berita-acara';
     if (sub.includes('rekap-peserta')) return 'admin-rekap-peserta';
     if (sub.includes('rekapcbg') || sub.includes('rekap-cabang')) return 'admin-rekapcbg-lomba';
@@ -145,7 +149,7 @@ export function getCurrentRouteFromURL(): AppRoute {
     if (sub.includes('pengaturan') || sub.includes('setting')) return 'pengaturan';
     if (sub.includes('log') || sub.includes('audit')) return 'log';
     if (sub.includes('peserta') || sub.includes('data')) return 'admin-data-peserta';
-    return 'admin-data-peserta';
+    return 'admin-dashboard';
   }
 
   return 'beranda';
