@@ -46,6 +46,7 @@ const LOGO_FASI_URL = 'https://gigluvvkswjaiwxpnqet.supabase.co/storage/v1/objec
 interface BeritaAcaraAdminProps {
   participants: Participant[];
   onDataChanged?: () => void;
+  initialCabangId?: string;
 }
 
 export interface CategoryGroup {
@@ -68,10 +69,16 @@ export function checkIsCabangUtama(categoryName: string, level: Jenjang): boolea
   return false;
 }
 
-export const BeritaAcaraAdmin: React.FC<BeritaAcaraAdminProps> = ({ participants, onDataChanged }) => {
+export const BeritaAcaraAdmin: React.FC<BeritaAcaraAdminProps> = ({ participants, onDataChanged, initialCabangId }) => {
   const [beritaAcaraList, setBeritaAcaraList] = useState<BeritaAcaraKejuaraan[]>(() => getStoredBeritaAcara());
-  const [selectedCabangId, setSelectedCabangId] = useState<string>(CATEGORIES_LIST[0]?.id || '');
+  const [selectedCabangId, setSelectedCabangId] = useState<string>(initialCabangId || CATEGORIES_LIST[0]?.id || '');
   const [filterJenjang, setFilterJenjang] = useState<'ALL' | Jenjang>('ALL');
+
+  useEffect(() => {
+    if (initialCabangId) {
+      setSelectedCabangId(initialCabangId);
+    }
+  }, [initialCabangId]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);

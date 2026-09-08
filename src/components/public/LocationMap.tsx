@@ -66,7 +66,7 @@ export const LocationMap: React.FC = () => {
               <span>Sekretariat BADKO Kota</span>
             </div>
             <p className="font-semibold text-slate-900 text-sm">Panitia Pelaksana FASI XIII</p>
-            <p className="text-slate-500 text-[11px]">Helpdesk: 0812-2334-4000 (WhatsApp)</p>
+            <p className="text-slate-500 text-[11px]">Helpdesk: 0812-XXXX-XXXX (WhatsApp)</p>
           </div>
         </div>
       </div>
@@ -75,15 +75,15 @@ export const LocationMap: React.FC = () => {
       <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
         <div className="flex items-center gap-2">
           <Clock className="w-5 h-5 text-emerald-700" />
-          <h3 className="font-bold text-slate-900 text-base">Rundown Resmi Pelaksanaan Hari-H</h3>
+          <h3 className="font-bold text-slate-900 text-base">Rundown Pelaksanaan Hari-H</h3>
         </div>
 
         <div className="relative pl-6 border-l-2 border-emerald-500/30 space-y-5 text-xs">
           <div className="relative">
             <div className="absolute -left-[31px] top-0.5 w-3.5 h-3.5 rounded-full bg-emerald-600 border-2 border-white"></div>
             <div className="font-bold text-slate-900">06.30 - 07.30 WIB</div>
-            <div className="text-slate-700 font-semibold">Registrasi Ulang & Check-in QR Kontingen 14 Kemantren</div>
-            <p className="text-slate-500 text-[11px]">Verifikasi ID Card santri di meja panitia per wilayah kemantren.</p>
+            <div className="text-slate-700 font-semibold">Registrasi Ulang & Check-in QR Kontingen 14 Rayon</div>
+            <p className="text-slate-500 text-[11px]">Verifikasi ID Card santri di meja panitia per wilayah rayon.</p>
           </div>
 
           <div className="relative">

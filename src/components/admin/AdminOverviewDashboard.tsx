@@ -25,6 +25,7 @@ import {
   Calendar,
   Clock,
   CheckCircle2,
+  Trophy,
 } from 'lucide-react';
 import { Participant, UserSession, Kemantren, CompetitionCategory, AppSettings } from '../../types/fasi';
 
@@ -35,7 +36,7 @@ interface AdminOverviewDashboardProps {
   categoriesList: CompetitionCategory[];
   appSettings: AppSettings;
   onOpenAddModal: () => void;
-  onNavigateTab: (tab: 'peserta' | 'rekap-peserta' | 'rekap-cabang' | 'berita-acara' | 'pengaturan' | 'log') => void;
+  onNavigateTab: (tab: 'dashboard' | 'peserta' | 'rekap-peserta' | 'rekap-cabang' | 'hasil-cabang' | 'berita-acara' | 'pengaturan' | 'log') => void;
   onOpenLotteryModal?: () => void;
   onOpenPrintCards?: () => void;
 }
@@ -534,6 +535,25 @@ export const AdminOverviewDashboard: React.FC<AdminOverviewDashboardProps> = ({
                     </div>
                   </div>
                   <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+                </button>
+              )}
+
+              {/* Tombol Hasil Cabang Lomba (Superadmin) */}
+              {isSuperAdmin && (
+                <button
+                  onClick={() => onNavigateTab('hasil-cabang')}
+                  className="w-full p-3 rounded-xl bg-amber-50/70 hover:bg-amber-100/70 border border-amber-200/60 text-slate-800 font-bold text-xs flex items-center justify-between transition-colors cursor-pointer group text-left"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-7 h-7 rounded-lg bg-amber-500 text-slate-950 flex items-center justify-center shrink-0 shadow-2xs">
+                      <Trophy className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="font-bold text-slate-900">Hasil Per Cabang Lomba</div>
+                      <div className="text-[10px] text-amber-900 font-normal">Executive board juara 1, 2, 3 per cabang</div>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-amber-700 group-hover:translate-x-0.5 transition-transform" />
                 </button>
               )}
             </div>

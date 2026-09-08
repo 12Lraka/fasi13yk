@@ -114,6 +114,7 @@ export default function App() {
       route === 'admin-data-peserta' ||
       route === 'admin-rekap-peserta' ||
       route === 'admin-rekapcbg-lomba' ||
+      route === 'hasil-cabang' ||
       route === 'berita-acara' ||
       route === 'pengaturan' ||
       route === 'log' ||
@@ -127,6 +128,7 @@ export default function App() {
         // Menu khusus Superadmin: jika admin kemantren mencoba membuka, alihkan ke admin-dashboard
         const isSuperOnly =
           route === 'admin-rekapcbg-lomba' ||
+          route === 'hasil-cabang' ||
           route === 'berita-acara' ||
           route === 'pengaturan' ||
           route === 'log';
@@ -399,6 +401,7 @@ export default function App() {
           activeTab === 'admin-data-peserta' ||
           activeTab === 'admin-rekap-peserta' ||
           activeTab === 'admin-rekapcbg-lomba' ||
+          activeTab === 'hasil-cabang' ||
           activeTab === 'berita-acara' ||
           activeTab === 'pengaturan' ||
           activeTab === 'log') &&

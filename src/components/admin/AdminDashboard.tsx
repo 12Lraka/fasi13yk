@@ -36,6 +36,7 @@ import {
   Layers,
   Lock,
   LayoutDashboard,
+  Trophy,
 } from 'lucide-react';
 import { Participant, UserSession } from '../../types/fasi';
 import {
@@ -51,6 +52,7 @@ import { showToast, showConfirmDialog, showSuccessAlert } from '../../utils/swee
 import { AdminOverviewDashboard } from './AdminOverviewDashboard';
 import { RekapPesertaAdmin } from './RekapPesertaAdmin';
 import { RekapCabangLombaAdmin } from './RekapCabangLombaAdmin';
+import { HasilCabangLombaAdmin } from './HasilCabangLombaAdmin';
 import { BeritaAcaraAdmin } from './BeritaAcaraAdmin';
 import { PengaturanAdmin } from './PengaturanAdmin';
 import { LogAktivitasAdmin } from './LogAktivitasAdmin';
@@ -91,23 +93,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   activeRoute = 'admin-dashboard',
   onNavigateRoute,
 }) => {
-  const getInitialTab = (): 'dashboard' | 'peserta' | 'rekap-peserta' | 'rekap-cabang' | 'berita-acara' | 'pengaturan' | 'log' => {
+  const getInitialTab = (): 'dashboard' | 'peserta' | 'rekap-peserta' | 'rekap-cabang' | 'hasil-cabang' | 'berita-acara' | 'pengaturan' | 'log' => {
     if (activeRoute === 'admin-data-peserta') return 'peserta';
     if (activeRoute === 'admin-rekap-peserta') return 'rekap-peserta';
     if (activeRoute === 'admin-rekapcbg-lomba' && session.role === 'super_admin') return 'rekap-cabang';
+    if (activeRoute === 'hasil-cabang') return 'hasil-cabang';
     if (activeRoute === 'berita-acara' && session.role === 'super_admin') return 'berita-acara';
     if (activeRoute === 'pengaturan' && session.role === 'super_admin') return 'pengaturan';
     if (activeRoute === 'log' && session.role === 'super_admin') return 'log';
     return 'dashboard';
   };
 
-  const [activeAdminTab, setActiveAdminTab] = useState<'dashboard' | 'peserta' | 'rekap-peserta' | 'rekap-cabang' | 'berita-acara' | 'pengaturan' | 'log'>(getInitialTab);
+  const [activeAdminTab, setActiveAdminTab] = useState<'dashboard' | 'peserta' | 'rekap-peserta' | 'rekap-cabang' | 'hasil-cabang' | 'berita-acara' | 'pengaturan' | 'log'>(getInitialTab);
+  const [targetBeritaAcaraCabangId, setTargetBeritaAcaraCabangId] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     if (activeRoute === 'admin-dashboard' || activeRoute === 'admin') setActiveAdminTab('dashboard');
     else if (activeRoute === 'admin-data-peserta') setActiveAdminTab('peserta');
     else if (activeRoute === 'admin-rekap-peserta') setActiveAdminTab('rekap-peserta');
     else if (activeRoute === 'admin-rekapcbg-lomba' && session.role === 'super_admin') setActiveAdminTab('rekap-cabang');
+    else if (activeRoute === 'hasil-cabang') setActiveAdminTab('hasil-cabang');
     else if (activeRoute === 'berita-acara' && session.role === 'super_admin') setActiveAdminTab('berita-acara');
     else if (activeRoute === 'pengaturan' && session.role === 'super_admin') setActiveAdminTab('pengaturan');
     else if (activeRoute === 'log' && session.role === 'super_admin') setActiveAdminTab('log');
@@ -116,13 +121,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   }, [activeRoute, session.role]);
 
-  const handleTabChange = (tab: 'dashboard' | 'peserta' | 'rekap-peserta' | 'rekap-cabang' | 'berita-acara' | 'pengaturan' | 'log') => {
+  const handleTabChange = (tab: 'dashboard' | 'peserta' | 'rekap-peserta' | 'rekap-cabang' | 'hasil-cabang' | 'berita-acara' | 'pengaturan' | 'log') => {
     setActiveAdminTab(tab);
     if (onNavigateRoute) {
       if (tab === 'dashboard') onNavigateRoute('admin-dashboard');
       else if (tab === 'peserta') onNavigateRoute('admin-data-peserta');
       else if (tab === 'rekap-peserta') onNavigateRoute('admin-rekap-peserta');
       else if (tab === 'rekap-cabang') onNavigateRoute('admin-rekapcbg-lomba');
+      else if (tab === 'hasil-cabang') onNavigateRoute('hasil-cabang');
       else if (tab === 'berita-acara') onNavigateRoute('berita-acara');
       else if (tab === 'pengaturan') onNavigateRoute('pengaturan');
       else if (tab === 'log') onNavigateRoute('log');
@@ -361,6 +367,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </button>
           )}
 
+          {/* Hasil Cabang Lomba Tab */}
+          <button
+            onClick={() => handleTabChange('hasil-cabang')}
+            className={`w-full px-3 py-2 font-bold rounded-xl flex items-center justify-between transition-all cursor-pointer text-left ${
+              activeAdminTab === 'hasil-cabang'
+                ? 'bg-emerald-800 text-white shadow-xs'
+                : 'text-slate-700 hover:text-emerald-900 hover:bg-slate-100'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <Trophy className="w-4 h-4 shrink-0 text-amber-500" />
+              <span>Hasil Cabang Lomba</span>
+            </div>
+            <span className="px-1.5 py-0.2 bg-amber-400 text-emerald-950 text-[9px] font-extrabold rounded">
+              Juara
+            </span>
+          </button>
+
           {/* Berita Acara Kejuaraan Tab (Superadmin Only) */}
           {session.role === 'super_admin' && (
             <button
@@ -539,10 +563,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           />
         )}
 
+        {/* VIEW: HASIL CABANG LOMBA */}
+        {activeAdminTab === 'hasil-cabang' && (
+          <HasilCabangLombaAdmin
+            onNavigateToBeritaAcara={(cabangId) => {
+              if (cabangId) {
+                setTargetBeritaAcaraCabangId(cabangId);
+              }
+              handleTabChange('berita-acara');
+            }}
+          />
+        )}
+
         {/* VIEW: BERITA ACARA KEJUARAAN (SUPERADMIN ONLY) */}
         {activeAdminTab === 'berita-acara' && session.role === 'super_admin' && (
           <BeritaAcaraAdmin
             participants={participants}
+            initialCabangId={targetBeritaAcaraCabangId}
             onDataChanged={() => {
               // Trigger state refresh
             }}
