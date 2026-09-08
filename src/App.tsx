@@ -34,13 +34,18 @@ import {
   logAuditEvent,
   getStoredSettings,
   saveBeritaAcaraList,
+  saveKemantren,
+  getStoredKemantren,
 } from './utils/storage';
 import {
   isSupabaseConfigured,
   fetchParticipantsFromSupabase,
   fetchBeritaAcaraFromSupabase,
+  fetchKemantrenFromSupabase,
   subscribeToParticipantsRealtime,
   subscribeToBeritaAcaraRealtime,
+  subscribeToKemantrenRealtime,
+  syncKemantrenToSupabase,
   upsertParticipantToSupabase,
   bulkSyncParticipantsToSupabase,
 } from './lib/supabase';
@@ -187,6 +192,7 @@ export default function App() {
 
     let unsubscribeParticipants: (() => void) | null = null;
     let unsubscribeBeritaAcara: (() => void) | null = null;
+    let unsubscribeKemantren: (() => void) | null = null;
 
     // Jika Supabase aktif, lakukan sinkronisasi awal dan subscribe realtime
     if (isSupabaseConfigured()) {
@@ -203,6 +209,19 @@ export default function App() {
         }
       });
 
+      fetchKemantrenFromSupabase().then((remoteKemantren) => {
+        if (remoteKemantren && remoteKemantren.length > 0) {
+          saveKemantren(remoteKemantren);
+          // Jika ada kemantren di remote DB yang kolom link drive-nya masih null/kosong, sinkronkan master
+          const hasEmptyDriveUrls = remoteKemantren.some((k) => !k.driveFolderUrl);
+          if (hasEmptyDriveUrls) {
+            syncKemantrenToSupabase(getStoredKemantren());
+          }
+        } else {
+          syncKemantrenToSupabase(getStoredKemantren());
+        }
+      });
+
       // Pasang Realtime Subscription agar perubahan dari device lain langsung sinkron seketika
       unsubscribeParticipants = subscribeToParticipantsRealtime((updatedList) => {
         setParticipants(updatedList);
@@ -211,6 +230,10 @@ export default function App() {
 
       unsubscribeBeritaAcara = subscribeToBeritaAcaraRealtime((updatedBA) => {
         saveBeritaAcaraList(updatedBA);
+      });
+
+      unsubscribeKemantren = subscribeToKemantrenRealtime((updatedKemantren) => {
+        saveKemantren(updatedKemantren);
       });
     }
 
@@ -235,6 +258,7 @@ export default function App() {
       window.removeEventListener('hashchange', handlePopState);
       if (unsubscribeParticipants) unsubscribeParticipants();
       if (unsubscribeBeritaAcara) unsubscribeBeritaAcara();
+      if (unsubscribeKemantren) unsubscribeKemantren();
     };
   }, []);
 

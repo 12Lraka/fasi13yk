@@ -774,7 +774,9 @@ export async function syncKemantrenToSupabase(kemantrenList: Kemantren[]): Promi
       code: k.code,
       name: k.name,
       admin_name: k.adminName,
+      contact_person: k.contactPerson || null,
       password_hash: k.password || `${k.name.toLowerCase().replace(/\s+/g, '')}123`,
+      drive_folder_url: k.driveFolderUrl || null,
     }));
     const { error } = await client.from('kemantren').upsert(payloads, { onConflict: 'id' });
     if (error) throw error;
@@ -782,6 +784,71 @@ export async function syncKemantrenToSupabase(kemantrenList: Kemantren[]): Promi
   } catch (error: any) {
     console.error('Gagal sinkronisasi kemantren ke Supabase:', error);
     return { success: false, count: 0, error: error?.message || 'Gagal menyimpan ke Supabase' };
+  }
+}
+
+/**
+ * Mengambil master kemantren dari Supabase
+ */
+export async function fetchKemantrenFromSupabase(): Promise<Kemantren[] | null> {
+  const client = getSupabaseClient();
+  if (!client) return null;
+
+  try {
+    const { data, error } = await client
+      .from('kemantren')
+      .select('*')
+      .order('id', { ascending: true });
+
+    if (error) throw error;
+    if (!data || data.length === 0) return null;
+
+    return data.map((row: any) => {
+      const fallback = KEMANTREN_LIST.find((k) => k.id === row.id || k.code === row.code);
+      return {
+        id: row.id,
+        code: row.code,
+        name: row.name,
+        adminName: row.admin_name || fallback?.adminName || `Admin ${row.name}`,
+        contactPerson: row.contact_person || fallback?.contactPerson || '',
+        password: row.password_hash || row.password || fallback?.password || '',
+        driveFolderUrl: row.drive_folder_url || fallback?.driveFolderUrl || '',
+      };
+    });
+  } catch (error: any) {
+    console.error('Gagal mengambil data kemantren dari Supabase:', error);
+    return null;
+  }
+}
+
+/**
+ * Berlangganan (Realtime Subscription) untuk perubahan kemantren dari Supabase
+ */
+export function subscribeToKemantrenRealtime(callback: (kemantren: Kemantren[]) => void) {
+  const client = getSupabaseClient();
+  if (!client) return null;
+
+  try {
+    const channel = client
+      .channel('public:kemantren')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'kemantren' },
+        async () => {
+          const fresh = await fetchKemantrenFromSupabase();
+          if (fresh) {
+            callback(fresh);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      client.removeChannel(channel);
+    };
+  } catch (error) {
+    console.warn('Gagal mengaktifkan Realtime Supabase untuk kemantren:', error);
+    return null;
   }
 }
 

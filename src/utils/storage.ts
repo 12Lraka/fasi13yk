@@ -137,10 +137,13 @@ export function getStoredKemantren(): Kemantren[] {
     const parsed: Kemantren[] = JSON.parse(raw);
     const upgraded = parsed.map((kem) => {
       const defaultPass = `${kem.name.toLowerCase().replace(/\s+/g, '')}123`;
-      if (!kem.password || kem.password === 'kemantren123') {
-        return { ...kem, password: defaultPass };
-      }
-      return kem;
+      const master = KEMANTREN_LIST.find((m) => m.id === kem.id || m.code === kem.code);
+      const driveFolderUrl = kem.driveFolderUrl || master?.driveFolderUrl || '';
+      return {
+        ...kem,
+        password: (!kem.password || kem.password === 'kemantren123') ? defaultPass : kem.password,
+        driveFolderUrl,
+      };
     });
     return upgraded;
   } catch {
@@ -151,6 +154,9 @@ export function getStoredKemantren(): Kemantren[] {
 export function saveKemantren(kemantrenList: Kemantren[]): void {
   try {
     localStorage.setItem(KEMANTREN_KEY, JSON.stringify(kemantrenList));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('fasi_kemantren_updated', { detail: kemantrenList }));
+    }
   } catch (err) {
     console.error('Gagal menyimpan data kemantren:', err);
   }

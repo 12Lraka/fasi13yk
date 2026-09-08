@@ -38,7 +38,7 @@ import {
   LayoutDashboard,
   Trophy,
 } from 'lucide-react';
-import { Participant, UserSession } from '../../types/fasi';
+import { Participant, UserSession, Kemantren } from '../../types/fasi';
 import {
   saveParticipants,
   logAuditEvent,
@@ -135,9 +135,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
-  const kemantrenList = getStoredKemantren();
+  const [kemantrenList, setKemantrenList] = useState<Kemantren[]>(() => getStoredKemantren());
   const categoriesList = getStoredCategories();
   const appSettings = getStoredSettings();
+
+  useEffect(() => {
+    const handleKemantrenUpdate = () => {
+      setKemantrenList(getStoredKemantren());
+    };
+    window.addEventListener('fasi_kemantren_updated', handleKemantrenUpdate);
+    window.addEventListener('storage', handleKemantrenUpdate);
+    return () => {
+      window.removeEventListener('fasi_kemantren_updated', handleKemantrenUpdate);
+      window.removeEventListener('storage', handleKemantrenUpdate);
+    };
+  }, []);
 
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [selectedKemantrenFilter, setSelectedKemantrenFilter] = useState<string>(
