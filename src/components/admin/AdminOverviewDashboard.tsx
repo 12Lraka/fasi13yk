@@ -538,8 +538,8 @@ export const AdminOverviewDashboard: React.FC<AdminOverviewDashboardProps> = ({
                 </button>
               )}
 
-              {/* Tombol Hasil Cabang Lomba (Superadmin) */}
-              {isSuperAdmin && (
+              {/* Tombol Hasil Cabang Lomba (Superadmin atau jika diizinkan ke Rayon) */}
+              {(isSuperAdmin || appSettings.publishResultsToRayon) && (
                 <button
                   onClick={() => onNavigateTab('hasil-cabang')}
                   className="w-full p-3 rounded-xl bg-amber-50/70 hover:bg-amber-100/70 border border-amber-200/60 text-slate-800 font-bold text-xs flex items-center justify-between transition-colors cursor-pointer group text-left"

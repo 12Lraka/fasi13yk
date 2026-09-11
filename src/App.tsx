@@ -133,7 +133,7 @@ export default function App() {
         // Menu khusus Superadmin: jika admin kemantren mencoba membuka, alihkan ke admin-dashboard
         const isSuperOnly =
           route === 'admin-rekapcbg-lomba' ||
-          route === 'hasil-cabang' ||
+          (route === 'hasil-cabang' && !settings.publishResultsToRayon) ||
           route === 'berita-acara' ||
           route === 'pengaturan' ||
           route === 'log';

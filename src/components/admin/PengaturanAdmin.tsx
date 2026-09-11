@@ -38,7 +38,8 @@ import {
   X,
   FlaskConical,
   Trash,
-  AlertTriangle
+  AlertTriangle,
+  Trophy
 } from 'lucide-react';
 import { AppSettings, CompetitionCategory, Kemantren, UserSession } from '../../types/fasi';
 import {
@@ -89,6 +90,7 @@ export const PengaturanAdmin: React.FC<PengaturanAdminProps> = ({
   const [eventLocationInput, setEventLocationInput] = useState<string>(settings.eventLocation);
   const [superAdminPassInput, setSuperAdminPassInput] = useState<string>(settings.superAdminPassword || '');
   const [showPass, setShowPass] = useState<boolean>(false);
+  const [publishResultsToRayon, setPublishResultsToRayon] = useState<boolean>(!!settings.publishResultsToRayon);
 
   // 2. Kemantren Admin CRUD State
   const [kemantrenList, setKemantrenList] = useState<Kemantren[]>(() => getStoredKemantren());
@@ -168,6 +170,7 @@ export const PengaturanAdmin: React.FC<PengaturanAdminProps> = ({
       eventDate: eventDateInput.trim() || DEFAULT_SETTINGS.eventDate,
       eventLocation: eventLocationInput.trim() || DEFAULT_SETTINGS.eventLocation,
       superAdminPassword: superAdminPassInput.trim() || undefined,
+      publishResultsToRayon,
     };
 
     setSettings(updated);
@@ -178,6 +181,31 @@ export const PengaturanAdmin: React.FC<PengaturanAdminProps> = ({
       `Memperbarui tagline dan identitas pelaksanaan FASI XIII.`
     );
     showToast('success', 'Pengaturan identitas dan tagline berhasil disimpan.');
+    onSettingsChanged?.();
+  };
+
+  // Toggle Publikasi Hasil Lomba ke Admin Rayon
+  const handleTogglePublishResults = (enabled: boolean) => {
+    setPublishResultsToRayon(enabled);
+    const updated: AppSettings = {
+      ...settings,
+      publishResultsToRayon: enabled,
+    };
+    setSettings(updated);
+    saveSettings(updated);
+    logAuditEvent(
+      session.name,
+      'PENGATURAN_VISIBILITAS_HASIL',
+      enabled
+        ? 'Mengaktifkan publikasi hasil cabang lomba untuk Admin Rayon/Kecamatan.'
+        : 'Menonaktifkan dan menyembunyikan hasil cabang lomba dari Admin Rayon/Kecamatan.'
+    );
+    showToast(
+      'success',
+      enabled
+        ? 'Hasil Cabang Lomba sekarang DIBUKA untuk Admin Rayon.'
+        : 'Hasil Cabang Lomba sekarang DIKUNCI (Hanya Superadmin).'
+    );
     onSettingsChanged?.();
   };
 
@@ -890,6 +918,53 @@ export const PengaturanAdmin: React.FC<PengaturanAdminProps> = ({
                 </button>
               </div>
             </form>
+
+            {/* Toggle Visibilitas Hasil Lomba ke Admin Rayon */}
+            <div className="pt-5 border-t border-slate-200">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl bg-slate-50 border border-slate-200">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Trophy className="w-4 h-4 text-amber-500" />
+                    <h4 className="text-xs font-bold text-slate-800">
+                      Publikasikan Hasil Lomba ke Admin Rayon
+                    </h4>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+                        publishResultsToRayon
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                          : 'bg-slate-200 text-slate-600 border border-slate-300'
+                      }`}
+                    >
+                      {publishResultsToRayon ? 'AKTIF (DIBUKA)' : 'NONAKTIF (TERKUNCI)'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    {publishResultsToRayon
+                      ? 'Admin Rayon / Kecamatan dapat melihat tab "Hasil Cabang Lomba" untuk memantau rekap juara 1, 2, 3 tiap cabang (mode baca).'
+                      : 'Tab "Hasil Cabang Lomba" disembunyikan sepenuhnya dari Admin Rayon. Disarankan tetap nonaktif selama penjurian hari-H berlangsung.'}
+                  </p>
+                </div>
+
+                {/* Switch Toggle Button */}
+                <button
+                  type="button"
+                  onClick={() => handleTogglePublishResults(!publishResultsToRayon)}
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2 ${
+                    publishResultsToRayon ? 'bg-emerald-700' : 'bg-slate-300'
+                  }`}
+                  role="switch"
+                  aria-checked={publishResultsToRayon}
+                >
+                  <span className="sr-only">Toggle publikasikan hasil lomba ke admin rayon</span>
+                  <span
+                    aria-hidden="true"
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                      publishResultsToRayon ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Live Preview of Card with Tagline */}

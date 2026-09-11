@@ -38,7 +38,7 @@ import {
   LayoutDashboard,
   Trophy,
 } from 'lucide-react';
-import { Participant, UserSession, Kemantren } from '../../types/fasi';
+import { Participant, UserSession, Kemantren, AppSettings } from '../../types/fasi';
 import {
   saveParticipants,
   logAuditEvent,
@@ -97,7 +97,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     if (activeRoute === 'admin-data-peserta') return 'peserta';
     if (activeRoute === 'admin-rekap-peserta') return 'rekap-peserta';
     if (activeRoute === 'admin-rekapcbg-lomba' && session.role === 'super_admin') return 'rekap-cabang';
-    if (activeRoute === 'hasil-cabang') return 'hasil-cabang';
+    if (activeRoute === 'hasil-cabang') {
+      if (session.role === 'super_admin' || getStoredSettings().publishResultsToRayon) return 'hasil-cabang';
+      return 'dashboard';
+    }
     if (activeRoute === 'berita-acara' && session.role === 'super_admin') return 'berita-acara';
     if (activeRoute === 'pengaturan' && session.role === 'super_admin') return 'pengaturan';
     if (activeRoute === 'log' && session.role === 'super_admin') return 'log';
@@ -107,19 +110,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [activeAdminTab, setActiveAdminTab] = useState<'dashboard' | 'peserta' | 'rekap-peserta' | 'rekap-cabang' | 'hasil-cabang' | 'berita-acara' | 'pengaturan' | 'log'>(getInitialTab);
   const [targetBeritaAcaraCabangId, setTargetBeritaAcaraCabangId] = useState<string | undefined>(undefined);
 
+  const [kemantrenList, setKemantrenList] = useState<Kemantren[]>(() => getStoredKemantren());
+  const categoriesList = getStoredCategories();
+  const [appSettings, setAppSettings] = useState<AppSettings>(() => getStoredSettings());
+
   useEffect(() => {
     if (activeRoute === 'admin-dashboard' || activeRoute === 'admin') setActiveAdminTab('dashboard');
     else if (activeRoute === 'admin-data-peserta') setActiveAdminTab('peserta');
     else if (activeRoute === 'admin-rekap-peserta') setActiveAdminTab('rekap-peserta');
     else if (activeRoute === 'admin-rekapcbg-lomba' && session.role === 'super_admin') setActiveAdminTab('rekap-cabang');
-    else if (activeRoute === 'hasil-cabang') setActiveAdminTab('hasil-cabang');
+    else if (activeRoute === 'hasil-cabang') {
+      if (session.role === 'super_admin' || appSettings.publishResultsToRayon) {
+        setActiveAdminTab('hasil-cabang');
+      } else {
+        setActiveAdminTab('dashboard');
+      }
+    }
     else if (activeRoute === 'berita-acara' && session.role === 'super_admin') setActiveAdminTab('berita-acara');
     else if (activeRoute === 'pengaturan' && session.role === 'super_admin') setActiveAdminTab('pengaturan');
     else if (activeRoute === 'log' && session.role === 'super_admin') setActiveAdminTab('log');
     else if (session.role !== 'super_admin' && (activeRoute === 'admin-rekapcbg-lomba' || activeRoute === 'berita-acara' || activeRoute === 'pengaturan' || activeRoute === 'log')) {
       setActiveAdminTab('dashboard');
     }
-  }, [activeRoute, session.role]);
+  }, [activeRoute, session.role, appSettings.publishResultsToRayon]);
 
   const handleTabChange = (tab: 'dashboard' | 'peserta' | 'rekap-peserta' | 'rekap-cabang' | 'hasil-cabang' | 'berita-acara' | 'pengaturan' | 'log') => {
     setActiveAdminTab(tab);
@@ -135,21 +148,28 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
-  const [kemantrenList, setKemantrenList] = useState<Kemantren[]>(() => getStoredKemantren());
-  const categoriesList = getStoredCategories();
-  const appSettings = getStoredSettings();
-
   useEffect(() => {
     const handleKemantrenUpdate = () => {
       setKemantrenList(getStoredKemantren());
     };
+    const handleSettingsUpdate = () => {
+      const fresh = getStoredSettings();
+      setAppSettings(fresh);
+      if (session.role !== 'super_admin' && !fresh.publishResultsToRayon) {
+        setActiveAdminTab((curr) => (curr === 'hasil-cabang' ? 'dashboard' : curr));
+      }
+    };
     window.addEventListener('fasi_kemantren_updated', handleKemantrenUpdate);
+    window.addEventListener('fasi_settings_updated', handleSettingsUpdate);
     window.addEventListener('storage', handleKemantrenUpdate);
+    window.addEventListener('storage', handleSettingsUpdate);
     return () => {
       window.removeEventListener('fasi_kemantren_updated', handleKemantrenUpdate);
+      window.removeEventListener('fasi_settings_updated', handleSettingsUpdate);
       window.removeEventListener('storage', handleKemantrenUpdate);
+      window.removeEventListener('storage', handleSettingsUpdate);
     };
-  }, []);
+  }, [session.role]);
 
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [selectedKemantrenFilter, setSelectedKemantrenFilter] = useState<string>(
@@ -379,23 +399,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </button>
           )}
 
-          {/* Hasil Cabang Lomba Tab */}
-          <button
-            onClick={() => handleTabChange('hasil-cabang')}
-            className={`w-full px-3 py-2 font-bold rounded-xl flex items-center justify-between transition-all cursor-pointer text-left ${
-              activeAdminTab === 'hasil-cabang'
-                ? 'bg-emerald-800 text-white shadow-xs'
-                : 'text-slate-700 hover:text-emerald-900 hover:bg-slate-100'
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <Trophy className="w-4 h-4 shrink-0 text-amber-500" />
-              <span>Hasil Cabang Lomba</span>
-            </div>
-            <span className="px-1.5 py-0.2 bg-amber-400 text-emerald-950 text-[9px] font-extrabold rounded">
-              Juara
-            </span>
-          </button>
+          {/* Hasil Cabang Lomba Tab (Superadmin atau jika diizinkan untuk Admin Rayon) */}
+          {(session.role === 'super_admin' || appSettings.publishResultsToRayon) && (
+            <button
+              onClick={() => handleTabChange('hasil-cabang')}
+              className={`w-full px-3 py-2 font-bold rounded-xl flex items-center justify-between transition-all cursor-pointer text-left ${
+                activeAdminTab === 'hasil-cabang'
+                  ? 'bg-emerald-800 text-white shadow-xs'
+                  : 'text-slate-700 hover:text-emerald-900 hover:bg-slate-100'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Trophy className="w-4 h-4 shrink-0 text-amber-500" />
+                <span>Hasil Cabang Lomba</span>
+              </div>
+              <span className="px-1.5 py-0.2 bg-amber-400 text-emerald-950 text-[9px] font-extrabold rounded">
+                Juara
+              </span>
+            </button>
+          )}
 
           {/* Berita Acara Kejuaraan Tab (Superadmin Only) */}
           {session.role === 'super_admin' && (
@@ -578,6 +600,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         {/* VIEW: HASIL CABANG LOMBA */}
         {activeAdminTab === 'hasil-cabang' && (
           <HasilCabangLombaAdmin
+            session={session}
             onNavigateToBeritaAcara={(cabangId) => {
               if (cabangId) {
                 setTargetBeritaAcaraCabangId(cabangId);

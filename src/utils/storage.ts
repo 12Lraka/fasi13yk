@@ -54,6 +54,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   eventDate: 'Ahad, 11 Oktober 2026',
   eventLocation: 'SMPN 1 Yogyakarta (Jl. Cik Di Tiro No. 29, Terban, Gondokusuman)',
   themeColor: 'emerald',
+  publishResultsToRayon: false,
 };
 
 /**

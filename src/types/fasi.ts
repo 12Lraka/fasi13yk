@@ -78,6 +78,7 @@ export interface AppSettings {
   eventVenue?: string;
   eventLogoUrl?: string;
   fontFamily?: string;
+  publishResultsToRayon?: boolean;
 }
 
 export interface CompetitionCategory {

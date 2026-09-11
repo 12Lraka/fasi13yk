@@ -23,9 +23,9 @@ import {
   ChevronRight,
   Filter
 } from 'lucide-react';
-import { Jenjang, BeritaAcaraKejuaraan, CompetitionCategory } from '../../types/fasi';
+import { Jenjang, BeritaAcaraKejuaraan, CompetitionCategory, UserSession } from '../../types/fasi';
 import { CATEGORIES_LIST } from '../../data/fasiMasterData';
-import { getStoredBeritaAcara, saveBeritaAcaraList } from '../../utils/storage';
+import { getStoredBeritaAcara, saveBeritaAcaraList, getStoredSession } from '../../utils/storage';
 import {
   fetchBeritaAcaraFromSupabase,
   subscribeToBeritaAcaraRealtime,
@@ -34,12 +34,16 @@ import {
 import { showToast } from '../../utils/sweetalert';
 
 interface HasilCabangLombaAdminProps {
+  session?: UserSession;
   onNavigateToBeritaAcara?: (cabangId?: string) => void;
 }
 
 export const HasilCabangLombaAdmin: React.FC<HasilCabangLombaAdminProps> = ({
+  session,
   onNavigateToBeritaAcara
 }) => {
+  const currentSession = session || getStoredSession();
+  const isSuperAdmin = currentSession?.role === 'super_admin';
   const [beritaAcaraList, setBeritaAcaraList] = useState<BeritaAcaraKejuaraan[]>(() => getStoredBeritaAcara());
   const [filterJenjang, setFilterJenjang] = useState<'ALL' | Jenjang>('ALL');
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'Disahkan' | 'Menunggu'>('ALL');
@@ -560,19 +564,16 @@ export const HasilCabangLombaAdmin: React.FC<HasilCabangLombaAdminProps> = ({
                 {/* Card Footer: Metadata Juri & Tombol Aksi */}
                 <div className="px-4 sm:px-5 py-3 bg-slate-50 border-t border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs">
                   <div className="text-[11px] text-slate-500 space-y-0.5">
-                    {ba?.tanggalPenetapan && (
+                    {ba?.tanggalPenetapan ? (
                       <div>
                         Penetapan: <strong className="text-slate-700">{ba.tanggalPenetapan}</strong>
                       </div>
-                    )}
-                    {(ba?.namaKetuaJuri || ba?.juriSatu) && (
-                      <div className="truncate max-w-xs">
-                        Ketua Juri: <strong className="text-slate-700">{ba.namaKetuaJuri || ba.juriSatu}</strong>
-                      </div>
+                    ) : (
+                      <span className="text-slate-400 italic">Tanggal penetapan belum tersedia</span>
                     )}
                   </div>
 
-                  {onNavigateToBeritaAcara && (
+                  {isSuperAdmin && onNavigateToBeritaAcara && (
                     <button
                       onClick={() => onNavigateToBeritaAcara(cat.id)}
                       className="inline-flex items-center gap-1.5 text-emerald-800 hover:text-emerald-950 font-bold text-xs hover:underline cursor-pointer ml-auto"
