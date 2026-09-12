@@ -37,6 +37,10 @@ import {
   CheckCircle2,
   HelpCircle,
   Scale,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
 } from 'lucide-react';
 import { Participant, UserSession, CompetitionCategory, Kemantren } from '../../types/fasi';
 import { CATEGORIES_LIST, KEMANTREN_LIST } from '../../data/fasiMasterData';
@@ -115,6 +119,10 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
   const [selectedGenderFilter, setSelectedGenderFilter] = useState<string>('ALL');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [qrCodes, setQrCodes] = useState<Record<string, string>>({});
+
+  // Virtual Page Carousel & Preview Paginasi
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [printCurrentOnly, setPrintCurrentOnly] = useState<boolean>(false);
 
   // 4. State Generator untuk Official (Superadmin & Admin Rayon)
   const [officialMode, setOfficialMode] = useState<'auto_kemantren' | 'custom' | 'blanko'>('auto_kemantren');
@@ -487,9 +495,16 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
     showToast('success', `Kartu "${com.name || com.division}" dihapus.`);
   };
 
-  const handlePrint = () => {
-    window.focus();
-    window.print();
+  const handlePrint = (onlyCurrentPage: boolean = false) => {
+    setPrintCurrentOnly(onlyCurrentPage);
+    setTimeout(() => {
+      window.focus();
+      window.print();
+      // Kembalikan ke false setelah dialog print ditutup
+      setTimeout(() => {
+        setPrintCurrentOnly(false);
+      }, 500);
+    }, 50);
   };
 
   // Unduh 1 Kartu Tunggal ke format PNG
@@ -595,6 +610,23 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
   const officialPages = useMemo(() => chunkArray(generatedOfficials, 9), [generatedOfficials]);
   const committeePages = useMemo(() => chunkArray(generatedCommittees, 9), [generatedCommittees]);
 
+  // Halaman aktif berdasarkan tab
+  const activePages =
+    activeCardType === 'peserta'
+      ? participantPages
+      : activeCardType === 'official'
+      ? officialPages
+      : committeePages;
+
+  const totalPages = Math.max(1, activePages.length);
+
+  // Pastikan currentPage selalu dalam rentang yang valid saat filter atau tab berganti
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(1);
+    }
+  }, [totalPages, currentPage, activeCardType]);
+
   return (
     <div className="space-y-6">
       {/* 1. TOP CONTROL BAR (Hidden on Print) */}
@@ -682,19 +714,33 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
             </button>
 
             {/* Tombol Cetak Browser */}
-            <button
-              onClick={handlePrint}
-              disabled={currentTotalCards === 0 || isGeneratingPdf || isGeneratingZip}
-              className={`px-3.5 py-2.5 rounded-xl font-bold text-xs border border-slate-300 shadow-xs flex items-center gap-2 transition-all active:scale-95 cursor-pointer ${
-                currentTotalCards === 0
-                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                  : 'bg-white hover:bg-slate-50 text-slate-800'
-              }`}
-              title="Cetak langsung menggunakan printer bawaan browser (Ctrl+P)"
-            >
-              <Printer className="w-4 h-4 text-slate-600" />
-              <span>Cetak Langsung</span>
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => handlePrint(false)}
+                disabled={currentTotalCards === 0 || isGeneratingPdf || isGeneratingZip}
+                className={`px-3.5 py-2.5 rounded-xl font-bold text-xs border border-slate-300 shadow-xs flex items-center gap-2 transition-all active:scale-95 cursor-pointer ${
+                  currentTotalCards === 0
+                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                    : 'bg-white hover:bg-slate-50 text-slate-800'
+                }`}
+                title="Cetak seluruh lembar ke printer atau PDF (Ctrl+P)"
+              >
+                <Printer className="w-4 h-4 text-slate-600" />
+                <span>Cetak Semua ({totalPages} Lembar)</span>
+              </button>
+
+              {totalPages > 1 && (
+                <button
+                  onClick={() => handlePrint(true)}
+                  disabled={currentTotalCards === 0 || isGeneratingPdf || isGeneratingZip}
+                  className="px-3 py-2.5 rounded-xl font-bold text-xs border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 shadow-xs flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+                  title={`Cetak hanya lembar ke-${currentPage} yang sedang aktif`}
+                >
+                  <FileCheck className="w-4 h-4 text-emerald-700" />
+                  <span>Cetak Lembar Ini (#{currentPage})</span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -1348,10 +1394,16 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
               width: 55mm !important;
               height: 88mm !important;
             }
+            .print-page-hidden {
+              display: none !important;
+            }
           }
           @media screen {
             .idcard-print-page {
               box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            }
+            .screen-page-hidden {
+              display: none !important;
             }
           }
         `}} />
@@ -1369,190 +1421,292 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
             </p>
           </div>
         ) : (
-          <div className="space-y-8">
+          <div className="space-y-6">
+            {/* VIRTUAL PAGE CAROUSEL / NAVIGASI HALAMAN INTERAKTIF (No-Print) */}
+            <div className="no-print bg-white rounded-2xl p-3 sm:p-4 border border-slate-200 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3 sticky top-3 z-30 backdrop-blur-md bg-white/95">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-700">
+                  Pratinjau Lembar A4:
+                </span>
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-slate-100 text-slate-800 border border-slate-200">
+                  Halaman {currentPage} dari {totalPages}
+                </span>
+                <span className="text-[11px] text-slate-500 hidden sm:inline">
+                  (Total {currentTotalCards} kartu • 9 kartu/lembar)
+                </span>
+              </div>
+
+              {/* Kontrol Tombol Navigasi Halaman */}
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage <= 1}
+                  className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                  title="Halaman Pertama"
+                >
+                  <ChevronsLeft className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                  disabled={currentPage <= 1}
+                  className="px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center gap-1 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                  title="Halaman Sebelumnya"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  <span className="hidden sm:inline">Sebelumnya</span>
+                </button>
+
+                {/* Dropdown Langsung Lompat Halaman */}
+                <select
+                  value={currentPage}
+                  onChange={(e) => setCurrentPage(Number(e.target.value))}
+                  className="px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs font-extrabold text-slate-800 bg-white cursor-pointer focus:outline-emerald-600"
+                >
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((pNum) => (
+                    <option key={pNum} value={pNum}>
+                      Lembar {pNum}
+                    </option>
+                  ))}
+                </select>
+
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage >= totalPages}
+                  className="px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center gap-1 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                  title="Halaman Berikutnya"
+                >
+                  <span className="hidden sm:inline">Berikutnya</span>
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage >= totalPages}
+                  className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                  title="Halaman Terakhir"
+                >
+                  <ChevronsRight className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Tombol Cetak Cepat Lembar Aktif */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handlePrint(true)}
+                  className="px-3 py-1.5 rounded-lg font-bold text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-2xs"
+                  title={`Cetak lembar ke-${currentPage} ini saja ke printer`}
+                >
+                  <Printer className="w-3.5 h-3.5 text-emerald-700" />
+                  <span>Cetak Lembar Ini</span>
+                </button>
+              </div>
+            </div>
+
             {/* RENDER PESERTA PER LEMBAR A4 */}
             {activeCardType === 'peserta' &&
-              participantPages.map((pageItems, pageIdx) => (
-                <div
-                  key={`page-peserta-${pageIdx}`}
-                  className="idcard-print-page bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 mx-auto transition-all"
-                  style={{
-                    width: '210mm',
-                    minHeight: '297mm',
-                    boxSizing: 'border-box',
-                  }}
-                >
-                  <div className="no-print flex items-center justify-between border-b border-slate-100 pb-2 mb-3 text-[11px] text-slate-400 font-mono">
-                    <span className="font-semibold text-emerald-800">ID Card Peserta FASI XIII</span>
-                    <span>Lembar {pageIdx + 1} dari {participantPages.length} ({pageItems.length} Kartu)</span>
-                  </div>
+              participantPages.map((pageItems, pageIdx) => {
+                const isScreenActive = pageIdx + 1 === currentPage;
+                const isPrintHidden = printCurrentOnly && pageIdx + 1 !== currentPage;
+                return (
                   <div
-                    className="grid grid-cols-3 gap-x-[4mm] gap-y-[3mm] justify-center items-center mx-auto py-1"
+                    key={`page-peserta-${pageIdx}`}
+                    className={`idcard-print-page bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 mx-auto transition-all ${
+                      !isScreenActive ? 'screen-page-hidden' : ''
+                    } ${isPrintHidden ? 'print-page-hidden' : ''}`}
                     style={{
-                      width: '173mm', // 3 * 55mm + 2 * 4mm = 173mm
+                      width: '210mm',
+                      minHeight: '297mm',
+                      boxSizing: 'border-box',
                     }}
                   >
-                    {pageItems.map((p) => {
-                      const cat = categoriesList.find((c) => c.id === p.categoryId);
-                      const kem = kemantrenList.find((k) => k.id === p.kemantrenId);
-                      const elementId = `card-peserta-${p.id}`;
-                      const fileName = `${p.registrationNumber}_${p.fullName.replace(/\s+/g, '_')}`;
-                      return (
-                        <div key={p.id} className="relative group flex justify-center">
-                          <div id={elementId}>
-                            <IdCardParticipant
-                              participant={p}
-                              category={cat}
-                              kemantrenName={kem?.name}
-                              qrCodeUrl={qrCodes[p.id]}
-                              theme={activeTheme}
-                              customTagline={customTagline}
-                            />
+                    <div className="no-print flex items-center justify-between border-b border-slate-100 pb-2 mb-3 text-[11px] text-slate-400 font-mono">
+                      <span className="font-semibold text-emerald-800">ID Card Peserta FASI XIII</span>
+                      <span>Lembar {pageIdx + 1} dari {participantPages.length} ({pageItems.length} Kartu)</span>
+                    </div>
+                    <div
+                      className="grid grid-cols-3 gap-x-[4mm] gap-y-[3mm] justify-center items-center mx-auto py-1"
+                      style={{
+                        width: '173mm', // 3 * 55mm + 2 * 4mm = 173mm
+                      }}
+                    >
+                      {pageItems.map((p) => {
+                        const cat = categoriesList.find((c) => c.id === p.categoryId);
+                        const kem = kemantrenList.find((k) => k.id === p.kemantrenId);
+                        const elementId = `card-peserta-${p.id}`;
+                        const fileName = `${p.registrationNumber}_${p.fullName.replace(/\s+/g, '_')}`;
+                        return (
+                          <div key={p.id} className="relative group flex justify-center">
+                            <div id={elementId}>
+                              <IdCardParticipant
+                                participant={p}
+                                category={cat}
+                                kemantrenName={kem?.name}
+                                qrCodeUrl={qrCodes[p.id]}
+                                theme={activeTheme}
+                                customTagline={customTagline}
+                              />
+                            </div>
+                            {/* Hover Single Card PNG Download Button */}
+                            <div className="no-print absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadSingleCard(elementId, fileName, p.id)}
+                                disabled={downloadingCardId === p.id}
+                                className="px-2 py-1 bg-slate-900/90 hover:bg-black text-white rounded-md text-[10px] font-bold shadow-md flex items-center gap-1 cursor-pointer transition-all active:scale-95"
+                                title="Download kartu ini saja sebagai gambar PNG 300 DPI"
+                              >
+                                {downloadingCardId === p.id ? (
+                                  <Loader2 className="w-3 h-3 animate-spin text-amber-300" />
+                                ) : (
+                                  <ImageIcon className="w-3 h-3 text-amber-300" />
+                                )}
+                                <span>Unduh PNG</span>
+                              </button>
+                            </div>
                           </div>
-                          {/* Hover Single Card PNG Download Button */}
-                          <div className="no-print absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-                            <button
-                              type="button"
-                              onClick={() => handleDownloadSingleCard(elementId, fileName, p.id)}
-                              disabled={downloadingCardId === p.id}
-                              className="px-2 py-1 bg-slate-900/90 hover:bg-black text-white rounded-md text-[10px] font-bold shadow-md flex items-center gap-1 cursor-pointer transition-all active:scale-95"
-                              title="Download kartu ini saja sebagai gambar PNG 300 DPI"
-                            >
-                              {downloadingCardId === p.id ? (
-                                <Loader2 className="w-3 h-3 animate-spin text-amber-300" />
-                              ) : (
-                                <ImageIcon className="w-3 h-3 text-amber-300" />
-                              )}
-                              <span>Unduh PNG</span>
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
 
             {/* RENDER OFFICIAL PER LEMBAR A4 */}
             {activeCardType === 'official' &&
-              officialPages.map((pageItems, pageIdx) => (
-                <div
-                  key={`page-official-${pageIdx}`}
-                  className="idcard-print-page bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 mx-auto transition-all"
-                  style={{
-                    width: '210mm',
-                    minHeight: '297mm',
-                    boxSizing: 'border-box',
-                  }}
-                >
-                  <div className="no-print flex items-center justify-between border-b border-slate-100 pb-2 mb-3 text-[11px] text-slate-400 font-mono">
-                    <span className="font-semibold text-blue-800">ID Card Official Kontingen Rayon FASI XIII</span>
-                    <span>Lembar {pageIdx + 1} dari {officialPages.length} ({pageItems.length} Kartu)</span>
-                  </div>
+              officialPages.map((pageItems, pageIdx) => {
+                const isScreenActive = pageIdx + 1 === currentPage;
+                const isPrintHidden = printCurrentOnly && pageIdx + 1 !== currentPage;
+                return (
                   <div
-                    className="grid grid-cols-3 gap-x-[4mm] gap-y-[3mm] justify-center items-center mx-auto py-1"
+                    key={`page-official-${pageIdx}`}
+                    className={`idcard-print-page bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 mx-auto transition-all ${
+                      !isScreenActive ? 'screen-page-hidden' : ''
+                    } ${isPrintHidden ? 'print-page-hidden' : ''}`}
                     style={{
-                      width: '173mm',
+                      width: '210mm',
+                      minHeight: '297mm',
+                      boxSizing: 'border-box',
                     }}
                   >
-                    {pageItems.map((off, idx) => {
-                      const elementId = `card-official-${off.id || idx}`;
-                      const fileName = `Official_${off.kemantrenCode || idx + 1}_${off.name ? off.name.replace(/\s+/g, '_') : 'Blanko'}`;
-                      return (
-                        <div key={off.id || idx} className="relative group flex justify-center">
-                          <div id={elementId}>
-                            <IdCardOfficial
-                              data={off}
-                              theme={activeTheme}
-                              customTagline={customTagline}
-                            />
+                    <div className="no-print flex items-center justify-between border-b border-slate-100 pb-2 mb-3 text-[11px] text-slate-400 font-mono">
+                      <span className="font-semibold text-blue-800">ID Card Official Kontingen Rayon FASI XIII</span>
+                      <span>Lembar {pageIdx + 1} dari {officialPages.length} ({pageItems.length} Kartu)</span>
+                    </div>
+                    <div
+                      className="grid grid-cols-3 gap-x-[4mm] gap-y-[3mm] justify-center items-center mx-auto py-1"
+                      style={{
+                        width: '173mm',
+                      }}
+                    >
+                      {pageItems.map((off, idx) => {
+                        const elementId = `card-official-${off.id || idx}`;
+                        const fileName = `Official_${off.kemantrenCode || idx + 1}_${off.name ? off.name.replace(/\s+/g, '_') : 'Blanko'}`;
+                        return (
+                          <div key={off.id || idx} className="relative group flex justify-center">
+                            <div id={elementId}>
+                              <IdCardOfficial
+                                data={off}
+                                theme={activeTheme}
+                                customTagline={customTagline}
+                              />
+                            </div>
+                            {/* Hover Single Card PNG Download Button */}
+                            <div className="no-print absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadSingleCard(elementId, fileName, off.id || String(idx))}
+                                disabled={downloadingCardId === (off.id || String(idx))}
+                                className="px-2 py-1 bg-slate-900/90 hover:bg-black text-white rounded-md text-[10px] font-bold shadow-md flex items-center gap-1 cursor-pointer transition-all active:scale-95"
+                                title="Download kartu official ini saja sebagai gambar PNG 300 DPI"
+                              >
+                                {downloadingCardId === (off.id || String(idx)) ? (
+                                  <Loader2 className="w-3 h-3 animate-spin text-amber-300" />
+                                ) : (
+                                  <ImageIcon className="w-3 h-3 text-amber-300" />
+                                )}
+                                <span>Unduh PNG</span>
+                              </button>
+                            </div>
                           </div>
-                          {/* Hover Single Card PNG Download Button */}
-                          <div className="no-print absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-                            <button
-                              type="button"
-                              onClick={() => handleDownloadSingleCard(elementId, fileName, off.id || String(idx))}
-                              disabled={downloadingCardId === (off.id || String(idx))}
-                              className="px-2 py-1 bg-slate-900/90 hover:bg-black text-white rounded-md text-[10px] font-bold shadow-md flex items-center gap-1 cursor-pointer transition-all active:scale-95"
-                              title="Download kartu official ini saja sebagai gambar PNG 300 DPI"
-                            >
-                              {downloadingCardId === (off.id || String(idx)) ? (
-                                <Loader2 className="w-3 h-3 animate-spin text-amber-300" />
-                              ) : (
-                                <ImageIcon className="w-3 h-3 text-amber-300" />
-                              )}
-                              <span>Unduh PNG</span>
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
 
             {/* RENDER COMMITTEE & DEWAN HAKIM PER LEMBAR A4 */}
             {activeCardType === 'panitia' &&
-              committeePages.map((pageItems, pageIdx) => (
-                <div
-                  key={`page-panitia-${pageIdx}`}
-                  className="idcard-print-page bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 mx-auto transition-all"
-                  style={{
-                    width: '210mm',
-                    minHeight: '297mm',
-                    boxSizing: 'border-box',
-                  }}
-                >
-                  <div className="no-print flex items-center justify-between border-b border-slate-100 pb-2 mb-3 text-[11px] text-slate-400 font-mono">
-                    <span className="font-semibold text-rose-800">
-                      ID Card Panitia & Dewan Hakim FASI XIII
-                      {committeeSubCategory === 'panitia' && ' (Khusus Panitia)'}
-                      {committeeSubCategory === 'dewan_hakim' && ' (Khusus Dewan Hakim)'}
-                    </span>
-                    <span>Lembar {pageIdx + 1} dari {committeePages.length} ({pageItems.length} Kartu)</span>
-                  </div>
+              committeePages.map((pageItems, pageIdx) => {
+                const isScreenActive = pageIdx + 1 === currentPage;
+                const isPrintHidden = printCurrentOnly && pageIdx + 1 !== currentPage;
+                return (
                   <div
-                    className="grid grid-cols-3 gap-x-[4mm] gap-y-[3mm] justify-center items-center mx-auto py-1"
+                    key={`page-panitia-${pageIdx}`}
+                    className={`idcard-print-page bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 mx-auto transition-all ${
+                      !isScreenActive ? 'screen-page-hidden' : ''
+                    } ${isPrintHidden ? 'print-page-hidden' : ''}`}
                     style={{
-                      width: '173mm',
+                      width: '210mm',
+                      minHeight: '297mm',
+                      boxSizing: 'border-box',
                     }}
                   >
-                    {pageItems.map((com, idx) => {
-                      const isHakim = com.cardCategory === 'dewan_hakim';
-                      const elementId = `card-panitia-${com.id || idx}`;
-                      const fileName = `${isHakim ? 'Dewan_Hakim' : 'Panitia'}_${idx + 1}_${com.name ? com.name.replace(/\s+/g, '_') : 'Blanko'}`;
-                      return (
-                        <div key={com.id || idx} className="relative group flex justify-center">
-                          <div id={elementId}>
-                            <IdCardCommittee
-                              data={com}
-                              theme={activeTheme}
-                              customTagline={customTagline}
-                            />
+                    <div className="no-print flex items-center justify-between border-b border-slate-100 pb-2 mb-3 text-[11px] text-slate-400 font-mono">
+                      <span className="font-semibold text-rose-800">
+                        ID Card Panitia & Dewan Hakim FASI XIII
+                        {committeeSubCategory === 'panitia' && ' (Khusus Panitia)'}
+                        {committeeSubCategory === 'dewan_hakim' && ' (Khusus Dewan Hakim)'}
+                      </span>
+                      <span>Lembar {pageIdx + 1} dari {committeePages.length} ({pageItems.length} Kartu)</span>
+                    </div>
+                    <div
+                      className="grid grid-cols-3 gap-x-[4mm] gap-y-[3mm] justify-center items-center mx-auto py-1"
+                      style={{
+                        width: '173mm',
+                      }}
+                    >
+                      {pageItems.map((com, idx) => {
+                        const isHakim = com.cardCategory === 'dewan_hakim';
+                        const elementId = `card-panitia-${com.id || idx}`;
+                        const fileName = `${isHakim ? 'Dewan_Hakim' : 'Panitia'}_${idx + 1}_${com.name ? com.name.replace(/\s+/g, '_') : 'Blanko'}`;
+                        return (
+                          <div key={com.id || idx} className="relative group flex justify-center">
+                            <div id={elementId}>
+                              <IdCardCommittee
+                                data={com}
+                                theme={activeTheme}
+                                customTagline={customTagline}
+                              />
+                            </div>
+                            {/* Hover Single Card PNG Download Button */}
+                            <div className="no-print absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadSingleCard(elementId, fileName, com.id || String(idx))}
+                                disabled={downloadingCardId === (com.id || String(idx))}
+                                className="px-2 py-1 bg-slate-900/90 hover:bg-black text-white rounded-md text-[10px] font-bold shadow-md flex items-center gap-1 cursor-pointer transition-all active:scale-95"
+                                title={`Download kartu ${isHakim ? 'Dewan Hakim' : 'Panitia'} ini saja sebagai gambar PNG 300 DPI`}
+                              >
+                                {downloadingCardId === (com.id || String(idx)) ? (
+                                  <Loader2 className="w-3 h-3 animate-spin text-amber-300" />
+                                ) : (
+                                  <ImageIcon className="w-3 h-3 text-amber-300" />
+                                )}
+                                <span>Unduh PNG</span>
+                              </button>
+                            </div>
                           </div>
-                          {/* Hover Single Card PNG Download Button */}
-                          <div className="no-print absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-                            <button
-                              type="button"
-                              onClick={() => handleDownloadSingleCard(elementId, fileName, com.id || String(idx))}
-                              disabled={downloadingCardId === (com.id || String(idx))}
-                              className="px-2 py-1 bg-slate-900/90 hover:bg-black text-white rounded-md text-[10px] font-bold shadow-md flex items-center gap-1 cursor-pointer transition-all active:scale-95"
-                              title={`Download kartu ${isHakim ? 'Dewan Hakim' : 'Panitia'} ini saja sebagai gambar PNG 300 DPI`}
-                            >
-                              {downloadingCardId === (com.id || String(idx)) ? (
-                                <Loader2 className="w-3 h-3 animate-spin text-amber-300" />
-                              ) : (
-                                <ImageIcon className="w-3 h-3 text-amber-300" />
-                              )}
-                              <span>Unduh PNG</span>
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
           </div>
         )}
       </div>
