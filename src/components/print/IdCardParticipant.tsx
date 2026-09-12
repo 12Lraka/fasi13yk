@@ -186,7 +186,7 @@ export const IdCardParticipant: React.FC<IdCardParticipantProps> = ({
 
       {/* 3. Bottom Footer: QR Code & No Peserta -> Tagline -> BADKO TKA-TPA KOTA YOGYAKARTA */}
       <div className="relative z-10 pt-0.5 text-center flex flex-col items-center justify-end space-y-0.5 shrink-0">
-        {/* QR Code & No Peserta (Ukuran QR Code Diperbesar) */}
+        {/* QR Code & No Peserta (Ukuran QR Code 2 cm / 20mm) */}
         <div className="flex flex-col items-center justify-center">
           <div className="p-0.5 bg-white border border-slate-300 rounded shadow-2xs inline-block">
             {qrCodeUrl ? (
@@ -194,10 +194,10 @@ export const IdCardParticipant: React.FC<IdCardParticipantProps> = ({
                 src={qrCodeUrl}
                 alt={`QR ${participant.registrationNumber}`}
                 crossOrigin="anonymous"
-                className="w-9 h-9 object-contain"
+                className="w-[20mm] h-[20mm] object-contain"
               />
             ) : (
-              <div className="w-9 h-9 bg-slate-100 flex items-center justify-center text-[6px] text-slate-400 font-bold">
+              <div className="w-[20mm] h-[20mm] bg-slate-100 flex items-center justify-center text-[7px] text-slate-400 font-bold">
                 QR
               </div>
             )}
