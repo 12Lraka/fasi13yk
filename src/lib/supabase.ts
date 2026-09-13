@@ -774,7 +774,6 @@ export async function syncKemantrenToSupabase(kemantrenList: Kemantren[]): Promi
       code: k.code,
       name: k.name,
       admin_name: k.adminName,
-      contact_person: k.contactPerson || null,
       password_hash: k.password || `${k.name.toLowerCase().replace(/\s+/g, '')}123`,
       drive_folder_url: k.driveFolderUrl || null,
     }));
@@ -810,7 +809,7 @@ export async function fetchKemantrenFromSupabase(): Promise<Kemantren[] | null> 
         code: row.code,
         name: row.name,
         adminName: row.admin_name || fallback?.adminName || `Admin ${row.name}`,
-        contactPerson: row.contact_person || fallback?.contactPerson || '',
+        contactPerson: fallback?.contactPerson || '',
         password: row.password_hash || row.password || fallback?.password || '',
         driveFolderUrl: row.drive_folder_url || fallback?.driveFolderUrl || '',
       };

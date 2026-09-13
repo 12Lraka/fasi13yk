@@ -124,7 +124,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
               <KeyRound className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-bold text-base">Autentikasi Hak Akses (RBAC)</h3>
+              <h3 className="font-bold text-base">LOGIN</h3>
               <p className="text-xs text-emerald-300">Sistem Informasi FASI XIII Kota Yogyakarta</p>
             </div>
           </div>
