@@ -200,7 +200,7 @@ export const HasilCabangLombaAdmin: React.FC<HasilCabangLombaAdminProps> = ({
               Hasil Pemenang Per Cabang Lomba
             </h2>
             <p className="text-emerald-100/80 text-xs sm:text-sm max-w-2xl leading-relaxed">
-              Daftar resmi juara 1, 2, 3 dan harapan per cabang lomba. Terhubung secara otomatis dan real-time dengan status pengesahan di Berita Acara Kejuaraan.
+              Daftar resmi juara 1, 2, 3 dan harapan per cabang lomba.
             </p>
           </div>
 
