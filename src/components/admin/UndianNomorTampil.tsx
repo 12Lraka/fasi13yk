@@ -740,7 +740,7 @@ export const UndianNomorTampil: React.FC<UndianNomorTampilProps> = ({
                       <th className="py-3 px-4 w-12 text-center">No</th>
                       <th className="py-3 px-4">No. Registrasi</th>
                       <th className="py-3 px-4">Nama Lengkap Santri</th>
-                      <th className="py-3 px-4">Kemantren & Unit TPA</th>
+                      <th className="py-3 px-4">Rayon & Unit TPA</th>
                       <th className="py-3 px-4 text-center">Nomor Undian</th>
                       <th className="py-3 px-4 text-center">Status</th>
                     </tr>
@@ -779,11 +779,11 @@ export const UndianNomorTampil: React.FC<UndianNomorTampilProps> = ({
                             <td className="py-3.5 px-4">
                               <div className="font-bold text-slate-900">{p.fullName}</div>
                               <div className="text-[11px] text-slate-400 font-medium">
-                                {p.gender === 'L' ? '👦 Putra' : '🧕 Putri'} • Usia: {p.ageOnCutoff?.years || 0} Thn {p.ageOnCutoff?.months || 0} Bln
+                                {p.gender === 'L' ? 'Putra' : 'Putri'} • Usia: {p.ageOnCutoff?.years || 0} Thn {p.ageOnCutoff?.months || 0} Bln
                               </div>
                             </td>
                             <td className="py-3.5 px-4">
-                              <div className="font-semibold text-slate-800">Kemantren {kem}</div>
+                              <div className="font-semibold text-slate-800">Rayon {kem}</div>
                               <div className="text-[11px] text-slate-500">{p.tpaUnitName}</div>
                             </td>
                             <td className="py-3.5 px-4 text-center">

@@ -127,8 +127,8 @@ export function generateDummyParticipantsList(
     const tpaName = `${pickRandom(TPA_PREFIXES)} ${kemantren.name}`;
     const dummyId = `dummy-${timestamp}-${i + 1}`;
 
-    // Undian nomor tampil (acak 1 s.d. 14)
-    const lotteryNumber = (i % 14) + 1;
+    // Undian nomor tampil (default null agar diundi resmi melalui menu Undian Nomor Tampil)
+    const lotteryNumber = null;
     const nowIso = new Date().toISOString();
 
     participants.push({
@@ -151,7 +151,7 @@ export function generateDummyParticipantsList(
       whatsappNumber: kemantren.contactPerson,
       status: 'verified',
       attendance: 'belum_hadir',
-      lotteryNumber,
+      lotteryNumber: null,
       scoreJury1: undefined,
       scoreJury2: undefined,
       scoreJury3: undefined,
