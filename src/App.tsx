@@ -33,6 +33,7 @@ import {
   clearSession,
   logAuditEvent,
   getStoredSettings,
+  saveSettings,
   saveBeritaAcaraList,
   saveKemantren,
   getStoredKemantren,
@@ -48,6 +49,8 @@ import {
   syncKemantrenToSupabase,
   upsertParticipantToSupabase,
   bulkSyncParticipantsToSupabase,
+  fetchSettingsFromSupabase,
+  subscribeToSettingsRealtime,
 } from './lib/supabase';
 import { showToast, showConfirmDialog } from './utils/sweetalert';
 import { AppRoute, getCurrentRouteFromURL, navigateToRoute } from './utils/router';
@@ -193,9 +196,17 @@ export default function App() {
     let unsubscribeParticipants: (() => void) | null = null;
     let unsubscribeBeritaAcara: (() => void) | null = null;
     let unsubscribeKemantren: (() => void) | null = null;
+    let unsubscribeSettings: (() => void) | null = null;
 
     // Jika Supabase aktif, lakukan sinkronisasi awal dan subscribe realtime
     if (isSupabaseConfigured()) {
+      fetchSettingsFromSupabase().then((remoteSettings) => {
+        if (remoteSettings) {
+          saveSettings(remoteSettings);
+          setSettings(remoteSettings);
+        }
+      });
+
       fetchParticipantsFromSupabase().then((remoteData) => {
         if (remoteData !== null) {
           setParticipants(remoteData);
@@ -235,6 +246,11 @@ export default function App() {
       unsubscribeKemantren = subscribeToKemantrenRealtime((updatedKemantren) => {
         saveKemantren(updatedKemantren);
       });
+
+      unsubscribeSettings = subscribeToSettingsRealtime((updatedSettings) => {
+        saveSettings(updatedSettings);
+        setSettings(updatedSettings);
+      });
     }
 
     // Initial URL Routing sync
@@ -259,6 +275,7 @@ export default function App() {
       if (unsubscribeParticipants) unsubscribeParticipants();
       if (unsubscribeBeritaAcara) unsubscribeBeritaAcara();
       if (unsubscribeKemantren) unsubscribeKemantren();
+      if (unsubscribeSettings) unsubscribeSettings();
     };
   }, []);
 

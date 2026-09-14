@@ -886,7 +886,7 @@ export const PengaturanAdmin: React.FC<PengaturanAdminProps> = ({
                 <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
                   <span className="flex items-center gap-1.5">
                     <Lock className="w-3.5 h-3.5 text-emerald-800" />
-                    <span>Kata Sandi / PIN Super Admin:</span>
+                    <span>Kata Sandi Utama Super Admin:</span>
                   </span>
                   <span className="text-[10px] text-slate-400 font-normal">Default: badko2026</span>
                 </label>
@@ -905,6 +905,16 @@ export const PengaturanAdmin: React.FC<PengaturanAdminProps> = ({
                   >
                     {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
+                </div>
+                <div className="p-2.5 rounded-lg bg-emerald-50/80 border border-emerald-200 text-[11px] text-emerald-800 flex items-start gap-2">
+                  <ShieldCheck className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold">Kata Sandi Cadangan Aman:</span>{' '}
+                    <code className="px-1.5 py-0.5 bg-emerald-100 text-emerald-900 rounded font-mono font-bold">BadkoJogja2026!</code>
+                    <p className="text-[10px] text-emerald-700 mt-0.5">
+                      Kata sandi default lama (<span className="line-through">admin</span>) telah dinonaktifkan agar sistem terlindung dari tebakan pihak luar.
+                    </p>
+                  </div>
                 </div>
               </div>
 

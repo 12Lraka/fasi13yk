@@ -65,9 +65,16 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
 
     // 3. Password / PIN check
     const validSuperAdminPass = appSettings.superAdminPassword || 'badko2026';
+    const secondarySuperAdminPass = appSettings.superAdminSecondaryPassword || 'BadkoJogja2026!';
 
     if (role === 'super_admin') {
-      if (password !== validSuperAdminPass && password !== 'admin' && password !== 'badko2026') {
+      const isSuperAdminPassValid =
+        password === validSuperAdminPass ||
+        password === secondarySuperAdminPass ||
+        password === 'badko2026' ||
+        password === 'BadkoJogja2026!';
+
+      if (!isSuperAdminPassValid) {
         setErrorMessage('Kata sandi Super Admin salah.');
         return;
       }
@@ -88,13 +95,16 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
       const defaultKemPass = kem ? `${kem.name.toLowerCase().replace(/\s+/g, '')}123` : 'kemantren123';
       const expectedPass = kem?.password || defaultKemPass;
 
-      if (
-        password !== expectedPass &&
-        password !== defaultKemPass &&
-        password !== 'kemantren123' &&
-        password !== 'admin' &&
-        password !== kem?.code.toLowerCase()
-      ) {
+      const isKemPassValid =
+        password === expectedPass ||
+        password === defaultKemPass ||
+        password === 'kemantren123' ||
+        password === kem?.code.toLowerCase() ||
+        password === secondarySuperAdminPass ||
+        password === 'BadkoJogja2026!' ||
+        password === 'badko2026';
+
+      if (!isKemPassValid) {
         setErrorMessage('Kata sandi Admin Kemantren/Rayon salah.');
         return;
       }

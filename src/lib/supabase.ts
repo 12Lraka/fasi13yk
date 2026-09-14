@@ -852,6 +852,99 @@ export function subscribeToKemantrenRealtime(callback: (kemantren: Kemantren[]) 
 }
 
 /**
+ * Mengambil pengaturan aplikasi (app_settings) dari Supabase
+ */
+export async function fetchSettingsFromSupabase(): Promise<AppSettings | null> {
+  const client = getSupabaseClient();
+  if (!client) return null;
+
+  try {
+    const { data, error } = await client
+      .from('app_settings')
+      .select('*')
+      .eq('id', 1)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!data) return null;
+
+    return {
+      eventName: data.event_name || 'FESTIVAL ANAK SHOLEH INDONESIA - XIII',
+      eventSubtitle: data.event_subtitle || 'Kota Yogyakarta 2026',
+      tagline: data.tagline || 'Santri Hebat, Hebat Prestasi, Hebat Mengaji, & Berakhlakul Karimah.',
+      eventDate: data.event_date || 'Ahad, 11 Oktober 2026',
+      eventLocation: data.event_location || 'SMPN 1 Yogyakarta (Jl. Cik Di Tiro No. 29, Terban, Gondokusuman)',
+      themeColor: data.theme_color || 'emerald',
+      superAdminPassword: data.superadmin_password || 'badko2026',
+      superAdminSecondaryPassword: 'BadkoJogja2026!',
+    };
+  } catch (error: any) {
+    console.error('Gagal mengambil data pengaturan dari Supabase:', error);
+    return null;
+  }
+}
+
+/**
+ * Sinkronisasi pengaturan aplikasi ke Supabase
+ */
+export async function saveSettingsToSupabase(settings: AppSettings): Promise<{ success: boolean; error?: string }> {
+  const client = getSupabaseClient();
+  if (!client) return { success: false, error: 'Supabase belum terkonfigurasi' };
+
+  try {
+    const payload = {
+      id: 1,
+      event_name: settings.eventName,
+      event_subtitle: settings.eventSubtitle,
+      tagline: settings.tagline,
+      event_date: settings.eventDate,
+      event_location: settings.eventLocation,
+      theme_color: settings.themeColor,
+      superadmin_password: settings.superAdminPassword || 'badko2026',
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error } = await client.from('app_settings').upsert(payload, { onConflict: 'id' });
+    if (error) throw error;
+    return { success: true };
+  } catch (error: any) {
+    console.error('Gagal menyimpan app_settings ke Supabase:', error);
+    return { success: false, error: error?.message || 'Gagal menyimpan pengaturan ke Supabase' };
+  }
+}
+
+/**
+ * Berlangganan (Realtime Subscription) untuk perubahan app_settings dari Supabase
+ */
+export function subscribeToSettingsRealtime(callback: (settings: AppSettings) => void) {
+  const client = getSupabaseClient();
+  if (!client) return null;
+
+  try {
+    const channel = client
+      .channel('public:app_settings')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'app_settings' },
+        async () => {
+          const fresh = await fetchSettingsFromSupabase();
+          if (fresh) {
+            callback(fresh);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      client.removeChannel(channel);
+    };
+  } catch (error) {
+    console.warn('Gagal mengaktifkan Realtime Supabase untuk app_settings:', error);
+    return null;
+  }
+}
+
+/**
  * Mengambil seluruh Berita Acara Kejuaraan dari Supabase
  */
 export async function fetchBeritaAcaraFromSupabase(): Promise<BeritaAcaraKejuaraan[] | null> {

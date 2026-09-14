@@ -34,6 +34,7 @@ import {
   fetchCommitteesFromSupabase,
   upsertCommitteeToSupabase,
   deleteCommitteeFromSupabase,
+  saveSettingsToSupabase,
 } from '../lib/supabase';
 
 const PARTICIPANTS_KEY = 'fasi13_participants_data';
@@ -55,6 +56,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   eventLocation: 'SMPN 1 Yogyakarta (Jl. Cik Di Tiro No. 29, Terban, Gondokusuman)',
   themeColor: 'emerald',
   publishResultsToRayon: false,
+  superAdminPassword: 'badko2026',
+  superAdminSecondaryPassword: 'BadkoJogja2026!',
 };
 
 /**
@@ -78,6 +81,11 @@ export function saveSettings(settings: AppSettings): void {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('fasi_settings_updated', { detail: settings }));
+    }
+    if (isSupabaseConfigured()) {
+      saveSettingsToSupabase(settings).catch((e) => {
+        console.warn('Sync app_settings to Supabase warning:', e);
+      });
     }
   } catch (err) {
     console.error('Gagal menyimpan pengaturan:', err);
