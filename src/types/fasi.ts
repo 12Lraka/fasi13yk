@@ -69,7 +69,7 @@ export interface AppSettings {
   eventSubtitle: string;
   eventDate: string;
   eventLocation: string;
-  themeColor: 'emerald' | 'islamic-green' | 'teal' | 'sapphire' | 'maroon' | 'gold';
+  themeColor: 'emerald' | 'islamic-green' | 'teal' | 'sapphire' | 'maroon' | 'gold' | 'midnight-slate' | 'royal-violet';
   customAccentColor?: string;
   superAdminPassword?: string;
   superAdminSecondaryPassword?: string;

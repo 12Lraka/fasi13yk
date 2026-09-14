@@ -1172,6 +1172,52 @@ export const PengaturanAdmin: React.FC<PengaturanAdminProps> = ({
                 Nuansa Emas Klasik Yogyakarta
               </div>
             </div>
+
+            {/* Midnight Slate Modern */}
+            <div
+              onClick={() => handleSelectTheme('midnight-slate')}
+              className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${
+                settings.themeColor === 'midnight-slate'
+                  ? 'border-slate-800 bg-slate-100 shadow-md scale-[1.02]'
+                  : 'border-slate-200 hover:border-slate-400'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-5 rounded-full bg-slate-900"></div>
+                  <span className="font-bold text-xs text-slate-900">Midnight Slate Modern</span>
+                </div>
+                {settings.themeColor === 'midnight-slate' && (
+                  <CheckCircle2 className="w-4 h-4 text-slate-900" />
+                )}
+              </div>
+              <div className="h-10 rounded-xl bg-gradient-to-r from-slate-950 via-slate-800 to-sky-400 flex items-center justify-center text-white text-[10px] font-bold">
+                Nuansa Monokrom & Sky Blue Bersih
+              </div>
+            </div>
+
+            {/* Royal Amethyst Violet */}
+            <div
+              onClick={() => handleSelectTheme('royal-violet')}
+              className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${
+                settings.themeColor === 'royal-violet'
+                  ? 'border-purple-700 bg-purple-50/50 shadow-md scale-[1.02]'
+                  : 'border-slate-200 hover:border-purple-400'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-5 rounded-full bg-purple-800"></div>
+                  <span className="font-bold text-xs text-slate-900">Royal Amethyst Violet</span>
+                </div>
+                {settings.themeColor === 'royal-violet' && (
+                  <CheckCircle2 className="w-4 h-4 text-purple-700" />
+                )}
+              </div>
+              <div className="h-10 rounded-xl bg-gradient-to-r from-indigo-950 via-purple-900 to-amber-400 flex items-center justify-center text-white text-[10px] font-bold">
+                Nuansa Ungu Mewah & Emas Lembut
+              </div>
+            </div>
           </div>
         </div>
       )}
