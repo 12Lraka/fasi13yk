@@ -489,7 +489,7 @@ export const RekapCabangLombaAdmin: React.FC<RekapCabangLombaAdminProps> = ({
                         </span>
                       </td>
                       <td className="py-2 px-3 border border-slate-300 text-slate-800">
-                        <div className="font-bold text-slate-900">Kem. {kem?.name || p.kemantrenId}</div>
+                        <div className="font-bold text-slate-900">Rayon {kem?.name || p.kemantrenId}</div>
                         {p.tpaUnitName && (
                           <div className="text-[10px] text-slate-600 font-medium">{p.tpaUnitName}</div>
                         )}

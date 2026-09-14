@@ -177,7 +177,7 @@ export const RekapPesertaAdmin: React.FC<RekapPesertaAdminProps> = ({
               <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-900 border border-emerald-300 font-extrabold text-[10px] uppercase tracking-wider rounded-md">
                 {isKemantrenAdmin ? `Wilayah Kemantren ${currentKemantrenObj?.name || ''}` : 'BADKO TKA-TPA KOTA YOGYAKARTA'}
               </span>
-              <span className="text-xs text-slate-500 font-medium">Buku Induk & Rekapitulasi</span>
+              <span className="text-xs text-slate-500 font-medium">Rekapitulasi Peserta</span>
             </div>
             <h2 className="text-xl font-extrabold text-slate-900 mt-1">
               Daftar Peserta {isKemantrenAdmin ? `Kemantren ${currentKemantrenObj?.name || ''}` : 'FASI XIII'}
@@ -235,7 +235,7 @@ export const RekapPesertaAdmin: React.FC<RekapPesertaAdminProps> = ({
           <div className="pt-2 border-t border-slate-100">
             <div className="text-[11px] font-bold text-slate-500 mb-2 flex items-center gap-1.5">
               <Building2 className="w-3.5 h-3.5 text-emerald-700" />
-              <span>Filter Cepat Kemantren (14 Wilayah):</span>
+              <span>Filter Cepat Rayon (14 Wilayah):</span>
             </div>
             <div className="flex flex-wrap gap-1.5">
               {kemantrenDistribution.map((k) => (
@@ -299,11 +299,11 @@ export const RekapPesertaAdmin: React.FC<RekapPesertaAdminProps> = ({
             >
               {isKemantrenAdmin ? (
                 <option value={session.kemantrenId || ''}>
-                  Kemantren {currentKemantrenObj?.name}
+                  Rayon {currentKemantrenObj?.name}
                 </option>
               ) : (
                 <>
-                  <option value="ALL">Semua Kemantren (14)</option>
+                  <option value="ALL">Semua Rayon (14)</option>
                   {kemantrenList.map((k) => (
                     <option key={k.id} value={k.id}>
                       {k.name} ({k.code})
@@ -445,8 +445,8 @@ export const RekapPesertaAdmin: React.FC<RekapPesertaAdminProps> = ({
           </h4>
           <p className="text-[11px] font-bold text-slate-700 uppercase tracking-wider mt-1">
             {selectedKemantren !== 'ALL'
-              ? `KONTINGEN KEMANTREN ${getKem(selectedKemantren)?.name.toUpperCase()}`
-              : 'GABUNGAN SELURUH 14 KEMANTREN KOTA YOGYAKARTA'}
+              ? `KONTINGEN RAYON ${getKem(selectedKemantren)?.name.toUpperCase()}`
+              : 'GABUNGAN SELURUH 14 RAYON KOTA YOGYAKARTA'}
           </p>
         </div>
 
@@ -461,7 +461,7 @@ export const RekapPesertaAdmin: React.FC<RekapPesertaAdminProps> = ({
                 <th className="py-2.5 px-2 border border-slate-300 w-28">No Registrasi</th>
                 <th className="py-2.5 px-3 border border-slate-300">Nama lengkap</th>
                 <th className="py-2.5 px-2 border border-slate-300 text-center w-12">L/P</th>
-                <th className="py-2.5 px-3 border border-slate-300">Kemantren dan Asal TPA</th>
+                <th className="py-2.5 px-3 border border-slate-300">Rayon dan Asal TPA</th>
                 <th className="py-2.5 px-3 border border-slate-300">Cabang Lomba</th>
                 <th className="py-2.5 px-2 border border-slate-300 text-center w-20">Kehadiran</th>
               </tr>
@@ -501,7 +501,7 @@ export const RekapPesertaAdmin: React.FC<RekapPesertaAdminProps> = ({
                         </span>
                       </td>
                       <td className="py-2 px-3 border border-slate-300 text-slate-800">
-                        <div className="font-bold text-slate-900">Kemantren {kem?.name || p.kemantrenId}</div>
+                        <div className="font-bold text-slate-900">Rayon {kem?.name || p.kemantrenId}</div>
                         <div className="text-[10px] text-slate-600 font-medium">{p.tpaUnitName || '-'}</div>
                       </td>
                       <td className="py-2 px-3 border border-slate-300">
