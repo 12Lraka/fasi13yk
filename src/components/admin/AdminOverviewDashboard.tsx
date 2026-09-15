@@ -126,7 +126,7 @@ export const AdminOverviewDashboard: React.FC<AdminOverviewDashboardProps> = ({
           <div className="space-y-1.5 max-w-2xl">
             <div className="flex flex-wrap items-center gap-2">
               <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-amber-400 text-emerald-950 uppercase tracking-wider shadow-xs">
-                {isSuperAdmin ? 'Pusat FASI XIII Kota Yogyakarta' : `Rayon Kemantren ${currentKemantren?.name || ''}`}
+                {isSuperAdmin ? 'Pusat FASI XIII Kota Yogyakarta' : `Rayon ${currentKemantren?.name || ''}`}
               </span>
               <span className="flex items-center gap-1 text-xs text-emerald-200 bg-emerald-800/60 px-2.5 py-0.5 rounded-full border border-emerald-600/40">
                 <Calendar className="w-3.5 h-3.5 text-amber-300" />
@@ -139,8 +139,8 @@ export const AdminOverviewDashboard: React.FC<AdminOverviewDashboardProps> = ({
             </h1>
             <p className="text-xs sm:text-sm text-emerald-100/90 leading-relaxed">
               {isSuperAdmin
-                ? 'Pantau progres pendaftaran santri 14 Kemantren, kesiapan berkas kafilah, dan statistik cabang lomba se-Kota Yogyakarta secara real-time.'
-                : `Panel statistik dan kesiapan kafilah santri Kemantren ${currentKemantren?.name}. Pastikan seluruh kuota cabang lomba terisi maksimal.`}
+                ? 'Pantau progres pendaftaran santri 14 Rayon, kesiapan berkas kafilah, dan statistik cabang lomba se-Kota Yogyakarta secara real-time.'
+                : `Panel statistik dan kesiapan kafilah santri Rayon ${currentKemantren?.name}. Pastikan seluruh kuota cabang lomba terisi maksimal.`}
             </p>
           </div>
 

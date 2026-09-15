@@ -663,17 +663,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <div>
                 <div className="flex items-center gap-2">
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-400 text-emerald-950 uppercase tracking-wider">
-                    {session.role === 'super_admin' ? 'Pusat FASI XIII Kota' : `Wilayah Kemantren ${currentKemantren?.name || ''}`}
+                    {session.role === 'super_admin' ? 'Pusat FASI XIII Kota' : `Wilayah Rayon ${currentKemantren?.name || ''}`}
                   </span>
                   <span className="text-xs text-emerald-300">
                     {appSettings.eventDate}
                   </span>
                 </div>
                 <h2 className="text-lg sm:text-xl font-bold tracking-tight mt-1">
-                  Data Santri & Penilaian {appSettings.eventName}
+                  Data Santri {appSettings.eventName}
                 </h2>
                 <p className="text-xs text-emerald-200 mt-0.5">
-                  Kelola data pendaftaran, presensi QR, nomor undian, dan rekapitulasi poin kejuaraan.
+                  Kelola data pendaftaran, presensi QR, nomor undian.
                 </p>
               </div>
 
@@ -721,7 +721,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       onChange={(e) => setSelectedKemantrenFilter(e.target.value)}
                       className="w-full py-2 px-3 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:bg-white focus:outline-none cursor-pointer"
                     >
-                      <option value="ALL">Semua Kemantren (14)</option>
+                      <option value="ALL">Semua Rayon (14)</option>
                       {kemantrenList.map((k) => (
                         <option key={k.id} value={k.id}>
                           {k.name} ({k.code})
@@ -732,7 +732,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 ) : (
                   <div className="sm:col-span-3">
                     <div className="w-full py-2 px-3 text-xs bg-slate-100 border border-slate-200 rounded-xl text-slate-700 font-medium truncate">
-                      Wilayah: Kemantren {currentKemantren?.name}
+                      Wilayah: Rayon {currentKemantren?.name}
                     </div>
                   </div>
                 )}
@@ -786,7 +786,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <th className="py-3 px-3 text-center w-12">No</th>
                       <th className="py-3 px-3">No. Registrasi</th>
                       <th className="py-3 px-3">Nama Santri</th>
-                      <th className="py-3 px-3">Kemantren / Unit TPA</th>
+                      <th className="py-3 px-3">Rayon / Unit TPA</th>
                       <th className="py-3 px-3">Cabang Lomba</th>
                       <th className="py-3 px-3 text-center">No. Undian</th>
                       <th className="py-3 px-3 text-center">Kehadiran</th>
@@ -846,7 +846,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             {/* Kemantren & TPA */}
                             <td className="py-3 px-3">
                               <div className="font-semibold text-slate-800">
-                                Kemantren {kem?.name || participant.kemantrenId}
+                                Rayon {kem?.name || participant.kemantrenId}
                               </div>
                               <div className="text-[11px] text-slate-500 truncate max-w-[150px]">
                                 {participant.tpaUnitName}
