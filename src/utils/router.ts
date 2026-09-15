@@ -18,6 +18,7 @@ export type AppRoute =
   | 'admin-data-peserta'
   | 'admin-rekap-peserta'
   | 'admin-rekapcbg-lomba'
+  | 'admin-form-peserta'
   | 'hasil-cabang'
   | 'berita-acara'
   | 'superadmin'
@@ -49,6 +50,9 @@ export const ROUTE_PATH_MAP: Record<string, AppRoute> = {
   '/admin/overview': 'admin-dashboard',
   '/admin/data-peserta': 'admin-data-peserta',
   '/admin/peserta': 'admin-data-peserta',
+  '/admin/form-peserta': 'admin-form-peserta',
+  '/admin/tambah-peserta': 'admin-form-peserta',
+  '/admin/input-peserta': 'admin-form-peserta',
   '/admin/rekap-peserta': 'admin-rekap-peserta',
   '/admin/rekapcbg-lomba': 'admin-rekapcbg-lomba',
   '/admin/rekap-cabang': 'admin-rekapcbg-lomba',
@@ -106,6 +110,7 @@ export const CANONICAL_PATH_MAP: Record<AppRoute, string> = {
   admin: '/admin/dashboard',
   'admin-dashboard': '/admin/dashboard',
   'admin-data-peserta': '/admin/data-peserta',
+  'admin-form-peserta': '/admin/form-peserta',
   'admin-rekap-peserta': '/admin/rekap-peserta',
   'admin-rekapcbg-lomba': '/admin/rekapcbg-lomba',
   'hasil-cabang': '/admin/hasil-cabang',

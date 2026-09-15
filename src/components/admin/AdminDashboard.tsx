@@ -37,6 +37,7 @@ import {
   Lock,
   LayoutDashboard,
   Trophy,
+  Maximize2,
 } from 'lucide-react';
 import { Participant, UserSession, Kemantren, AppSettings } from '../../types/fasi';
 import {
@@ -352,6 +353,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               }`}
             >
               {visibleParticipants.length}
+            </span>
+          </button>
+
+          {/* Form Pendaftaran Halaman Penuh Tab (A/B Testing Pembanding Modal) */}
+          <button
+            onClick={() => {
+              if (onNavigateRoute) {
+                onNavigateRoute('admin-form-peserta');
+              }
+            }}
+            className="w-full px-3 py-2 font-bold rounded-xl flex items-center justify-between transition-all cursor-pointer text-left text-slate-700 hover:text-emerald-900 hover:bg-slate-100"
+          >
+            <div className="flex items-center gap-2">
+              <Maximize2 className="w-4 h-4 shrink-0 text-emerald-600" />
+              <span>Input Peserta</span>
+            </div>
+            <span className="px-1.5 py-0.2 bg-emerald-100 text-emerald-800 text-[9px] font-extrabold rounded">
+              Baru
             </span>
           </button>
 
@@ -671,6 +690,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <button
                   onClick={onOpenAddModal}
                   className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-emerald-950 font-bold text-xs rounded-xl shadow-sm flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer whitespace-nowrap"
+                  title="Buka formulir pendaftaran santri baru FASI XIII"
                 >
                   <UserPlus className="w-4 h-4" />
                   <span>+ Daftarkan Santri</span>

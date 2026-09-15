@@ -16,7 +16,7 @@ import { LocationMap } from './components/public/LocationMap';
 import { AgeCalculatorModal } from './components/public/AgeCalculatorModal';
 import { AdminLoginModal } from './components/admin/AdminLoginModal';
 import { AdminDashboard } from './components/admin/AdminDashboard';
-import { ParticipantFormModal } from './components/admin/ParticipantFormModal';
+import { ParticipantFormPage } from './components/admin/ParticipantFormPage';
 import { LotteryDrawModal } from './components/admin/LotteryDrawModal';
 import { UndianNomorTampil } from './components/admin/UndianNomorTampil';
 import { JudgingModal } from './components/admin/JudgingModal';
@@ -52,7 +52,7 @@ import {
   fetchSettingsFromSupabase,
   subscribeToSettingsRealtime,
 } from './lib/supabase';
-import { showToast, showConfirmDialog } from './utils/sweetalert';
+import { showToast, showConfirmDialog, showErrorAlert } from './utils/sweetalert';
 import { AppRoute, getCurrentRouteFromURL, navigateToRoute } from './utils/router';
 import { getThemeConfig } from './utils/theme';
 import { AppSettings } from './types/fasi';
@@ -67,7 +67,6 @@ export default function App() {
   // Modals
   const [isAgeCalcOpen, setIsAgeCalcOpen] = useState<boolean>(false);
   const [isLoginOpen, setIsLoginOpen] = useState<boolean>(false);
-  const [isFormModalOpen, setIsFormModalOpen] = useState<boolean>(false);
   const [editingParticipant, setEditingParticipant] = useState<Participant | null>(null);
   const [isLotteryModalOpen, setIsLotteryModalOpen] = useState<boolean>(false);
   const [isJudgingModalOpen, setIsJudgingModalOpen] = useState<boolean>(false);
@@ -120,6 +119,7 @@ export default function App() {
       route === 'admin' ||
       route === 'admin-dashboard' ||
       route === 'admin-data-peserta' ||
+      route === 'admin-form-peserta' ||
       route === 'admin-rekap-peserta' ||
       route === 'admin-rekapcbg-lomba' ||
       route === 'hasil-cabang' ||
@@ -288,7 +288,19 @@ export default function App() {
     saveParticipants(newList);
   };
 
-  const handleSaveParticipant = (savedParticipant: Participant) => {
+  const handleSaveParticipant = async (savedParticipant: Participant): Promise<{ success: boolean; error?: string }> => {
+    // 1. Simpan langsung ke database Supabase jika kredensial aktif
+    if (isSupabaseConfigured()) {
+      const res = await upsertParticipantToSupabase(savedParticipant);
+      if (!res.success) {
+        showErrorAlert(
+          'Gagal Menyimpan ke Supabase',
+          `Data santri gagal tersimpan ke database cloud Supabase: ${res.error || 'Terjadi gangguan koneksi atau masalah izin RLS'}.`
+        );
+        return res;
+      }
+    }
+
     const exists = participants.some((p) => p.id === savedParticipant.id);
     let updated: Participant[];
 
@@ -297,35 +309,37 @@ export default function App() {
       logAuditEvent(
         session?.name || 'ADMIN',
         'UPDATE_SANTRI',
-        `Memperbarui data santri ${savedParticipant.fullName} (${savedParticipant.registrationNumber}).`
+        `Memperbarui data santri ${savedParticipant.fullName} (${savedParticipant.registrationNumber}) di ${isSupabaseConfigured() ? 'database Supabase' : 'sistem'}.`
       );
     } else {
       updated = [savedParticipant, ...participants];
       logAuditEvent(
         session?.name || 'ADMIN',
         'TAMBAH_SANTRI',
-        `Mendaftarkan santri baru ${savedParticipant.fullName} (${savedParticipant.registrationNumber}) ke sistem.`
+        `Mendaftarkan santri baru ${savedParticipant.fullName} (${savedParticipant.registrationNumber}) ke ${isSupabaseConfigured() ? 'database Supabase' : 'sistem'}.`
       );
     }
 
     handleUpdateParticipants(updated);
-
-    if (isSupabaseConfigured()) {
-      upsertParticipantToSupabase(savedParticipant).catch((err) =>
-        console.warn('Gagal menyimpan santri ke Supabase:', err)
-      );
-    }
+    return { success: true };
   };
 
-  const handleSaveMultipleParticipants = (newBatch: Participant[]) => {
+  const handleSaveMultipleParticipants = async (newBatch: Participant[]): Promise<{ success: boolean; error?: string }> => {
+    // Simpan batch langsung ke database Supabase
+    if (isSupabaseConfigured()) {
+      const res = await bulkSyncParticipantsToSupabase(newBatch);
+      if (!res.success) {
+        showErrorAlert(
+          'Gagal Menyimpan Batch ke Supabase',
+          `Data antrian santri gagal tersimpan ke database cloud Supabase: ${res.error || 'Terjadi kendala koneksi atau policy RLS'}.`
+        );
+        return res;
+      }
+    }
+
     const updated = [...newBatch, ...participants];
     handleUpdateParticipants(updated);
-
-    if (isSupabaseConfigured()) {
-      bulkSyncParticipantsToSupabase(newBatch).catch((err) =>
-        console.warn('Gagal menyimpan batch santri ke Supabase:', err)
-      );
-    }
+    return { success: true };
   };
 
   const handleLoginSuccess = (newSession: UserSession) => {
@@ -355,12 +369,12 @@ export default function App() {
 
   const handleOpenEdit = (p: Participant) => {
     setEditingParticipant(p);
-    setIsFormModalOpen(true);
+    handleNavigate('admin-form-peserta');
   };
 
   const handleOpenAdd = () => {
     setEditingParticipant(null);
-    setIsFormModalOpen(true);
+    handleNavigate('admin-form-peserta');
   };
 
   const handleOpenJudging = (p: Participant) => {
@@ -465,6 +479,20 @@ export default function App() {
             />
           )}
 
+        {activeTab === 'admin-form-peserta' && session && (
+          <ParticipantFormPage
+            session={session}
+            allParticipants={participants}
+            onSave={handleSaveParticipant}
+            onSaveMultiple={handleSaveMultipleParticipants}
+            editingParticipant={editingParticipant}
+            onBack={() => {
+              setEditingParticipant(null);
+              handleNavigate('admin-data-peserta');
+            }}
+          />
+        )}
+
         {activeTab === 'undian' && session && session.role === 'super_admin' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -517,19 +545,6 @@ export default function App() {
 
       {session && (
         <>
-          <ParticipantFormModal
-            isOpen={isFormModalOpen}
-            onClose={() => {
-              setIsFormModalOpen(false);
-              setEditingParticipant(null);
-            }}
-            onSave={handleSaveParticipant}
-            onSaveMultiple={handleSaveMultipleParticipants}
-            editingParticipant={editingParticipant}
-            session={session}
-            allParticipants={participants}
-          />
-
           {session.role === 'super_admin' && (
             <>
               <LotteryDrawModal
