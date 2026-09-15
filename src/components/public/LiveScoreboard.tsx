@@ -29,8 +29,6 @@ interface RayonTally {
   emas: number; // Juara 1
   perak: number; // Juara 2
   perunggu: number; // Juara 3
-  harapan1: number;
-  harapan2: number;
   totalPoin: number;
   rank: number;
 }
@@ -75,8 +73,6 @@ export const LiveScoreboard: React.FC<LiveScoreboardProps> = ({ participants, se
         emas: 0,
         perak: 0,
         perunggu: 0,
-        harapan1: 0,
-        harapan2: 0,
         totalPoin: 0,
         rank: 1,
       };
@@ -117,16 +113,6 @@ export const LiveScoreboard: React.FC<LiveScoreboardProps> = ({ participants, se
       if (t3) {
         t3.perunggu += 1;
         t3.totalPoin += p3;
-      }
-
-      const th1 = findTally(p.harapan1?.kemantren);
-      if (th1) {
-        th1.harapan1 += 1;
-      }
-
-      const th2 = findTally(p.harapan2?.kemantren);
-      if (th2) {
-        th2.harapan2 += 1;
       }
     });
 
@@ -377,7 +363,6 @@ export const LiveScoreboard: React.FC<LiveScoreboardProps> = ({ participants, se
                   <th className="py-3.5 px-4 text-center bg-amber-50/70 text-amber-950 font-bold w-24">🥇 Juara I</th>
                   <th className="py-3.5 px-4 text-center bg-slate-100/70 text-slate-800 font-bold w-24">🥈 Juara II</th>
                   <th className="py-3.5 px-4 text-center bg-amber-900/10 text-amber-950 font-bold w-24">🥉 Juara III</th>
-                  <th className="py-3.5 px-4 text-center w-28">Harapan 1 & 2</th>
                   <th className="py-3.5 px-4 text-center font-black bg-amber-100 text-slate-950 w-28">Total Poin</th>
                 </tr>
               </thead>
@@ -417,9 +402,6 @@ export const LiveScoreboard: React.FC<LiveScoreboardProps> = ({ participants, se
                     </td>
                     <td className="py-3 px-4 text-center font-bold text-amber-900 bg-amber-900/5">
                       {tally.perunggu}
-                    </td>
-                    <td className="py-3 px-4 text-center text-slate-500 font-mono">
-                      {tally.harapan1 + tally.harapan2}
                     </td>
                     <td className="py-3 px-4 text-center font-mono font-black text-slate-950 bg-amber-50 text-sm">
                       {tally.totalPoin}
