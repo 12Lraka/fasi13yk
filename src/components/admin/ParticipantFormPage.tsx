@@ -49,6 +49,7 @@ import {
   logAuditEvent,
   getStoredSettings,
   getStoredMasterTpa,
+  getStoredKemantren,
   persistMasterTpa,
   syncMasterTpaFromCloud,
   formatTpaName,
@@ -165,19 +166,26 @@ export const ParticipantFormPage: React.FC<ParticipantFormPageProps> = ({
       setSelectedTpaId(matched ? matched.id : 'CUSTOM');
     } else {
       // Form default
+      const defaultKemantrenId =
+        session?.role === 'kemantren_admin' && session?.kemantrenId
+          ? session.kemantrenId
+          : KEMANTREN_LIST[0]?.id || 'kem-1';
+
       setFullName('');
       setGender('L');
       setBirthDate('');
-      setKemantrenId(
-        session?.role === 'kemantren_admin' && session?.kemantrenId
-          ? session.kemantrenId
-          : KEMANTREN_LIST[0]?.id || 'kem-1'
-      );
+      setKemantrenId(defaultKemantrenId);
       setTpaUnitName('');
       setSelectedTpaId('');
       setCategoryId('');
-      setPjName('');
-      setWhatsappNumber('');
+
+      // Ambil PJ default dari data Rayon (Kemantren)
+      const kemantrenList = getStoredKemantren();
+      const currentKem = kemantrenList.find((k) => k.id === defaultKemantrenId) ||
+        KEMANTREN_LIST.find((k) => k.id === defaultKemantrenId);
+
+      setPjName(currentKem?.adminName || '');
+      setWhatsappNumber(currentKem?.contactPerson || '');
     }
     setFormError('');
     setEditingDraftId(null);
@@ -208,6 +216,23 @@ export const ParticipantFormPage: React.FC<ParticipantFormPageProps> = ({
     return masterTpaList.filter((t) => t.kemantrenId === kemantrenId);
   }, [masterTpaList, kemantrenId]);
 
+  // Helper ganti Rayon: otomatis tawarkan/isi PJ & Kontak resmi dari Rayon yang dipilih
+  const handleKemantrenChange = (newKid: string) => {
+    setKemantrenId(newKid);
+    setSelectedTpaId('');
+    setTpaUnitName('');
+
+    // Dapatkan data official PJ Rayon terpilih
+    const kemantrenList = getStoredKemantren();
+    const targetKem = kemantrenList.find((k) => k.id === newKid) ||
+      KEMANTREN_LIST.find((k) => k.id === newKid);
+
+    if (targetKem) {
+      setPjName(targetKem.adminName || '');
+      setWhatsappNumber(targetKem.contactPerson || '');
+    }
+  };
+
   const handleSelectMasterTpa = (tpaId: string) => {
     setSelectedTpaId(tpaId);
     if (!tpaId || tpaId === 'CUSTOM') {
@@ -216,12 +241,7 @@ export const ParticipantFormPage: React.FC<ParticipantFormPageProps> = ({
     const tpa = masterTpaList.find((t) => t.id === tpaId);
     if (tpa) {
       setTpaUnitName(tpa.namaTpa);
-      if (!pjName.trim() && tpa.namaDirektur) {
-        setPjName(tpa.namaDirektur);
-      }
-      if (!whatsappNumber.trim() && tpa.kontakDirektur) {
-        setWhatsappNumber(tpa.kontakDirektur);
-      }
+      // Nama PJ dan WhatsApp TIDAK menimpa PJ Rayon, karena PJ adalah official Rayon
     }
   };
 
@@ -1071,11 +1091,7 @@ export const ParticipantFormPage: React.FC<ParticipantFormPageProps> = ({
                   <select
                     disabled={session?.role === 'kemantren_admin'}
                     value={kemantrenId}
-                    onChange={(e) => {
-                      const newKid = e.target.value;
-                      setKemantrenId(newKid);
-                      setSelectedTpaId('');
-                    }}
+                    onChange={(e) => handleKemantrenChange(e.target.value)}
                     className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:bg-white focus:outline-none font-semibold text-slate-900 disabled:opacity-80"
                   >
                     {KEMANTREN_LIST.map((k) => (
@@ -1139,7 +1155,7 @@ export const ParticipantFormPage: React.FC<ParticipantFormPageProps> = ({
                       {selectedTpaId && selectedTpaId !== 'CUSTOM' ? (
                         <span className="text-emerald-700 font-semibold flex items-center gap-1">
                           <CheckCircle className="w-3 h-3 text-emerald-600 shrink-0" />
-                          <span>Terhubung Master TPA (Data nama & PJ otomatis terisi)</span>
+                          <span>Terhubung Master Data TPA Kota</span>
                         </span>
                       ) : (
                         'Auto-format aktif: Nama otomatis dilengkapi awalan "TPA " jika belum ada.'
@@ -1156,10 +1172,10 @@ export const ParticipantFormPage: React.FC<ParticipantFormPageProps> = ({
                             await persistMasterTpa({
                               id: newId,
                               namaTpa: formattedName,
-                              namaDirektur: pjName.trim(),
+                              namaDirektur: '',
                               kemantrenId: kemantrenId,
                               rayonName: matchedK?.name || 'Yogyakarta',
-                              kontakDirektur: whatsappNumber.trim() || undefined,
+                              kontakDirektur: undefined,
                             });
                             setTpaUnitName(formattedName);
                             setSelectedTpaId(newId);
@@ -1184,8 +1200,8 @@ export const ParticipantFormPage: React.FC<ParticipantFormPageProps> = ({
                     <Phone className="w-4 h-4" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-sm text-slate-900">4. Kontak Penanggung Jawab (PJ)</h3>
-                    <p className="text-[11px] text-slate-500">Untuk konfirmasi teknis & verifikasi panitia lomba.</p>
+                    <h3 className="font-bold text-sm text-slate-900">4. Kontak Penanggung Jawab Rayon (PJ Kontingen)</h3>
+                    <p className="text-[11px] text-slate-500">Official / Ustadz penanggung jawab dari Rayon (seragam untuk semua santri di rayon ini).</p>
                   </div>
                 </div>
 
@@ -1194,8 +1210,11 @@ export const ParticipantFormPage: React.FC<ParticipantFormPageProps> = ({
                   <div>
                     <div className="flex items-center justify-between mb-1">
                       <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                        Nama PJ / Ustadz <span className="text-rose-600">*</span>
+                        Nama PJ / Official Rayon <span className="text-rose-600">*</span>
                       </label>
+                      <span className="text-[10px] text-purple-700 font-semibold bg-purple-50 px-1.5 py-0.5 rounded">
+                        PJ Kontingen Rayon
+                      </span>
                     </div>
                     <input
                       type="text"
@@ -1205,14 +1224,14 @@ export const ParticipantFormPage: React.FC<ParticipantFormPageProps> = ({
                       placeholder="Ust. Hasan Basri"
                       className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:bg-white focus:outline-none text-slate-900"
                     />
-                    <p className="text-[10px] text-slate-400 mt-1">Ustadz/ah pendamping unit</p>
+                    <p className="text-[10px] text-slate-400 mt-1">Otomatis terisi data official Rayon & dapat disesuaikan.</p>
                   </div>
 
                   {/* Nomor WA PJ */}
                   <div>
                     <div className="flex items-center justify-between mb-1">
                       <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                        No. WhatsApp PJ <span className="text-rose-600">*</span>
+                        No. WhatsApp PJ Rayon <span className="text-rose-600">*</span>
                       </label>
                       <span className="text-[10px] text-slate-400">Aktif WA</span>
                     </div>
@@ -1229,7 +1248,7 @@ export const ParticipantFormPage: React.FC<ParticipantFormPageProps> = ({
                         <Phone className="w-3.5 h-3.5" />
                       </div>
                     </div>
-                    <p className="text-[10px] text-slate-400 mt-1">Format: 08xxxxxxxxxx</p>
+                    <p className="text-[10px] text-slate-400 mt-1">Kontak WhatsApp perwakilan official Rayon</p>
                   </div>
                 </div>
 
