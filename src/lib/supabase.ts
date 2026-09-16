@@ -1329,7 +1329,6 @@ export async function fetchMasterTpaFromSupabase(): Promise<MasterTpa[]> {
         kemantrenId: kId,
         rayonName: rName,
         kontakDirektur: row.kontak_direktur ? String(row.kontak_direktur).trim() : undefined,
-        alamat: row.alamat ? String(row.alamat).trim() : undefined,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
       };
@@ -1368,7 +1367,6 @@ export async function upsertMasterTpaToSupabase(tpa: MasterTpa): Promise<{ succe
       kemantren_id: kId,
       rayon_name: rName || '',
       kontak_direktur: tpa.kontakDirektur?.trim() || null,
-      alamat: tpa.alamat?.trim() || null,
       updated_at: new Date().toISOString(),
     };
 
@@ -1419,7 +1417,6 @@ export async function bulkSyncMasterTpaToSupabase(tpaList: MasterTpa[]): Promise
         kemantren_id: kId,
         rayon_name: rName || '',
         kontak_direktur: tpa.kontakDirektur?.trim() || null,
-        alamat: tpa.alamat?.trim() || null,
         updated_at: new Date().toISOString(),
       };
     });

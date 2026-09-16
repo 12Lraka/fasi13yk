@@ -169,7 +169,6 @@ export function exportMasterTpaToExcel(
     'Wilayah Rayon',
     'Kode Rayon',
     'No. Kontak / WA',
-    'Alamat Lembaga',
   ];
 
   const dataRows = tpaList.map((tpa, idx) => {
@@ -181,7 +180,6 @@ export function exportMasterTpaToExcel(
       kem?.name || tpa.rayonName || 'Yogyakarta',
       kem?.code || '-',
       tpa.kontakDirektur || '-',
-      tpa.alamat || '-',
     ];
   });
 
@@ -195,7 +193,6 @@ export function exportMasterTpaToExcel(
     { wch: 20 }, // Rayon
     { wch: 12 }, // Kode
     { wch: 18 }, // No Kontak
-    { wch: 35 }, // Alamat
   ];
 
   const wb = XLSX.utils.book_new();

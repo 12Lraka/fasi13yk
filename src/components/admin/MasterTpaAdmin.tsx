@@ -53,7 +53,6 @@ export const MasterTpaAdmin: React.FC<MasterTpaAdminProps> = ({ session }) => {
   const [formNamaDirektur, setFormNamaDirektur] = useState('');
   const [formKemantrenId, setFormKemantrenId] = useState(currentKemantrenId || 'kem-6');
   const [formKontakDirektur, setFormKontakDirektur] = useState('');
-  const [formAlamat, setFormAlamat] = useState('');
 
   // Modal State Impor Massal / Copy-Paste
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -133,7 +132,6 @@ export const MasterTpaAdmin: React.FC<MasterTpaAdminProps> = ({ session }) => {
     setFormNamaDirektur('');
     setFormKemantrenId(currentKemantrenId || 'kem-6');
     setFormKontakDirektur('');
-    setFormAlamat('');
     setIsModalOpen(true);
   };
 
@@ -144,7 +142,6 @@ export const MasterTpaAdmin: React.FC<MasterTpaAdminProps> = ({ session }) => {
     setFormNamaDirektur(tpa.namaDirektur);
     setFormKemantrenId(tpa.kemantrenId || currentKemantrenId || 'kem-6');
     setFormKontakDirektur(tpa.kontakDirektur || '');
-    setFormAlamat(tpa.alamat || '');
     setIsModalOpen(true);
   };
 
@@ -167,7 +164,6 @@ export const MasterTpaAdmin: React.FC<MasterTpaAdminProps> = ({ session }) => {
       kemantrenId: formKemantrenId,
       rayonName: targetRayonName,
       kontakDirektur: formKontakDirektur.trim() || undefined,
-      alamat: formAlamat.trim() || undefined,
     };
 
     setIsSaving(true);
@@ -511,11 +507,6 @@ export const MasterTpaAdmin: React.FC<MasterTpaAdminProps> = ({ session }) => {
                           <Building2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                           <span>{tpa.namaTpa}</span>
                         </div>
-                        {tpa.alamat && (
-                          <div className="text-[10px] text-slate-400 font-normal pl-5 truncate max-w-xs">
-                            {tpa.alamat}
-                          </div>
-                        )}
                       </td>
                       <td className="py-3 px-3.5 font-medium text-slate-800">
                         {tpa.namaDirektur || <span className="text-slate-400 italic">Belum dicatat</span>}
@@ -660,19 +651,6 @@ export const MasterTpaAdmin: React.FC<MasterTpaAdminProps> = ({ session }) => {
                   onChange={(e) => setFormKontakDirektur(e.target.value)}
                   placeholder="Contoh: 081234567890"
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:bg-white focus:outline-none font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">
-                  Alamat / Keterangan Lembaga (Opsional)
-                </label>
-                <input
-                  type="text"
-                  value={formAlamat}
-                  onChange={(e) => setFormAlamat(e.target.value)}
-                  placeholder="Contoh: Jl. Gambiran No. 12, Pandean"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:bg-white focus:outline-none"
                 />
               </div>
 
