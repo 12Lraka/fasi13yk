@@ -17,7 +17,11 @@ import {
   Database,
   ArrowUpDown,
   Check,
-  Info
+  Info,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
 } from 'lucide-react';
 import { MasterTpa, UserSession, Kemantren } from '../../types/fasi';
 import { KEMANTREN_LIST, normalizeRayonToKemantren } from '../../data/fasiMasterData';
@@ -114,6 +118,42 @@ export const MasterTpaAdmin: React.FC<MasterTpaAdminProps> = ({ session }) => {
       return true;
     });
   }, [tpaList, selectedRayonFilter, searchTerm]);
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(25);
+
+  // Otomatis kembali ke halaman 1 saat pencarian atau filter rayon berubah
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedRayonFilter]);
+
+  const totalPages = useMemo(() => {
+    if (pageSize === -1) return 1;
+    return Math.max(1, Math.ceil(filteredTpaList.length / pageSize));
+  }, [filteredTpaList.length, pageSize]);
+
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+
+  const paginatedTpaList = useMemo(() => {
+    if (pageSize === -1) return filteredTpaList;
+    const startIndex = (safeCurrentPage - 1) * pageSize;
+    return filteredTpaList.slice(startIndex, startIndex + pageSize);
+  }, [filteredTpaList, safeCurrentPage, pageSize]);
+
+  // Logika nomor halaman yang ditampilkan
+  const pageNumbers = useMemo(() => {
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+    if (safeCurrentPage <= 4) {
+      return [1, 2, 3, 4, 5, '...', totalPages];
+    }
+    if (safeCurrentPage >= totalPages - 3) {
+      return [1, '...', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+    }
+    return [1, '...', safeCurrentPage - 1, safeCurrentPage, safeCurrentPage + 1, '...', totalPages];
+  }, [totalPages, safeCurrentPage]);
 
   // Statistik
   const stats = useMemo(() => {
@@ -493,14 +533,15 @@ export const MasterTpaAdmin: React.FC<MasterTpaAdminProps> = ({ session }) => {
                   </td>
                 </tr>
               ) : (
-                filteredTpaList.map((tpa, idx) => {
+                paginatedTpaList.map((tpa, idx) => {
                   const kem = KEMANTREN_LIST.find((k) => k.id === tpa.kemantrenId);
                   const canEdit = isSuperAdmin || tpa.kemantrenId === currentKemantrenId;
+                  const rowNum = pageSize === -1 ? idx + 1 : (safeCurrentPage - 1) * pageSize + idx + 1;
 
                   return (
                     <tr key={tpa.id} className="hover:bg-slate-50/80 transition-colors">
                       <td className="py-3 px-3.5 text-center font-mono text-slate-400">
-                        {idx + 1}
+                        {rowNum}
                       </td>
                       <td className="py-3 px-3.5 font-bold text-slate-900">
                         <div className="flex items-center gap-2">
@@ -561,6 +602,112 @@ export const MasterTpaAdmin: React.FC<MasterTpaAdminProps> = ({ session }) => {
             </tbody>
           </table>
         </div>
+
+        {/* Footer Pagination */}
+        {filteredTpaList.length > 0 && (
+          <div className="px-4 py-3.5 bg-slate-50/70 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
+            <div className="flex items-center gap-2">
+              <span>
+                Menampilkan{' '}
+                <strong className="text-slate-900 font-bold">
+                  {pageSize === -1
+                    ? 1
+                    : Math.min((safeCurrentPage - 1) * pageSize + 1, filteredTpaList.length)}
+                </strong>{' '}
+                –{' '}
+                <strong className="text-slate-900 font-bold">
+                  {pageSize === -1
+                    ? filteredTpaList.length
+                    : Math.min(safeCurrentPage * pageSize, filteredTpaList.length)}
+                </strong>{' '}
+                dari <strong className="text-slate-900 font-bold">{filteredTpaList.length}</strong> unit TPA
+              </span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Jumlah Baris per Halaman */}
+              <div className="flex items-center gap-1.5">
+                <span className="text-slate-500">Tampilkan:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  className="bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-2xs focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+                >
+                  <option value={10}>10 baris</option>
+                  <option value={25}>25 baris</option>
+                  <option value={50}>50 baris</option>
+                  <option value={100}>100 baris</option>
+                  <option value={-1}>Semua ({filteredTpaList.length})</option>
+                </select>
+              </div>
+
+              {/* Tombol Navigasi Halaman */}
+              {pageSize !== -1 && totalPages > 1 && (
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setCurrentPage(1)}
+                    disabled={safeCurrentPage === 1}
+                    className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors shadow-2xs"
+                    title="Halaman Pertama"
+                  >
+                    <ChevronsLeft className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={safeCurrentPage === 1}
+                    className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors shadow-2xs"
+                    title="Halaman Sebelumnya"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                  </button>
+
+                  {/* Tombol Angka Halaman */}
+                  <div className="flex items-center gap-1">
+                    {pageNumbers.map((p, i) =>
+                      p === '...' ? (
+                        <span key={`ellipsis-${i}`} className="px-1 text-slate-400 font-bold select-none">
+                          ...
+                        </span>
+                      ) : (
+                        <button
+                          key={`page-${p}`}
+                          onClick={() => setCurrentPage(Number(p))}
+                          className={`min-w-7 h-7 px-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer shadow-2xs ${
+                            safeCurrentPage === p
+                              ? 'bg-emerald-800 text-white border border-emerald-800'
+                              : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+                          }`}
+                        >
+                          {p}
+                        </button>
+                      )
+                    )}
+                  </div>
+
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={safeCurrentPage === totalPages}
+                    className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors shadow-2xs"
+                    title="Halaman Berikutnya"
+                  >
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(totalPages)}
+                    disabled={safeCurrentPage === totalPages}
+                    className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors shadow-2xs"
+                    title="Halaman Terakhir"
+                  >
+                    <ChevronsRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* MODAL: Tambah / Edit TPA */}
