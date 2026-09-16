@@ -28,6 +28,7 @@ export type AppRoute =
   | 'penjurian'
   | 'rekapitulasi'
   | 'cetak'
+  | 'master-tpa'
   | 'pengaturan'
   | 'log';
 
@@ -68,6 +69,9 @@ export const ROUTE_PATH_MAP: Record<string, AppRoute> = {
   '/admin/cetak-kartu': 'cetak',
   '/admin/cetak': 'cetak',
   '/admin/idcard': 'cetak',
+  '/admin/master-tpa': 'master-tpa',
+  '/admin/tpa': 'master-tpa',
+  '/tpa': 'master-tpa',
   '/admin/rekapitulasi': 'rekapitulasi',
   '/admin/rekap': 'rekapitulasi',
   '/admin/pengaturan': 'pengaturan',
@@ -122,6 +126,7 @@ export const CANONICAL_PATH_MAP: Record<AppRoute, string> = {
   penjurian: '/admin/penjurian',
   rekapitulasi: '/admin/rekapitulasi',
   cetak: '/admin/cetak-kartu',
+  'master-tpa': '/admin/master-tpa',
   pengaturan: '/admin/pengaturan',
   log: '/admin/log-audit',
 };

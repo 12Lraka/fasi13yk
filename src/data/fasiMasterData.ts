@@ -6,7 +6,7 @@
  * 14 Kemantren & 18 Cabang Lomba Resmi
  */
 
-import { Kemantren, CompetitionCategory, Participant } from '../types/fasi';
+import { Kemantren, CompetitionCategory, Participant, MasterTpa } from '../types/fasi';
 
 export const KEMANTREN_LIST: Kemantren[] = [
   { id: 'kem-1', code: 'DN', name: 'Danurejan', adminName: 'Ust. Ahmad Danu', contactPerson: '08122334401', password: 'danurejan123', driveFolderUrl: 'https://drive.google.com/drive/folders/1HO9KHF4pQjqoe03-2ahxAyvc-hE0g05G' },
@@ -382,3 +382,41 @@ export const CATEGORIES_LIST: CompetitionCategory[] = [
 ];
 
 export const INITIAL_PARTICIPANTS: Participant[] = [];
+ 
+/**
+ * Normalisasi input nama Rayon / Kemantren (case-insensitive & pembersihan variasi)
+ * Menangani input seperti "KOTAGEDE", "Kotagede", "RAYON KOTAGEDE", "KG", "kem-6", dll.
+ */
+export function normalizeRayonToKemantren(rawInput: string): Kemantren | undefined {
+  if (!rawInput) return undefined;
+  const rawStr = String(rawInput).trim();
+  if (!rawStr) return undefined;
+
+  // Bersihkan prefiks umum & ubah ke UPPERCASE
+  const cleaned = rawStr
+    .toUpperCase()
+    .replace(/^RAYON\s+/i, '')
+    .replace(/^KEMANTREN\s+/i, '')
+    .replace(/^KECAMATAN\s+/i, '')
+    .replace(/[^A-Z0-9]/g, '');
+
+  return KEMANTREN_LIST.find((k) => {
+    const codeClean = k.code.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const nameClean = k.name.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const idClean = k.id.toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+    return (
+      cleaned === codeClean ||
+      cleaned === nameClean ||
+      cleaned === idClean ||
+      nameClean.includes(cleaned) ||
+      cleaned.includes(nameClean)
+    );
+  });
+}
+
+/**
+ * Data Master Awal Unit TPA se-Kota Yogyakarta (Kosong, dibaca murni dari tabel master_tpa Supabase)
+ */
+export const INITIAL_MASTER_TPA: MasterTpa[] = [];
+

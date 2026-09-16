@@ -37,12 +37,14 @@ import {
   saveBeritaAcaraList,
   saveKemantren,
   getStoredKemantren,
+  bulkPersistMasterTpa,
 } from './utils/storage';
 import {
   isSupabaseConfigured,
   fetchParticipantsFromSupabase,
   fetchBeritaAcaraFromSupabase,
   fetchKemantrenFromSupabase,
+  fetchMasterTpaFromSupabase,
   subscribeToParticipantsRealtime,
   subscribeToBeritaAcaraRealtime,
   subscribeToKemantrenRealtime,
@@ -124,6 +126,7 @@ export default function App() {
       route === 'admin-rekapcbg-lomba' ||
       route === 'hasil-cabang' ||
       route === 'berita-acara' ||
+      route === 'master-tpa' ||
       route === 'pengaturan' ||
       route === 'log' ||
       route === 'superadmin' ||
@@ -230,6 +233,12 @@ export default function App() {
           }
         } else {
           syncKemantrenToSupabase(getStoredKemantren());
+        }
+      });
+
+      fetchMasterTpaFromSupabase().then((remoteTpa) => {
+        if (remoteTpa && remoteTpa.length > 0) {
+          bulkPersistMasterTpa(remoteTpa);
         }
       });
 
@@ -458,6 +467,7 @@ export default function App() {
           activeTab === 'admin-rekapcbg-lomba' ||
           activeTab === 'hasil-cabang' ||
           activeTab === 'berita-acara' ||
+          activeTab === 'master-tpa' ||
           activeTab === 'pengaturan' ||
           activeTab === 'log') &&
           session && (

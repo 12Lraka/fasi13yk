@@ -7,7 +7,7 @@
  */
 
 import * as XLSX from 'xlsx';
-import { Participant } from '../types/fasi';
+import { Participant, MasterTpa } from '../types/fasi';
 import { getStoredCategories, getStoredKemantren } from './storage';
 
 /**
@@ -140,5 +140,69 @@ export function exportParticipantsToExcel(
   const fullFileName = `${fileNamePrefix}_${dateStr}.xlsx`;
 
   // Write and trigger download
+  XLSX.writeFile(wb, fullFileName);
+}
+
+/**
+ * Downloads Master Data TPA as a clean, professionally formatted Microsoft Excel (.xlsx) file
+ */
+export function exportMasterTpaToExcel(
+  tpaList: MasterTpa[],
+  fileNamePrefix: string = 'Master_Data_TPA_Kota_Yogyakarta'
+) {
+  const kemantrenList = getStoredKemantren();
+
+  const titleRows = [
+    ['FESTIVAL ANAK SHOLEH INDONESIA (FASI) XIII'],
+    ['BADKO TKA-TPA KOTA YOGYAKARTA'],
+    ['Sekretariat : Jln. Kenari No. 56 Muja Muju, Umbulharjo, Kota Yogyakarta | Telp. 085179928551'],
+    [],
+    ['MASTER DATA LEMBAGA TKA / TPA KOTA YOGYAKARTA'],
+    [`Tanggal Cetak: ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })} | Total Lembaga: ${tpaList.length} Unit TPA`],
+    [],
+  ];
+
+  const headers = [
+    'No',
+    'Nama Unit TKA / TPA',
+    'Nama Direktur / Kepala TPA',
+    'Wilayah Rayon',
+    'Kode Rayon',
+    'No. Kontak / WA',
+    'Alamat Lembaga',
+  ];
+
+  const dataRows = tpaList.map((tpa, idx) => {
+    const kem = kemantrenList.find((k) => k.id === tpa.kemantrenId);
+    return [
+      idx + 1,
+      tpa.namaTpa,
+      tpa.namaDirektur || '-',
+      kem?.name || tpa.rayonName || 'Yogyakarta',
+      kem?.code || '-',
+      tpa.kontakDirektur || '-',
+      tpa.alamat || '-',
+    ];
+  });
+
+  const wsData = [...titleRows, headers, ...dataRows];
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+  ws['!cols'] = [
+    { wch: 6 },  // No
+    { wch: 32 }, // Nama Unit TPA
+    { wch: 28 }, // Nama Direktur
+    { wch: 20 }, // Rayon
+    { wch: 12 }, // Kode
+    { wch: 18 }, // No Kontak
+    { wch: 35 }, // Alamat
+  ];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Master Data TPA');
+
+  const dateStr = new Date().toISOString().slice(0, 10);
+  const fullFileName = `${fileNamePrefix}_${dateStr}.xlsx`;
+
   XLSX.writeFile(wb, fullFileName);
 }

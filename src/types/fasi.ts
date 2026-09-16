@@ -63,6 +63,18 @@ export interface Kemantren {
   username?: string;
 }
 
+export interface MasterTpa {
+  id: string;
+  namaTpa: string;
+  namaDirektur: string;
+  kemantrenId: string; // ID Kemantren (e.g. 'kem-6')
+  rayonName?: string;  // Nama Rayon (e.g. 'Kotagede' / 'KOTAGEDE')
+  kontakDirektur?: string;
+  alamat?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface AppSettings {
   tagline: string;
   eventName: string;

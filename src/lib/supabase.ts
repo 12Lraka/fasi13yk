@@ -17,8 +17,9 @@ import {
   BeritaAcaraKejuaraan,
   IdCardOfficialData,
   IdCardCommitteeData,
+  MasterTpa,
 } from '../types/fasi';
-import { KEMANTREN_LIST } from '../data/fasiMasterData';
+import { KEMANTREN_LIST, normalizeRayonToKemantren } from '../data/fasiMasterData';
 import { unescapeHtml } from '../utils/security';
 
 // Environment variables via Vite import.meta.env and process.env fallback
@@ -1278,6 +1279,184 @@ export async function deleteCommitteeFromSupabase(id: string): Promise<boolean> 
     return true;
   } catch (err: any) {
     console.error('Exception deleteCommitteeFromSupabase:', err?.message || err);
+    return false;
+  }
+}
+
+/**
+ * ==========================================================
+ * MASTER TPA (Table: master_tpa)
+ * ==========================================================
+ */
+
+export async function fetchMasterTpaFromSupabase(): Promise<MasterTpa[]> {
+  const client = getSupabaseClient();
+  if (!client) return [];
+
+  try {
+    const { data, error } = await client
+      .from('master_tpa')
+      .select('*')
+      .order('nama_tpa', { ascending: true });
+
+    if (error) {
+      console.warn('Gagal fetch master_tpa dari Supabase:', error.message);
+      return [];
+    }
+
+    if (!data || !Array.isArray(data)) return [];
+
+    return data.map((row: any) => {
+      // Normalisasi kemantren ID jika hanya ada teks nama Rayon uppercase
+      let kId = row.kemantren_id || '';
+      let rName = row.rayon_name || '';
+
+      if (!kId && rName) {
+        const matched = normalizeRayonToKemantren(rName);
+        if (matched) {
+          kId = matched.id;
+          rName = matched.name;
+        }
+      } else if (kId && !rName) {
+        const matched = KEMANTREN_LIST.find((k) => k.id === kId);
+        if (matched) rName = matched.name;
+      }
+
+      return {
+        id: String(row.id),
+        namaTpa: String(row.nama_tpa || '').trim(),
+        namaDirektur: String(row.nama_direktur || '').trim(),
+        kemantrenId: kId,
+        rayonName: rName,
+        kontakDirektur: row.kontak_direktur ? String(row.kontak_direktur).trim() : undefined,
+        alamat: row.alamat ? String(row.alamat).trim() : undefined,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      };
+    });
+  } catch (err: any) {
+    console.error('Exception fetchMasterTpaFromSupabase:', err?.message || err);
+    return [];
+  }
+}
+
+export async function upsertMasterTpaToSupabase(tpa: MasterTpa): Promise<{ success: boolean; error?: string }> {
+  const client = getSupabaseClient();
+  if (!client) {
+    return { success: false, error: 'Klien Supabase belum aktif.' };
+  }
+
+  try {
+    // Pastikan kemantrenId terpetakan dengan benar meski input rayonName Uppercase
+    let kId = tpa.kemantrenId;
+    let rName = tpa.rayonName;
+    if (!kId && rName) {
+      const matched = normalizeRayonToKemantren(rName);
+      if (matched) {
+        kId = matched.id;
+        rName = matched.name;
+      }
+    } else if (kId && !rName) {
+      const matched = KEMANTREN_LIST.find((k) => k.id === kId);
+      if (matched) rName = matched.name;
+    }
+
+    const payload = {
+      id: tpa.id,
+      nama_tpa: tpa.namaTpa.trim(),
+      nama_direktur: tpa.namaDirektur.trim(),
+      kemantren_id: kId,
+      rayon_name: rName || '',
+      kontak_direktur: tpa.kontakDirektur?.trim() || null,
+      alamat: tpa.alamat?.trim() || null,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error } = await client
+      .from('master_tpa')
+      .upsert(payload, { onConflict: 'id' });
+
+    if (error) {
+      console.error('Error upserting master_tpa to Supabase:', error);
+      return { success: false, error: error.message };
+    }
+    return { success: true };
+  } catch (err: any) {
+    console.error('Exception upsertMasterTpaToSupabase:', err?.message || err);
+    return { success: false, error: err?.message || 'Gagal menyimpan data TPA ke Supabase' };
+  }
+}
+
+export async function bulkSyncMasterTpaToSupabase(tpaList: MasterTpa[]): Promise<{ success: boolean; count: number; error?: string }> {
+  const client = getSupabaseClient();
+  if (!client) {
+    return { success: false, count: 0, error: 'Klien Supabase belum aktif.' };
+  }
+
+  if (!tpaList || tpaList.length === 0) {
+    return { success: true, count: 0 };
+  }
+
+  try {
+    const payload = tpaList.map((tpa) => {
+      let kId = tpa.kemantrenId;
+      let rName = tpa.rayonName;
+      if (!kId && rName) {
+        const matched = normalizeRayonToKemantren(rName);
+        if (matched) {
+          kId = matched.id;
+          rName = matched.name;
+        }
+      } else if (kId && !rName) {
+        const matched = KEMANTREN_LIST.find((k) => k.id === kId);
+        if (matched) rName = matched.name;
+      }
+
+      return {
+        id: tpa.id,
+        nama_tpa: tpa.namaTpa.trim(),
+        nama_direktur: tpa.namaDirektur.trim(),
+        kemantren_id: kId,
+        rayon_name: rName || '',
+        kontak_direktur: tpa.kontakDirektur?.trim() || null,
+        alamat: tpa.alamat?.trim() || null,
+        updated_at: new Date().toISOString(),
+      };
+    });
+
+    const { error } = await client
+      .from('master_tpa')
+      .upsert(payload, { onConflict: 'id' });
+
+    if (error) {
+      console.error('Error bulkSyncMasterTpaToSupabase:', error);
+      return { success: false, count: 0, error: error.message };
+    }
+
+    return { success: true, count: payload.length };
+  } catch (err: any) {
+    console.error('Exception bulkSyncMasterTpaToSupabase:', err?.message || err);
+    return { success: false, count: 0, error: err?.message || 'Gagal sinkronisasi data master TPA ke Supabase' };
+  }
+}
+
+export async function deleteMasterTpaFromSupabase(id: string): Promise<boolean> {
+  const client = getSupabaseClient();
+  if (!client) return false;
+
+  try {
+    const { error } = await client
+      .from('master_tpa')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error deleting master_tpa from Supabase:', error);
+      return false;
+    }
+    return true;
+  } catch (err: any) {
+    console.error('Exception deleteMasterTpaFromSupabase:', err?.message || err);
     return false;
   }
 }

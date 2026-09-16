@@ -19,8 +19,9 @@ import {
   BeritaAcaraKejuaraan,
   IdCardOfficialData,
   IdCardCommitteeData,
+  MasterTpa,
 } from '../types/fasi';
-import { KEMANTREN_LIST, CATEGORIES_LIST, INITIAL_PARTICIPANTS } from '../data/fasiMasterData';
+import { KEMANTREN_LIST, CATEGORIES_LIST, INITIAL_PARTICIPANTS, INITIAL_MASTER_TPA, normalizeRayonToKemantren } from '../data/fasiMasterData';
 import { createAuditLog, unescapeHtml } from './security';
 import {
   isSupabaseConfigured,
@@ -35,6 +36,10 @@ import {
   upsertCommitteeToSupabase,
   deleteCommitteeFromSupabase,
   saveSettingsToSupabase,
+  fetchMasterTpaFromSupabase,
+  upsertMasterTpaToSupabase,
+  bulkSyncMasterTpaToSupabase,
+  deleteMasterTpaFromSupabase,
 } from '../lib/supabase';
 
 const PARTICIPANTS_KEY = 'fasi13_participants_data';
@@ -47,6 +52,7 @@ const KEMANTREN_KEY = 'fasi13_kemantren_data';
 const BERITA_ACARA_KEY = 'fasi13_berita_acara_data';
 const OFFICIALS_KEY = 'fasi13_id_card_officials';
 const COMMITTEES_KEY = 'fasi13_id_card_committees';
+const MASTER_TPA_KEY = 'fasi13_master_tpa_data';
 
 export const DEFAULT_SETTINGS: AppSettings = {
   tagline: 'Santri Hebat, Hebat Prestasi, Hebat Mengaji, & Berakhlakul Karimah.',
@@ -744,6 +750,186 @@ export async function syncCommitteesFromCloud(): Promise<IdCardCommitteeData[]> 
   } catch (err) {
     console.warn('Gagal sync committees dari cloud:', err);
     return getStoredCommittees();
+  }
+}
+
+/**
+ * ==========================================================
+ * MASTER TPA STORAGE & SYNC
+ * ==========================================================
+ */
+
+/**
+ * Memformat nama TPA secara cerdas:
+ * Jika belum memiliki awalan lembaga (TPA/TKA/TPQ/TQA), otomatis ditambahkan awalan "TPA ".
+ * Jika sudah memiliki awalan, memastikan formatnya rapi tanpa menduplikasi awalan.
+ */
+export function formatTpaName(rawName: string): string {
+  if (!rawName) return '';
+  const trimmed = rawName.trim();
+  if (!trimmed) return '';
+
+  // Cek apakah sudah berawalan TPA, TKA, TPQ, atau TQA
+  const prefixMatch = trimmed.match(/^(tpa|tka|tpq|tqa)\b[\s\-\.]*/i);
+  if (prefixMatch) {
+    const matchedPrefix = prefixMatch[1].toUpperCase();
+    const rest = trimmed.slice(prefixMatch[0].length).trim();
+    return `${matchedPrefix} ${rest}`;
+  }
+
+  // Jika belum memiliki awalan, tambahkan "TPA "
+  return `TPA ${trimmed}`;
+}
+
+export function getStoredMasterTpa(): MasterTpa[] {
+  try {
+    const raw = localStorage.getItem(MASTER_TPA_KEY);
+    if (!raw) {
+      return [];
+    }
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      // Bersihkan data dummy awal bawaan jika masih tersimpan di cache
+      const cleaned = parsed.filter(
+        (t: any) => !String(t.id || '').match(/^tpa-(dn|gt|gk|gm|jt|kg|kr|mj|mg|ng|pa|tr|uh|wb)-\d+$/)
+      );
+      if (cleaned.length !== parsed.length) {
+        localStorage.setItem(MASTER_TPA_KEY, JSON.stringify(cleaned));
+      }
+      return cleaned;
+    }
+    return [];
+  } catch (err) {
+    console.error('Gagal membaca data master TPA:', err);
+    return [];
+  }
+}
+
+export function saveMasterTpaList(list: MasterTpa[]): void {
+  try {
+    localStorage.setItem(MASTER_TPA_KEY, JSON.stringify(list));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('fasi_master_tpa_updated', { detail: list }));
+    }
+  } catch (err) {
+    console.error('Gagal menyimpan data master TPA:', err);
+  }
+}
+
+export async function persistMasterTpa(tpa: MasterTpa): Promise<void> {
+  // Pastikan kemantren terpetakan meski input uppercase
+  let kId = tpa.kemantrenId;
+  let rName = tpa.rayonName;
+  if (!kId && rName) {
+    const matched = normalizeRayonToKemantren(rName);
+    if (matched) {
+      kId = matched.id;
+      rName = matched.name;
+    }
+  } else if (kId && !rName) {
+    const matched = KEMANTREN_LIST.find((k) => k.id === kId);
+    if (matched) rName = matched.name;
+  }
+
+  const normalizedTpa: MasterTpa = {
+    ...tpa,
+    namaTpa: formatTpaName(tpa.namaTpa),
+    kemantrenId: kId,
+    rayonName: rName,
+    updatedAt: new Date().toISOString(),
+  };
+
+  // 1. Langsung simpan ke server Supabase (Primary Source of Truth)
+  if (isSupabaseConfigured()) {
+    const res = await upsertMasterTpaToSupabase(normalizedTpa);
+    if (!res.success) {
+      throw new Error(res.error || 'Gagal menyimpan data ke server Supabase');
+    }
+  }
+
+  // 2. Perbarui cache lokal untuk performa dan rendering offline
+  const current = getStoredMasterTpa();
+  const existingIdx = current.findIndex((t) => t.id === normalizedTpa.id);
+  let updated: MasterTpa[];
+  if (existingIdx >= 0) {
+    updated = [...current];
+    updated[existingIdx] = normalizedTpa;
+  } else {
+    updated = [normalizedTpa, ...current];
+  }
+  saveMasterTpaList(updated);
+}
+
+export async function bulkPersistMasterTpa(newList: MasterTpa[]): Promise<{ count: number }> {
+  // Normalisasi data baru
+  const normalizedNewList = newList.map((t) => {
+    let kId = t.kemantrenId;
+    let rName = t.rayonName;
+    if (!kId && rName) {
+      const matched = normalizeRayonToKemantren(rName);
+      if (matched) {
+        kId = matched.id;
+        rName = matched.name;
+      }
+    } else if (kId && !rName) {
+      const matched = KEMANTREN_LIST.find((k) => k.id === kId);
+      if (matched) rName = matched.name;
+    }
+
+    return {
+      ...t,
+      namaTpa: formatTpaName(t.namaTpa),
+      kemantrenId: kId,
+      rayonName: rName,
+      updatedAt: new Date().toISOString(),
+    };
+  });
+
+  // 1. Langsung simpan massal ke server Supabase
+  if (isSupabaseConfigured()) {
+    const res = await bulkSyncMasterTpaToSupabase(normalizedNewList);
+    if (!res.success) {
+      throw new Error(res.error || 'Gagal menyimpan data massal ke server Supabase');
+    }
+  }
+
+  // 2. Perbarui cache lokal
+  const current = getStoredMasterTpa();
+  const map = new Map<string, MasterTpa>();
+  current.forEach((t) => map.set(t.id, t));
+  normalizedNewList.forEach((t) => map.set(t.id, t));
+  const merged = Array.from(map.values()).sort((a, b) => a.namaTpa.localeCompare(b.namaTpa));
+
+  saveMasterTpaList(merged);
+
+  return { count: normalizedNewList.length };
+}
+
+export async function removeMasterTpa(id: string): Promise<void> {
+  // 1. Hapus langsung di server Supabase
+  if (isSupabaseConfigured()) {
+    const success = await deleteMasterTpaFromSupabase(id);
+    if (!success) {
+      throw new Error('Gagal menghapus data dari server Supabase');
+    }
+  }
+
+  // 2. Perbarui cache lokal
+  const current = getStoredMasterTpa();
+  const updated = current.filter((t) => t.id !== id);
+  saveMasterTpaList(updated);
+}
+
+export async function syncMasterTpaFromCloud(): Promise<MasterTpa[]> {
+  if (!isSupabaseConfigured()) return getStoredMasterTpa();
+  try {
+    const cloudData = await fetchMasterTpaFromSupabase();
+    // Sinkronisasi data murni dari Supabase ke cache lokal
+    saveMasterTpaList(cloudData);
+    return cloudData;
+  } catch (err) {
+    console.warn('Gagal sync master_tpa dari cloud:', err);
+    return getStoredMasterTpa();
   }
 }
 

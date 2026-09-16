@@ -37,7 +37,7 @@ import {
   Clock,
   Sparkle,
 } from 'lucide-react';
-import { Participant, ParticipantDraft, UserSession, Gender } from '../../types/fasi';
+import { Participant, ParticipantDraft, UserSession, Gender, MasterTpa } from '../../types/fasi';
 import { KEMANTREN_LIST, CATEGORIES_LIST } from '../../data/fasiMasterData';
 import { maskDateInput, evaluateFasiAge } from '../../utils/ageCalculator';
 import { sanitizeInput, validateHoneypot } from '../../utils/security';
@@ -48,6 +48,10 @@ import {
   clearDrafts,
   logAuditEvent,
   getStoredSettings,
+  getStoredMasterTpa,
+  persistMasterTpa,
+  syncMasterTpaFromCloud,
+  formatTpaName,
 } from '../../utils/storage';
 import { showToast, showSuccessAlert, showConfirmDialog } from '../../utils/sweetalert';
 import { getThemeConfig } from '../../utils/theme';
@@ -87,6 +91,8 @@ export const ParticipantFormPage: React.FC<ParticipantFormPageProps> = ({
     return KEMANTREN_LIST[0]?.id || 'kem-1';
   });
   const [tpaUnitName, setTpaUnitName] = useState<string>('');
+  const [selectedTpaId, setSelectedTpaId] = useState<string>('');
+  const [masterTpaList, setMasterTpaList] = useState<MasterTpa[]>(() => getStoredMasterTpa());
   const [categoryId, setCategoryId] = useState<string>('');
   const [pjName, setPjName] = useState<string>('');
   const [whatsappNumber, setWhatsappNumber] = useState<string>('');
@@ -151,6 +157,12 @@ export const ParticipantFormPage: React.FC<ParticipantFormPageProps> = ({
       setCategoryId(editingParticipant.categoryId || '');
       setPjName(editingParticipant.pjName || '');
       setWhatsappNumber(editingParticipant.whatsappNumber || '');
+
+      // Cari apakah tpaUnitName ada di master
+      const matched = masterTpaList.find(
+        (t) => t.namaTpa.toLowerCase() === (editingParticipant.tpaUnitName || '').toLowerCase()
+      );
+      setSelectedTpaId(matched ? matched.id : 'CUSTOM');
     } else {
       // Form default
       setFullName('');
@@ -162,13 +174,56 @@ export const ParticipantFormPage: React.FC<ParticipantFormPageProps> = ({
           : KEMANTREN_LIST[0]?.id || 'kem-1'
       );
       setTpaUnitName('');
+      setSelectedTpaId('');
       setCategoryId('');
       setPjName('');
       setWhatsappNumber('');
     }
     setFormError('');
     setEditingDraftId(null);
-  }, [editingParticipant, session]);
+  }, [editingParticipant, session, masterTpaList]);
+
+  // Listen live event master TPA & sync dari cloud jika Supabase aktif
+  useEffect(() => {
+    const handleTpaUpdate = () => {
+      setMasterTpaList(getStoredMasterTpa());
+    };
+    window.addEventListener('fasi_master_tpa_updated', handleTpaUpdate);
+
+    if (isSupabaseConfigured()) {
+      syncMasterTpaFromCloud()
+        .then((cloudData) => {
+          setMasterTpaList(cloudData);
+        })
+        .catch((e) => {
+          console.warn('Gagal sync master_tpa:', e);
+        });
+    }
+
+    return () => window.removeEventListener('fasi_master_tpa_updated', handleTpaUpdate);
+  }, []);
+
+  // Filter TPA berdasarkan Rayon yang sedang dipilih
+  const availableTpasInRayon = useMemo(() => {
+    return masterTpaList.filter((t) => t.kemantrenId === kemantrenId);
+  }, [masterTpaList, kemantrenId]);
+
+  const handleSelectMasterTpa = (tpaId: string) => {
+    setSelectedTpaId(tpaId);
+    if (!tpaId || tpaId === 'CUSTOM') {
+      return;
+    }
+    const tpa = masterTpaList.find((t) => t.id === tpaId);
+    if (tpa) {
+      setTpaUnitName(tpa.namaTpa);
+      if (!pjName.trim() && tpa.namaDirektur) {
+        setPjName(tpa.namaDirektur);
+      }
+      if (!whatsappNumber.trim() && tpa.kontakDirektur) {
+        setWhatsappNumber(tpa.kontakDirektur);
+      }
+    }
+  };
 
   // Evaluasi usia FASI (Cutoff 1 Juli 2027)
   const ageEvaluation = useMemo(() => {
@@ -310,7 +365,7 @@ export const ParticipantFormPage: React.FC<ParticipantFormPageProps> = ({
         isValid: ageEvaluation.isEligible ?? false,
         levelEligible: ageEvaluation.eligibleLevel ?? null,
       },
-      tpaUnitName: sanitizeInput(tpaUnitName),
+      tpaUnitName: formatTpaName(sanitizeInput(tpaUnitName)),
       kemantrenId,
       categoryId,
       documentUrl: editingParticipant?.documentUrl || undefined,
@@ -379,7 +434,7 @@ export const ParticipantFormPage: React.FC<ParticipantFormPageProps> = ({
         isValid: ageEvaluation.isEligible ?? false,
         levelEligible: ageEvaluation.eligibleLevel ?? null,
       },
-      tpaUnitName: sanitizeInput(tpaUnitName),
+      tpaUnitName: formatTpaName(sanitizeInput(tpaUnitName)),
       kemantrenId,
       categoryId,
       pjName: sanitizeInput(pjName),
@@ -1005,47 +1060,120 @@ export const ParticipantFormPage: React.FC<ParticipantFormPageProps> = ({
                   )}
                 </div>
 
-                {/* Kontingen Kemantren */}
+                {/* Kontingen Rayon */}
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                      Kontingen Kemantren (Kecamatan) <span className="text-rose-600">*</span>
+                      Kontingen Rayon (Kemantren) <span className="text-rose-600">*</span>
                     </label>
                     <span className="text-[10px] text-slate-400">Rayon Wilayah</span>
                   </div>
                   <select
                     disabled={session?.role === 'kemantren_admin'}
                     value={kemantrenId}
-                    onChange={(e) => setKemantrenId(e.target.value)}
+                    onChange={(e) => {
+                      const newKid = e.target.value;
+                      setKemantrenId(newKid);
+                      setSelectedTpaId('');
+                    }}
                     className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:bg-white focus:outline-none font-semibold text-slate-900 disabled:opacity-80"
                   >
                     {KEMANTREN_LIST.map((k) => (
                       <option key={k.id} value={k.id}>
-                        Kemantren {k.name} ({k.code})
+                        Rayon {k.name} ({k.code})
                       </option>
                     ))}
                   </select>
                 </div>
 
-                {/* Nama Unit TKA/TPA */}
-                <div>
+                {/* Nama Unit TKA/TPA (Terintegrasi Master Data TPA) */}
+                <div className="space-y-1.5">
                   <div className="flex items-center justify-between mb-1">
                     <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
                       Nama Unit TKA / TPA <span className="text-rose-600">*</span>
                     </label>
-                    <span className="text-[10px] text-slate-400">Contoh: TPA Baitul Makmur</span>
+                    <span className="text-[10px] text-emerald-800 font-bold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                      {availableTpasInRayon.length} Unit di Rayon ini
+                    </span>
                   </div>
+
+                  {availableTpasInRayon.length > 0 && (
+                    <select
+                      value={selectedTpaId}
+                      onChange={(e) => handleSelectMasterTpa(e.target.value)}
+                      className="w-full px-3 py-2 text-xs bg-emerald-50/70 border border-emerald-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:bg-white focus:outline-none font-semibold text-emerald-950 cursor-pointer"
+                    >
+                      <option value="">-- Pilih dari Master Data TPA Resmi --</option>
+                      {availableTpasInRayon.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.namaTpa} {t.namaDirektur ? `(Kepala: ${t.namaDirektur})` : ''}
+                        </option>
+                      ))}
+                      <option value="CUSTOM">+ Tulis Manual / TPA Belum Ada di Daftar</option>
+                    </select>
+                  )}
+
                   <input
                     type="text"
                     required
                     value={tpaUnitName}
-                    onChange={(e) => setTpaUnitName(e.target.value)}
-                    placeholder="Contoh: TPA Baitul Makmur"
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setTpaUnitName(val);
+                      const match = availableTpasInRayon.find(
+                        (t) => t.namaTpa.toLowerCase() === val.trim().toLowerCase()
+                      );
+                      setSelectedTpaId(match ? match.id : 'CUSTOM');
+                    }}
+                    onBlur={() => {
+                      if (tpaUnitName.trim()) {
+                        setTpaUnitName(formatTpaName(tpaUnitName));
+                      }
+                    }}
+                    placeholder="Contoh: Baitul Makmur atau TPA Baitul Makmur"
                     className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:bg-white focus:outline-none text-slate-900"
                   />
-                  <p className="text-[10px] text-slate-400 mt-1">
-                    Penulisan nama unit wajib konsisten untuk seluruh santri dari lembaga yang sama.
-                  </p>
+
+                  <div className="flex flex-wrap items-center justify-between gap-1 text-[10px] text-slate-400 mt-1">
+                    <span>
+                      {selectedTpaId && selectedTpaId !== 'CUSTOM' ? (
+                        <span className="text-emerald-700 font-semibold flex items-center gap-1">
+                          <CheckCircle className="w-3 h-3 text-emerald-600 shrink-0" />
+                          <span>Terhubung Master TPA (Data nama & PJ otomatis terisi)</span>
+                        </span>
+                      ) : (
+                        'Auto-format aktif: Nama otomatis dilengkapi awalan "TPA " jika belum ada.'
+                      )}
+                    </span>
+                    {tpaUnitName.trim() && selectedTpaId === 'CUSTOM' && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            const newId = `tpa-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+                            const matchedK = KEMANTREN_LIST.find((k) => k.id === kemantrenId);
+                            const formattedName = formatTpaName(tpaUnitName);
+                            await persistMasterTpa({
+                              id: newId,
+                              namaTpa: formattedName,
+                              namaDirektur: pjName.trim(),
+                              kemantrenId: kemantrenId,
+                              rayonName: matchedK?.name || 'Yogyakarta',
+                              kontakDirektur: whatsappNumber.trim() || undefined,
+                            });
+                            setTpaUnitName(formattedName);
+                            setSelectedTpaId(newId);
+                            showToast('success', `"${formattedName}" berhasil disimpan ke database server Supabase!`);
+                          } catch (err: any) {
+                            showToast('error', err?.message || 'Gagal menyimpan ke Supabase');
+                          }
+                        }}
+                        className="text-emerald-700 hover:text-emerald-800 font-bold underline cursor-pointer"
+                      >
+                        + Simpan ke Master Data TPA
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 
