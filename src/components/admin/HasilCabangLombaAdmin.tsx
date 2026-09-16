@@ -21,7 +21,9 @@ import {
   Users,
   ExternalLink,
   ChevronRight,
-  Filter
+  Filter,
+  Download,
+  FileSpreadsheet
 } from 'lucide-react';
 import { Jenjang, BeritaAcaraKejuaraan, CompetitionCategory, UserSession } from '../../types/fasi';
 import { CATEGORIES_LIST } from '../../data/fasiMasterData';
@@ -32,6 +34,11 @@ import {
   isSupabaseConfigured
 } from '../../lib/supabase';
 import { showToast } from '../../utils/sweetalert';
+import {
+  exportPemenangToExcel,
+  exportPemenangToPdf,
+  exportSingleCabangPdf
+} from '../../utils/pemenangExport';
 
 interface HasilCabangLombaAdminProps {
   session?: UserSession;
@@ -49,6 +56,9 @@ export const HasilCabangLombaAdmin: React.FC<HasilCabangLombaAdminProps> = ({
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'Disahkan' | 'Menunggu'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isExportingExcel, setIsExportingExcel] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [exportingCabangId, setExportingCabangId] = useState<string | null>(null);
 
   // Helper untuk menentukan cabang utama (Bobot 7-5-3)
   const isCategoryUtama = (name: string, level: string) => {
@@ -122,6 +132,49 @@ export const HasilCabangLombaAdmin: React.FC<HasilCabangLombaAdminProps> = ({
       showToast('error', 'Gagal menyinkronkan data.');
     } finally {
       setIsSyncing(false);
+    }
+  };
+
+  // Export Semua Pemenang ke Excel (.xlsx)
+  const handleExportExcel = () => {
+    try {
+      setIsExportingExcel(true);
+      exportPemenangToExcel(CATEGORIES_LIST, beritaAcaraMap);
+      showToast('success', 'File Excel (.xlsx) daftar pemenang berhasil diunduh.');
+    } catch (err) {
+      console.error('Gagal ekspor Excel:', err);
+      showToast('error', 'Gagal membuat file Excel.');
+    } finally {
+      setIsExportingExcel(false);
+    }
+  };
+
+  // Export Semua Pemenang ke PDF
+  const handleExportPdf = async () => {
+    try {
+      setIsExportingPdf(true);
+      await exportPemenangToPdf(CATEGORIES_LIST, beritaAcaraMap, 'Hasil_Pemenang_FASI_XIII_Kota_Yogyakarta', false);
+      showToast('success', 'Dokumen PDF daftar pemenang berhasil diunduh.');
+    } catch (err) {
+      console.error('Gagal ekspor PDF:', err);
+      showToast('error', 'Gagal membuat dokumen PDF.');
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
+
+  // Export 1 Cabang Lomba ke PDF Lembar Berita Acara
+  const handleExportSingleCabangPdf = async (cat: CompetitionCategory) => {
+    const ba = beritaAcaraMap.get(cat.id);
+    try {
+      setExportingCabangId(cat.id);
+      await exportSingleCabangPdf(cat, ba);
+      showToast('success', `PDF Berita Acara ${cat.name} berhasil diunduh.`);
+    } catch (err) {
+      console.error('Gagal ekspor PDF cabang:', err);
+      showToast('error', 'Gagal membuat dokumen PDF cabang.');
+    } finally {
+      setExportingCabangId(null);
     }
   };
 
@@ -204,23 +257,46 @@ export const HasilCabangLombaAdmin: React.FC<HasilCabangLombaAdminProps> = ({
             </p>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+            {/* Download Excel (.xlsx) */}
+            <button
+              onClick={handleExportExcel}
+              disabled={isExportingExcel}
+              className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-md active:scale-95 disabled:opacity-50 border border-emerald-400/40"
+              title="Download Rekap Seluruh Pemenang format Microsoft Excel (.xlsx)"
+            >
+              <FileSpreadsheet className="w-4 h-4 text-emerald-100" />
+              <span>{isExportingExcel ? 'Membuat...' : 'Excel (.xlsx)'}</span>
+            </button>
+
+            {/* Download PDF Resmi */}
+            <button
+              onClick={handleExportPdf}
+              disabled={isExportingPdf}
+              className="px-3.5 py-2 rounded-xl bg-rose-700 hover:bg-rose-600 text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-md active:scale-95 disabled:opacity-50 border border-rose-400/40"
+              title="Download Dokumen Rekap Pemenang Resmi format PDF Landscape"
+            >
+              <Download className="w-4 h-4 text-rose-100" />
+              <span>{isExportingPdf ? 'Membuat...' : 'PDF Resmi'}</span>
+            </button>
+
             <button
               onClick={handleManualRefresh}
               disabled={isSyncing}
-              className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold border border-white/10 transition-all flex items-center gap-2 cursor-pointer shadow-sm active:scale-95 disabled:opacity-50"
+              className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold border border-white/10 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95 disabled:opacity-50"
               title="Sinkronkan dengan Database Cloud Supabase"
             >
-              <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
-              <span>{isSyncing ? 'Menyinkronkan...' : 'Refresh Data'}</span>
+              <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+              <span>{isSyncing ? 'Sinkron...' : 'Refresh'}</span>
             </button>
+
             {onNavigateToBeritaAcara && (
               <button
                 onClick={() => onNavigateToBeritaAcara()}
-                className="px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-md active:scale-95"
+                className="px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-md active:scale-95"
               >
-                <FileText className="w-4 h-4" />
-                <span>Buka Berita Acara</span>
+                <FileText className="w-3.5 h-3.5" />
+                <span>Berita Acara</span>
               </button>
             )}
           </div>
@@ -573,15 +649,29 @@ export const HasilCabangLombaAdmin: React.FC<HasilCabangLombaAdminProps> = ({
                     )}
                   </div>
 
-                  {isSuperAdmin && onNavigateToBeritaAcara && (
-                    <button
-                      onClick={() => onNavigateToBeritaAcara(cat.id)}
-                      className="inline-flex items-center gap-1.5 text-emerald-800 hover:text-emerald-950 font-bold text-xs hover:underline cursor-pointer ml-auto"
-                    >
-                      <span>{isDisahkan ? 'Kelola di Berita Acara' : 'Input Berita Acara'}</span>
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </button>
-                  )}
+                  <div className="flex items-center gap-2 ml-auto">
+                    {isDisahkan && (
+                      <button
+                        onClick={() => handleExportSingleCabangPdf(cat)}
+                        disabled={exportingCabangId === cat.id}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 font-semibold text-xs transition-colors cursor-pointer shadow-2xs active:scale-95 disabled:opacity-50"
+                        title="Download PDF Lembar Berita Acara & Keputusan Cabang Ini"
+                      >
+                        <Download className="w-3.5 h-3.5 text-rose-600" />
+                        <span>{exportingCabangId === cat.id ? 'Membuat...' : 'PDF Cabang'}</span>
+                      </button>
+                    )}
+
+                    {isSuperAdmin && onNavigateToBeritaAcara && (
+                      <button
+                        onClick={() => onNavigateToBeritaAcara(cat.id)}
+                        className="inline-flex items-center gap-1.5 text-emerald-800 hover:text-emerald-950 font-bold text-xs hover:underline cursor-pointer"
+                      >
+                        <span>{isDisahkan ? 'Kelola di Berita Acara' : 'Input Berita Acara'}</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             );
