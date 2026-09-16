@@ -237,8 +237,13 @@ export const MasterTpaAdmin: React.FC<MasterTpaAdminProps> = ({ session }) => {
     }
   };
 
-  // Sync Manual dari Supabase
+  // Sync Manual dari Supabase (Hanya untuk Super Admin)
   const handleManualSync = async () => {
+    if (!isSuperAdmin) {
+      showErrorAlert('Akses Dibatasi', 'Hanya Super Admin yang berwenang melakukan sinkronisasi Supabase.');
+      return;
+    }
+
     setIsSyncing(true);
     try {
       const data = await syncMasterTpaFromCloud();
@@ -381,15 +386,17 @@ export const MasterTpaAdmin: React.FC<MasterTpaAdminProps> = ({ session }) => {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={handleManualSync}
-              disabled={isSyncing}
-              className="px-3.5 py-2 bg-emerald-800/80 hover:bg-emerald-700 text-emerald-100 font-bold text-xs rounded-xl shadow-xs border border-emerald-600/50 flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
-              title="Sinkronisasi ulang dengan Supabase"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-amber-400' : ''}`} />
-              <span>{isSyncing ? 'Sinkron...' : 'Sync Supabase'}</span>
-            </button>
+            {isSuperAdmin && (
+              <button
+                onClick={handleManualSync}
+                disabled={isSyncing}
+                className="px-3.5 py-2 bg-emerald-800/80 hover:bg-emerald-700 text-emerald-100 font-bold text-xs rounded-xl shadow-xs border border-emerald-600/50 flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                title="Sinkronisasi ulang dengan Supabase (Khusus Super Admin)"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-amber-400' : ''}`} />
+                <span>{isSyncing ? 'Sinkron...' : 'Sync Supabase'}</span>
+              </button>
+            )}
 
             {isSuperAdmin && (
               <button
