@@ -6,7 +6,7 @@
  * BADKO TKA-TPA Kota Yogyakarta
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Navbar } from './components/layout/Navbar';
 import { Footer } from './components/layout/Footer';
 import { PublicPortal } from './components/public/PublicPortal';
@@ -396,16 +396,23 @@ export default function App() {
     handleUpdateParticipants(list);
   };
 
-  const handleCheckInSuccess = (updated: Participant) => {
-    const list = participants.map((p) => (p.id === updated.id ? updated : p));
-    handleUpdateParticipants(list);
+  const handleCheckInSuccess = useCallback((updated: Participant) => {
+    setParticipants((prev) => {
+      const nextList = prev.map((p) => (p.id === updated.id ? updated : p));
+      try {
+        localStorage.setItem('fasi13_participants_data', JSON.stringify(nextList));
+      } catch (err) {
+        console.error('Gagal menyimpan data peserta:', err);
+      }
+      return nextList;
+    });
 
     if (isSupabaseConfigured()) {
       upsertParticipantToSupabase(updated).catch((err) =>
         console.warn('Gagal update kehadiran santri ke Supabase:', err)
       );
     }
-  };
+  }, []);
 
   const handleViewSingleCard = (p: Participant) => {
     setPrintQueue([p]);

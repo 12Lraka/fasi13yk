@@ -252,6 +252,11 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
     onCheckInSuccess(updated);
     setScannedResult(updated);
 
+    // Langsung mutasi ref scanner lokal seketika agar pembacaan kartu berikutnya tidak tertimpa/bentrok
+    participantsRef.current = participantsRef.current.map((p) =>
+      p.id === updated.id ? updated : p
+    );
+
     // 2. Simpan seketika ke database Supabase
     if (isSupabaseConfigured()) {
       upsertParticipantToSupabase(updated).catch((err) =>
