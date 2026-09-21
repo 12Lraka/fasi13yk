@@ -53,6 +53,13 @@
     display: none !important;
   }
 
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
   .print-only {
     display: block !important;
   }

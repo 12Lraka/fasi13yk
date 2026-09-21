@@ -26,6 +26,7 @@ interface ExportRecapPdfOptions {
   kemantrenList: Kemantren[];
   doc?: jsPDF;
   isFirstPage?: boolean;
+  docType?: 'daftar_hadir' | 'nominasi';
 }
 
 /**
@@ -38,6 +39,7 @@ export async function renderRecapToPdfPage({
   kemantrenList,
   doc,
   isFirstPage = true,
+  docType = 'daftar_hadir',
 }: ExportRecapPdfOptions): Promise<jsPDF> {
   const pdfDoc = doc || new jsPDF({
     orientation: 'portrait',
@@ -140,20 +142,42 @@ export async function renderRecapToPdfPage({
   };
 
   // 3. TABEL DATA
-  // Kolom: No, No. Registrasi, Nama Lengkap Santri, L/P, Tgl Lahir / Usia, Rayon & Unit TPA, Cabang Lomba, No. Undian
-  const tableHeaders = [
-    'No',
-    'No. Registrasi',
-    'Nama Lengkap Santri',
-    'L/P',
-    'Tgl Lahir / Usia',
-    'Rayon & Unit TPA',
-    'Cabang Lomba',
-    'No. Undian',
-  ];
+  const isDaftarHadir = docType === 'daftar_hadir';
+
+  const tableHeaders = isDaftarHadir
+    ? [
+        'No',
+        'No. Registrasi',
+        'Nama Lengkap Santri',
+        'L/P',
+        'Rayon & Unit TPA',
+        'Cabang Lomba',
+        'Paraf / Tanda Tangan Meja',
+      ]
+    : [
+        'No',
+        'No. Registrasi',
+        'Nama Lengkap Santri',
+        'L/P',
+        'Tgl Lahir / Usia',
+        'Rayon & Unit TPA',
+        'Cabang Lomba',
+        'No. Undian',
+      ];
 
   const tableBody = participants.length === 0
-    ? [['-', '-', 'Tidak ada santri yang memenuhi kriteria rekapitulasi.', '-', '-', '-', '-', '-']]
+    ? [[
+        '-',
+        '-',
+        isDaftarHadir
+          ? 'Tidak ada santri pada filter kehadiran ini.'
+          : 'Tidak ada santri yang memenuhi kriteria rekapitulasi.',
+        '-',
+        '-',
+        '-',
+        '-',
+        ...(isDaftarHadir ? [] : ['-']),
+      ]]
     : participants.map((p, index) => {
         const kemName = getKemName(p.kemantrenId);
         const cat = getCategory(p.categoryId);
@@ -161,13 +185,29 @@ export async function renderRecapToPdfPage({
           ? `Kem. ${kemName}\n${p.tpaUnitName}`
           : `Kem. ${kemName}`;
 
-        const birthAndAge = p.birthDate
-          ? `${p.birthDate}\n(${p.ageOnCutoff.years}th ${p.ageOnCutoff.months}bln)`
-          : '-';
-
         const branchName = cat
           ? `[${cat.level}] ${cat.name}${cat.isGroup ? ' (Grup)' : ''}`
           : p.categoryId;
+
+        if (isDaftarHadir) {
+          const attendanceSign = p.attendance === 'hadir'
+            ? '[ ✓ HADIR ]\n( .......................... )'
+            : '( .......................... )';
+
+          return [
+            String(index + 1),
+            p.registrationNumber || '-',
+            p.fullName || '-',
+            p.gender || '-',
+            rayonAndTpa,
+            branchName,
+            attendanceSign,
+          ];
+        }
+
+        const birthAndAge = p.birthDate
+          ? `${p.birthDate}\n(${p.ageOnCutoff.years}th ${p.ageOnCutoff.months}bln)`
+          : '-';
 
         return [
           String(index + 1),
@@ -206,24 +246,32 @@ export async function renderRecapToPdfPage({
       lineColor: [203, 213, 225], // slate-300
       valign: 'middle',
     },
-    columnStyles: {
-      0: { halign: 'center', cellWidth: 8 },  // No
-      1: { halign: 'center', cellWidth: 26, fontStyle: 'bold' }, // No Registrasi
-      2: { halign: 'left', cellWidth: 44, fontStyle: 'bold' },   // Nama Lengkap
-      3: { halign: 'center', cellWidth: 10 }, // L/P
-      4: { halign: 'center', cellWidth: 26 }, // Tgl Lahir / Usia
-      5: { halign: 'left', cellWidth: 36 },   // Rayon & Unit TPA
-      6: { halign: 'left', cellWidth: 24 },   // Cabang Lomba
-      7: { halign: 'center', cellWidth: 12, fontStyle: 'bold' }, // No Undian
-    },
+    columnStyles: isDaftarHadir
+      ? {
+          0: { halign: 'center', cellWidth: 8 },  // No
+          1: { halign: 'center', cellWidth: 26, fontStyle: 'bold' }, // No Registrasi
+          2: { halign: 'left', cellWidth: 46, fontStyle: 'bold' },   // Nama Lengkap
+          3: { halign: 'center', cellWidth: 10 }, // L/P
+          4: { halign: 'left', cellWidth: 38 },   // Rayon & Unit TPA
+          5: { halign: 'left', cellWidth: 28 },   // Cabang Lomba
+          6: { halign: 'center', cellWidth: 30 }, // Paraf / Tanda Tangan
+        }
+      : {
+          0: { halign: 'center', cellWidth: 8 },  // No
+          1: { halign: 'center', cellWidth: 26, fontStyle: 'bold' }, // No Registrasi
+          2: { halign: 'left', cellWidth: 44, fontStyle: 'bold' },   // Nama Lengkap
+          3: { halign: 'center', cellWidth: 10 }, // L/P
+          4: { halign: 'center', cellWidth: 26 }, // Tgl Lahir / Usia
+          5: { halign: 'left', cellWidth: 36 },   // Rayon & Unit TPA
+          6: { halign: 'left', cellWidth: 24 },   // Cabang Lomba
+          7: { halign: 'center', cellWidth: 12, fontStyle: 'bold' }, // No Undian
+        },
     alternateRowStyles: {
       fillColor: [248, 250, 252], // slate-50
     },
   });
 
   // 4. BLOK TANDA TANGAN RESMI
-  // Sisi Kiri: Mengetahui, Ketua Umum BADKO TKA-TPA Kota (Dicky Artanto, S.Pd., M.Pd.)
-  // Sisi Kanan: Yogyakarta, [Tanggal] Ketua Panitia FASI XIII (Andry Sunny, S.E.)
   const lastTableY = (pdfDoc as any).lastAutoTable?.finalY || startTableY + 40;
   const pageHeight = 297;
   let signatureY = lastTableY + 8;
@@ -242,35 +290,60 @@ export async function renderRecapToPdfPage({
   pdfDoc.setFontSize(8.5);
   pdfDoc.setTextColor(71, 85, 105);
 
-  // Kiri: Mengetahui, Ketua Umum BADKO TKA-TPA Kota
-  pdfDoc.text('Mengetahui,', colLeftX, signatureY, { align: 'center' });
-  pdfDoc.setFont('helvetica', 'bold');
-  pdfDoc.setTextColor(15, 23, 42);
-  pdfDoc.text('Ketua Umum BADKO TKA-TPA Kota', colLeftX, signatureY + 4.5, { align: 'center' });
-
-  // Kanan: Tanggal & Ketua Panitia FASI XIII
   const dateStr = `Yogyakarta, ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`;
-  pdfDoc.setFont('helvetica', 'normal');
-  pdfDoc.setTextColor(71, 85, 105);
-  pdfDoc.text(dateStr, colRightX, signatureY, { align: 'center' });
-  pdfDoc.setFont('helvetica', 'bold');
-  pdfDoc.setTextColor(15, 23, 42);
-  pdfDoc.text('Ketua Panitia FASI XIII', colRightX, signatureY + 4.5, { align: 'center' });
 
-  // Nama Pejabat Bertandatangan
-  const lineSignY = signatureY + 24;
-  pdfDoc.setFont('helvetica', 'bold');
-  pdfDoc.setFontSize(9.5);
-  pdfDoc.text('Dicky Artanto, S.Pd., M.Pd.', colLeftX, lineSignY, { align: 'center' });
-  pdfDoc.text('Andry Sunny, S.E.', colRightX, lineSignY, { align: 'center' });
+  if (isDaftarHadir) {
+    // Kiri: Mengetahui, Koordinator Registrasi / Kesekretariatan
+    pdfDoc.text('Mengetahui,', colLeftX, signatureY, { align: 'center' });
+    pdfDoc.setFont('helvetica', 'bold');
+    pdfDoc.setTextColor(15, 23, 42);
+    pdfDoc.text('Koordinator Registrasi / Kesekretariatan', colLeftX, signatureY + 4.5, { align: 'center' });
 
-  // Garis bawah nama
-  pdfDoc.setLineWidth(0.3);
-  pdfDoc.setDrawColor(15, 23, 42);
-  const leftTextWidth = pdfDoc.getTextWidth('Dicky Artanto, S.Pd., M.Pd.');
-  const rightTextWidth = pdfDoc.getTextWidth('Andry Sunny, S.E.');
-  pdfDoc.line(colLeftX - (leftTextWidth / 2), lineSignY + 0.8, colLeftX + (leftTextWidth / 2), lineSignY + 0.8);
-  pdfDoc.line(colRightX - (rightTextWidth / 2), lineSignY + 0.8, colRightX + (rightTextWidth / 2), lineSignY + 0.8);
+    // Kanan: Tanggal & Petugas Meja Registrasi
+    pdfDoc.setFont('helvetica', 'normal');
+    pdfDoc.setTextColor(71, 85, 105);
+    pdfDoc.text(dateStr, colRightX, signatureY, { align: 'center' });
+    pdfDoc.setFont('helvetica', 'bold');
+    pdfDoc.setTextColor(15, 23, 42);
+    pdfDoc.text('Petugas Meja Registrasi', colRightX, signatureY + 4.5, { align: 'center' });
+
+    // Garis tanda tangan / nama
+    const lineSignY = signatureY + 24;
+    pdfDoc.setFont('helvetica', 'normal');
+    pdfDoc.setFontSize(8.5);
+    pdfDoc.setTextColor(71, 85, 105);
+    pdfDoc.text('( .................................................. )', colLeftX, lineSignY, { align: 'center' });
+    pdfDoc.text('( .................................................. )', colRightX, lineSignY, { align: 'center' });
+  } else {
+    // Kiri: Mengetahui, Ketua Umum BADKO TKA-TPA Kota
+    pdfDoc.text('Mengetahui,', colLeftX, signatureY, { align: 'center' });
+    pdfDoc.setFont('helvetica', 'bold');
+    pdfDoc.setTextColor(15, 23, 42);
+    pdfDoc.text('Ketua Umum BADKO TKA-TPA Kota', colLeftX, signatureY + 4.5, { align: 'center' });
+
+    // Kanan: Tanggal & Ketua Panitia FASI XIII
+    pdfDoc.setFont('helvetica', 'normal');
+    pdfDoc.setTextColor(71, 85, 105);
+    pdfDoc.text(dateStr, colRightX, signatureY, { align: 'center' });
+    pdfDoc.setFont('helvetica', 'bold');
+    pdfDoc.setTextColor(15, 23, 42);
+    pdfDoc.text('Ketua Panitia FASI XIII', colRightX, signatureY + 4.5, { align: 'center' });
+
+    // Nama Pejabat Bertandatangan
+    const lineSignY = signatureY + 24;
+    pdfDoc.setFont('helvetica', 'bold');
+    pdfDoc.setFontSize(9.5);
+    pdfDoc.text('Dicky Artanto, S.Pd., M.Pd.', colLeftX, lineSignY, { align: 'center' });
+    pdfDoc.text('Andry Sunny, S.E.', colRightX, lineSignY, { align: 'center' });
+
+    // Garis bawah nama
+    pdfDoc.setLineWidth(0.3);
+    pdfDoc.setDrawColor(15, 23, 42);
+    const leftTextWidth = pdfDoc.getTextWidth('Dicky Artanto, S.Pd., M.Pd.');
+    const rightTextWidth = pdfDoc.getTextWidth('Andry Sunny, S.E.');
+    pdfDoc.line(colLeftX - (leftTextWidth / 2), lineSignY + 0.8, colLeftX + (leftTextWidth / 2), lineSignY + 0.8);
+    pdfDoc.line(colRightX - (rightTextWidth / 2), lineSignY + 0.8, colRightX + (rightTextWidth / 2), lineSignY + 0.8);
+  }
 
   return pdfDoc;
 }
@@ -284,6 +357,7 @@ export async function downloadSingleRecapPdf({
   categoriesList,
   kemantrenList,
   fileName = 'Rekapitulasi_Peserta_FASI_XIII',
+  docType = 'daftar_hadir',
 }: {
   titleSubtitle: {
     mainTitle?: string;
@@ -294,6 +368,7 @@ export async function downloadSingleRecapPdf({
   categoriesList: CompetitionCategory[];
   kemantrenList: Kemantren[];
   fileName?: string;
+  docType?: 'daftar_hadir' | 'nominasi';
 }): Promise<void> {
   const doc = await renderRecapToPdfPage({
     titleSubtitle,
@@ -301,6 +376,7 @@ export async function downloadSingleRecapPdf({
     categoriesList,
     kemantrenList,
     isFirstPage: true,
+    docType,
   });
 
   const dateIso = new Date().toISOString().slice(0, 10);

@@ -19,6 +19,7 @@ import {
   Edit,
   Search,
   CheckCircle2,
+  XCircle,
   FolderOpen,
   ExternalLink,
   Eye,
@@ -181,12 +182,30 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     session?.role === 'kemantren_admin' && session?.kemantrenId ? session.kemantrenId : 'ALL'
   );
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('ALL');
+  const [selectedAttendanceFilter, setSelectedAttendanceFilter] = useState<'ALL' | 'hadir' | 'belum_hadir'>('ALL');
+
+  // Hitung ringkasan statistik kehadiran santri sesuai cakupan wilayah dan cabang lomba aktif
+  const attendanceStats = useMemo(() => {
+    let baseList = participants;
+    if (session?.role === 'kemantren_admin' && session?.kemantrenId) {
+      baseList = baseList.filter((p) => p.kemantrenId === session.kemantrenId);
+    } else if (selectedKemantrenFilter !== 'ALL') {
+      baseList = baseList.filter((p) => p.kemantrenId === selectedKemantrenFilter);
+    }
+    if (selectedCategoryFilter !== 'ALL') {
+      baseList = baseList.filter((p) => p.categoryId === selectedCategoryFilter);
+    }
+
+    const hadir = baseList.filter((p) => p.attendance === 'hadir').length;
+    const belumHadir = baseList.length - hadir;
+    return { total: baseList.length, hadir, belumHadir };
+  }, [participants, session, selectedKemantrenFilter, selectedCategoryFilter]);
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(10);
 
-  // Filter participants based on role & search
+  // Filter participants based on role, category, search, & attendance
   const visibleParticipants = useMemo(() => {
     return participants.filter((p) => {
       // If Kemantren Admin, lock strictly to their kemantren
@@ -200,6 +219,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         return false;
       }
 
+      if (selectedAttendanceFilter !== 'ALL') {
+        if (selectedAttendanceFilter === 'hadir' && p.attendance !== 'hadir') return false;
+        if (selectedAttendanceFilter === 'belum_hadir' && p.attendance === 'hadir') return false;
+      }
+
       if (searchTerm) {
         const match =
           (p.fullName && p.fullName.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -211,7 +235,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       return true;
     });
-  }, [participants, session, selectedKemantrenFilter, selectedCategoryFilter, searchTerm]);
+  }, [participants, session, selectedKemantrenFilter, selectedCategoryFilter, selectedAttendanceFilter, searchTerm]);
 
   // Total Pages Calculation
   const totalPages = Math.max(1, Math.ceil(visibleParticipants.length / pageSize));
@@ -735,7 +759,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3">
               <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
                 {/* Search Box */}
-                <div className="sm:col-span-6 relative">
+                <div className="sm:col-span-4 relative">
                   <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
@@ -785,27 +809,82 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     ))}
                   </select>
                 </div>
+
+                {/* Attendance Filter Select */}
+                <div className="sm:col-span-2">
+                  <select
+                    value={selectedAttendanceFilter}
+                    onChange={(e) => setSelectedAttendanceFilter(e.target.value as 'ALL' | 'hadir' | 'belum_hadir')}
+                    className="w-full py-2 px-3 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:bg-white focus:outline-none cursor-pointer font-medium"
+                  >
+                    <option value="ALL">Semua Kehadiran</option>
+                    <option value="hadir">✓ Hadir ({attendanceStats.hadir})</option>
+                    <option value="belum_hadir">✗ Belum Hadir ({attendanceStats.belumHadir})</option>
+                  </select>
+                </div>
               </div>
 
-              {/* Rows Per Page Selector & Summary info */}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pt-1 text-xs text-slate-500 border-t border-slate-100">
-                <div>
-                  Menampilkan <span className="font-bold text-slate-900">{visibleParticipants.length}</span> dari{' '}
-                  <span className="font-bold text-slate-900">{participants.length}</span> total santri terdaftar
+              {/* Attendance Quick Pills & Rows Per Page Selector */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-2 text-xs border-t border-slate-100">
+                {/* Quick Filter Buttons */}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-[11px] font-medium text-slate-500 mr-1">Status Kehadiran:</span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedAttendanceFilter('ALL')}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                      selectedAttendanceFilter === 'ALL'
+                        ? 'bg-emerald-900 text-white shadow-xs'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    Semua ({attendanceStats.total})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedAttendanceFilter('hadir')}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 cursor-pointer ${
+                      selectedAttendanceFilter === 'hadir'
+                        ? 'bg-emerald-600 text-white shadow-xs'
+                        : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
+                    }`}
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Hadir ({attendanceStats.hadir})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedAttendanceFilter('belum_hadir')}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 cursor-pointer ${
+                      selectedAttendanceFilter === 'belum_hadir'
+                        ? 'bg-rose-600 text-white shadow-xs'
+                        : 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
+                    }`}
+                  >
+                    <XCircle className="w-3.5 h-3.5" />
+                    <span>Belum Hadir ({attendanceStats.belumHadir})</span>
+                  </button>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <label className="text-[11px] font-medium text-slate-600">Tampilkan per halaman:</label>
-                  <select
-                    value={pageSize}
-                    onChange={(e) => setPageSize(Number(e.target.value))}
-                    className="text-xs py-1 px-2 border border-slate-300 rounded-lg bg-slate-50 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                  >
-                    <option value={10}>10 Baris</option>
-                    <option value={25}>25 Baris</option>
-                    <option value={50}>50 Baris</option>
-                    <option value={100}>100 Baris</option>
-                  </select>
+                {/* Right: Info & Per-Page Selector */}
+                <div className="flex items-center gap-4 text-slate-500">
+                  <div className="hidden md:block">
+                    Menampilkan <span className="font-bold text-slate-900">{visibleParticipants.length}</span> santri
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <label className="text-[11px] font-medium text-slate-600">Per halaman:</label>
+                    <select
+                      value={pageSize}
+                      onChange={(e) => setPageSize(Number(e.target.value))}
+                      className="text-xs py-1 px-2 border border-slate-300 rounded-lg bg-slate-50 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    >
+                      <option value={10}>10</option>
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                    </select>
+                  </div>
                 </div>
               </div>
             </div>

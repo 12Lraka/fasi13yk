@@ -22,10 +22,16 @@ import {
   CheckCircle2,
   Clock,
   Award,
+  Download,
+  Loader2,
+  FileText,
+  ClipboardCheck,
 } from 'lucide-react';
 import { Participant, UserSession } from '../../types/fasi';
 import { getStoredKemantren, getStoredCategories } from '../../utils/storage';
 import { exportParticipantsToExcel } from '../../utils/excelExport';
+import { downloadSingleRecapPdf } from '../../utils/recapPdfGenerator';
+import { showToast } from '../../utils/sweetalert';
 
 const LOGO_BADKO_URL = 'https://gigluvvkswjaiwxpnqet.supabase.co/storage/v1/object/public/public-assets/logobadko.png';
 const LOGO_FASI_URL = 'https://gigluvvkswjaiwxpnqet.supabase.co/storage/v1/object/public/public-assets/logofasi.png';
@@ -58,6 +64,10 @@ export const RekapPesertaAdmin: React.FC<RekapPesertaAdminProps> = ({
   // Pagination State (for screen preview only; print mode displays all filtered rows)
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(25);
+
+  // Format Lembar Dokumen: Daftar Hadir Meja Registrasi vs Daftar Nominasi Resmi
+  const [docType, setDocType] = useState<'daftar_hadir' | 'nominasi'>('daftar_hadir');
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState<boolean>(false);
 
   const currentKemantrenObj = useMemo(() => {
     if (isKemantrenAdmin && session.kemantrenId) {
@@ -153,6 +163,52 @@ export const RekapPesertaAdmin: React.FC<RekapPesertaAdminProps> = ({
     window.print();
   };
 
+  const handleDownloadPdf = async () => {
+    try {
+      setIsGeneratingPdf(true);
+      const kemObj = selectedKemantren !== 'ALL'
+        ? kemantrenList.find((k) => k.id === selectedKemantren)
+        : null;
+      const kemName = isKemantrenAdmin
+        ? currentKemantrenObj?.name || 'Kemantren'
+        : kemObj
+        ? kemObj.name
+        : 'Semua_Rayon';
+
+      const mainTitle = docType === 'daftar_hadir'
+        ? 'DAFTAR HADIR PESERTA MEJA REGISTRASI FASI XIII'
+        : 'REKAPITULASI NOMINASI TETAP PESERTA LOMBA';
+
+      const subTitle = isKemantrenAdmin
+        ? `KONTINGEN RAYON KEMANTREN ${currentKemantrenObj?.name?.toUpperCase() || ''} (${filteredParticipants.length} SANTRI)`
+        : selectedKemantren !== 'ALL'
+        ? `KONTINGEN RAYON ${kemName.toUpperCase()} (${filteredParticipants.length} SANTRI)`
+        : `SEMUA KONTINGEN 14 RAYON KOTA YOGYAKARTA (${filteredParticipants.length} SANTRI)`;
+
+      const filterInfo = `FASI XIII BADKO TKA-TPA Kota Yogyakarta • Dicetak pada ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`;
+
+      const fileName = docType === 'daftar_hadir'
+        ? `Daftar_Hadir_Registrasi_${kemName}`
+        : `Daftar_Nominasi_Peserta_${kemName}`;
+
+      await downloadSingleRecapPdf({
+        titleSubtitle: { mainTitle, subTitle, filterInfo },
+        participants: filteredParticipants,
+        categoriesList,
+        kemantrenList,
+        fileName,
+        docType,
+      });
+
+      showToast('success', 'Dokumen PDF A4 siap cetak berhasil diunduh.');
+    } catch (err) {
+      console.error('Gagal unduh PDF:', err);
+      showToast('error', 'Gagal memproses file PDF. Silakan coba kembali.');
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
   const handleExportExcel = () => {
     const prefix = isKemantrenAdmin
       ? `Daftar_Peserta_Kemantren_${currentKemantrenObj?.name || 'Kecamatan'}`
@@ -197,11 +253,24 @@ export const RekapPesertaAdmin: React.FC<RekapPesertaAdminProps> = ({
             </button>
 
             <button
+              onClick={handleDownloadPdf}
+              disabled={isGeneratingPdf}
+              className="flex-1 md:flex-initial px-4 py-2.5 bg-rose-700 hover:bg-rose-600 text-white font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer whitespace-nowrap disabled:opacity-50"
+            >
+              {isGeneratingPdf ? (
+                <Loader2 className="w-4 h-4 text-amber-300 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4 text-amber-300" />
+              )}
+              <span>{isGeneratingPdf ? 'Membuat PDF...' : 'Download PDF (A4)'}</span>
+            </button>
+
+            <button
               onClick={handlePrint}
               className="flex-1 md:flex-initial px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer whitespace-nowrap"
             >
               <Printer className="w-4 h-4 text-amber-300" />
-              <span>Cetak / Simpan PDF (A4)</span>
+              <span>Cetak Fisik (Printer)</span>
             </button>
           </div>
         </div>
@@ -227,6 +296,39 @@ export const RekapPesertaAdmin: React.FC<RekapPesertaAdminProps> = ({
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-center col-span-2 sm:col-span-1">
             <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider block">Presensi Hadir</span>
             <span className="text-xl font-black text-amber-900">{stats.hadir}</span>
+          </div>
+        </div>
+
+        {/* Mode Dokumen: Daftar Hadir Meja Registrasi vs Daftar Nominasi Resmi */}
+        <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-slate-700">Format Lembar Cetak / PDF:</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5 bg-slate-100 p-1 rounded-xl">
+            <button
+              type="button"
+              onClick={() => setDocType('daftar_hadir')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                docType === 'daftar_hadir'
+                  ? 'bg-emerald-900 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <ClipboardCheck className="w-3.5 h-3.5 text-amber-300" />
+              <span>Lembar Presensi Meja Registrasi (Kolom Paraf & TTD Petugas)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setDocType('nominasi')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                docType === 'nominasi'
+                  ? 'bg-emerald-900 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <FileText className="w-3.5 h-3.5 text-amber-300" />
+              <span>Daftar Nominasi Resmi (TTD Ketua Panitia & Ketua Umum)</span>
+            </button>
           </div>
         </div>
 
@@ -441,10 +543,14 @@ export const RekapPesertaAdmin: React.FC<RekapPesertaAdminProps> = ({
         {/* JUDUL DOKUMEN */}
         <div className="text-center my-4">
           <h4 className="font-black text-sm sm:text-base text-slate-900 uppercase tracking-wide underline">
-            Daftar Peserta FASI XIII
+            {docType === 'daftar_hadir'
+              ? 'DAFTAR HADIR PESERTA MEJA REGISTRASI FASI XIII'
+              : 'REKAPITULASI NOMINASI TETAP PESERTA LOMBA FASI XIII'}
           </h4>
           <p className="text-[11px] font-bold text-slate-700 uppercase tracking-wider mt-1">
-            {selectedKemantren !== 'ALL'
+            {isKemantrenAdmin
+              ? `KONTINGEN RAYON KEMANTREN ${currentKemantrenObj?.name?.toUpperCase() || ''}`
+              : selectedKemantren !== 'ALL'
               ? `KONTINGEN RAYON ${getKem(selectedKemantren)?.name.toUpperCase()}`
               : 'GABUNGAN SELURUH 14 RAYON KOTA YOGYAKARTA'}
           </p>
@@ -464,12 +570,15 @@ export const RekapPesertaAdmin: React.FC<RekapPesertaAdminProps> = ({
                 <th className="py-2.5 px-3 border border-slate-300">Rayon dan Asal TPA</th>
                 <th className="py-2.5 px-3 border border-slate-300">Cabang Lomba</th>
                 <th className="py-2.5 px-2 border border-slate-300 text-center w-20">Kehadiran</th>
+                {docType === 'daftar_hadir' && (
+                  <th className="py-2.5 px-3 border border-slate-300 text-center w-36">Paraf / Tanda Tangan</th>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
               {paginatedScreenRows.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-slate-400 italic">
+                  <td colSpan={docType === 'daftar_hadir' ? 8 : 7} className="py-8 text-center text-slate-400 italic">
                     Tidak ada data peserta yang cocok dengan filter pencarian.
                   </td>
                 </tr>
@@ -522,6 +631,14 @@ export const RekapPesertaAdmin: React.FC<RekapPesertaAdminProps> = ({
                           <span className="text-slate-400 font-medium">Belum</span>
                         )}
                       </td>
+                      {docType === 'daftar_hadir' && (
+                        <td className="py-1 px-2 border border-slate-300 text-center">
+                          <div className="h-7 border border-dashed border-slate-300 rounded flex items-center justify-between px-2 text-[9px] text-slate-400 font-mono">
+                            <span>{rowNum}.</span>
+                            <span>....................</span>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   );
                 })
@@ -538,18 +655,21 @@ export const RekapPesertaAdmin: React.FC<RekapPesertaAdminProps> = ({
             <thead>
               <tr className="bg-slate-100 text-slate-900 font-bold border-b border-slate-400">
                 <th className="py-1.5 px-2 border border-slate-400 text-center w-8">No</th>
-                <th className="py-1.5 px-2 border border-slate-400 w-28">No Registrasi</th>
-                <th className="py-1.5 px-2 border border-slate-400">Nama lengkap</th>
-                <th className="py-1.5 px-1 border border-slate-400 text-center w-10">L/P</th>
-                <th className="py-1.5 px-2 border border-slate-400">Kemantren dan Asal TPA</th>
+                <th className="py-1.5 px-2 border border-slate-400 w-24">No Reg</th>
+                <th className="py-1.5 px-2 border border-slate-400">Nama Lengkap Santri</th>
+                <th className="py-1.5 px-1 border border-slate-400 text-center w-8">L/P</th>
+                <th className="py-1.5 px-2 border border-slate-400">Rayon dan Asal TPA</th>
                 <th className="py-1.5 px-2 border border-slate-400">Cabang Lomba</th>
-                <th className="py-1.5 px-2 border border-slate-400 text-center w-18">Kehadiran</th>
+                <th className="py-1.5 px-2 border border-slate-400 text-center w-16">Status</th>
+                {docType === 'daftar_hadir' && (
+                  <th className="py-1.5 px-2 border border-slate-400 text-center w-28">Paraf / TTD</th>
+                )}
               </tr>
             </thead>
             <tbody>
               {filteredParticipants.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-6 text-center text-slate-500 italic">
+                  <td colSpan={docType === 'daftar_hadir' ? 8 : 7} className="py-6 text-center text-slate-500 italic">
                     Tidak ada data peserta.
                   </td>
                 </tr>
@@ -574,7 +694,7 @@ export const RekapPesertaAdmin: React.FC<RekapPesertaAdminProps> = ({
                         {p.gender}
                       </td>
                       <td className="py-1 px-2 border border-slate-400">
-                        <span className="font-bold">Kemantren {kem?.name || p.kemantrenId}</span>
+                        <span className="font-bold">Rayon {kem?.name || p.kemantrenId}</span>
                         {p.tpaUnitName && <span className="text-[8pt] text-slate-700 block">{p.tpaUnitName}</span>}
                       </td>
                       <td className="py-1 px-2 border border-slate-400">
@@ -584,6 +704,14 @@ export const RekapPesertaAdmin: React.FC<RekapPesertaAdminProps> = ({
                       <td className="py-1 px-1.5 border border-slate-400 text-center font-semibold text-[8pt]">
                         {isHadir ? 'Hadir' : 'Belum'}
                       </td>
+                      {docType === 'daftar_hadir' && (
+                        <td className="py-1 px-1.5 border border-slate-400 text-left align-middle">
+                          <div className="flex items-center justify-between text-[8pt] text-slate-600 px-0.5">
+                            <span className="font-mono text-[7.5pt]">{idx + 1}.</span>
+                            <span className="text-slate-400">...............</span>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   );
                 })
@@ -596,33 +724,67 @@ export const RekapPesertaAdmin: React.FC<RekapPesertaAdminProps> = ({
         {/* TANDA TANGAN RESMI DI BAGIAN BAWAH */}
         {/* ========================================================================= */}
         <div className="mt-10 pt-4 grid grid-cols-2 gap-8 text-center text-xs break-inside-avoid">
-          {/* Kiri: Ketua Umum BADKO TKA-TPA Kota */}
-          <div className="flex flex-col items-center justify-between min-h-[100px]">
-            <div>
-              <p className="text-slate-600 font-medium">Mengetahui,</p>
-              <p className="font-bold text-slate-900 mt-0.5">Ketua Umum BADKO TKA-TPA Kota</p>
-            </div>
-            <div className="mt-14">
-              <p className="font-extrabold text-slate-950 underline tracking-wide text-xs sm:text-sm">
-                Dicky Artanto, S.Pd., M.Pd.
-              </p>
-            </div>
-          </div>
+          {docType === 'daftar_hadir' ? (
+            <>
+              {/* Kiri: Koordinator Registrasi & Kesekretariatan */}
+              <div className="flex flex-col items-center justify-between min-h-[100px]">
+                <div>
+                  <p className="text-slate-600 font-medium">Mengetahui / Mengesahkan,</p>
+                  <p className="font-bold text-slate-900 mt-0.5">Koordinator Sie Lomba</p>
+                </div>
+                <div className="mt-14">
+                  <p className="font-extrabold text-slate-950 underline tracking-wide text-xs sm:text-sm">
+                    ( .................................................... )
+                  </p>
+                </div>
+              </div>
 
-          {/* Kanan: Ketua Panitia FASI XIII */}
-          <div className="flex flex-col items-center justify-between min-h-[100px]">
-            <div>
-              <p className="text-slate-600 font-medium">
-                Yogyakarta, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
-              </p>
-              <p className="font-bold text-slate-900 mt-0.5">Ketua Panitia FASI XIII</p>
-            </div>
-            <div className="mt-14">
-              <p className="font-extrabold text-slate-950 underline tracking-wide text-xs sm:text-sm">
-                Andry Sunny, S.E.
-              </p>
-            </div>
-          </div>
+              {/* Kanan: Petugas Meja Registrasi */}
+              <div className="flex flex-col items-center justify-between min-h-[100px]">
+                <div>
+                  <p className="text-slate-600 font-medium">
+                    Yogyakarta, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  </p>
+                  <p className="font-bold text-slate-900 mt-0.5">Petugas Meja Registrasi</p>
+                </div>
+                <div className="mt-14">
+                  <p className="font-extrabold text-slate-950 underline tracking-wide text-xs sm:text-sm">
+                    ( .................................................... )
+                  </p>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Kiri: Ketua Umum BADKO TKA-TPA Kota */}
+              <div className="flex flex-col items-center justify-between min-h-[100px]">
+                <div>
+                  <p className="text-slate-600 font-medium">Mengetahui,</p>
+                  <p className="font-bold text-slate-900 mt-0.5">Ketua Umum BADKO TKA-TPA Kota</p>
+                </div>
+                <div className="mt-14">
+                  <p className="font-extrabold text-slate-950 underline tracking-wide text-xs sm:text-sm">
+                    Dicky Artanto, S.Pd., M.Pd.
+                  </p>
+                </div>
+              </div>
+
+              {/* Kanan: Ketua Panitia FASI XIII */}
+              <div className="flex flex-col items-center justify-between min-h-[100px]">
+                <div>
+                  <p className="text-slate-600 font-medium">
+                    Yogyakarta, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  </p>
+                  <p className="font-bold text-slate-900 mt-0.5">Ketua Panitia FASI XIII</p>
+                </div>
+                <div className="mt-14">
+                  <p className="font-extrabold text-slate-950 underline tracking-wide text-xs sm:text-sm">
+                    Andry Sunny, S.E.
+                  </p>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
