@@ -176,7 +176,7 @@ export interface IdCardCommitteeData {
   name?: string;
   division: string;
   accessLevel?: string;
-  cardCategory?: 'panitia' | 'dewan_hakim';
+  cardCategory?: 'panitia' | 'dewan_hakim' | 'panitera';
   customBadge?: string;
   createdAt?: string;
   updatedAt?: string;

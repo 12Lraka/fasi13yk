@@ -1221,8 +1221,8 @@ export async function fetchCommitteesFromSupabase(): Promise<IdCardCommitteeData
       name: row.name || '',
       division: row.division || 'Panitia Pelaksana',
       accessLevel: row.access_level || 'ALL ACCESS',
-      cardCategory: row.card_category === 'dewan_hakim' ? 'dewan_hakim' : 'panitia',
-      customBadge: row.custom_badge || (row.card_category === 'dewan_hakim' ? 'DEWAN HAKIM' : 'PANITIA'),
+      cardCategory: row.card_category === 'dewan_hakim' ? 'dewan_hakim' : (row.card_category === 'panitera' ? 'panitera' : 'panitia'),
+      customBadge: row.custom_badge || (row.card_category === 'dewan_hakim' ? 'DEWAN HAKIM' : (row.card_category === 'panitera' ? 'PANITERA' : 'PANITIA')),
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     }));
@@ -1243,7 +1243,7 @@ export async function upsertCommitteeToSupabase(committee: IdCardCommitteeData):
       division: committee.division,
       access_level: committee.accessLevel || 'ALL ACCESS',
       card_category: committee.cardCategory || 'panitia',
-      custom_badge: committee.customBadge || (committee.cardCategory === 'dewan_hakim' ? 'DEWAN HAKIM' : 'PANITIA'),
+      custom_badge: committee.customBadge || (committee.cardCategory === 'dewan_hakim' ? 'DEWAN HAKIM' : (committee.cardCategory === 'panitera' ? 'PANITERA' : 'PANITIA')),
       updated_at: new Date().toISOString(),
     };
 

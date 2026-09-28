@@ -682,6 +682,9 @@ export const DEFAULT_COMMITTEES: IdCardCommitteeData[] = [
   { id: 'com-7', name: 'Ustadz M. Qasim, S.Th.I', division: 'Sekretaris Dewan Hakim', accessLevel: 'RUANG HAKIM & JURI', cardCategory: 'dewan_hakim', customBadge: 'DEWAN HAKIM' },
   { id: 'com-8', name: 'Dewan Hakim Tilawah Al-Qur\'an', division: 'Cabang Tilawah (TKA, TPA, TQA)', accessLevel: 'RUANG HAKIM & JURI', cardCategory: 'dewan_hakim', customBadge: 'DEWAN HAKIM' },
   { id: 'com-9', name: 'Dewan Hakim Tahfidz Juz \'Amma', division: 'Cabang Tahfidz (TPA & TQA)', accessLevel: 'RUANG HAKIM & JURI', cardCategory: 'dewan_hakim', customBadge: 'DEWAN HAKIM' },
+  { id: 'com-10', name: 'Panitera Cabang Tilawah Al-Qur\'an', division: 'Panitera Arena Tilawah', accessLevel: 'ARENA LOMBA & MEJA PANITERA', cardCategory: 'panitera', customBadge: 'PANITERA' },
+  { id: 'com-11', name: 'Panitera Cabang Tahfidz Juz \'Amma', division: 'Panitera Arena Tahfidz', accessLevel: 'ARENA LOMBA & MEJA PANITERA', cardCategory: 'panitera', customBadge: 'PANITERA' },
+  { id: 'com-12', name: 'Panitera Cerdas Cermat Al-Qur\'an', division: 'Panitera Arena CCQ', accessLevel: 'ARENA LOMBA & MEJA PANITERA', cardCategory: 'panitera', customBadge: 'PANITERA' },
 ];
 
 export function getStoredCommittees(): IdCardCommitteeData[] {

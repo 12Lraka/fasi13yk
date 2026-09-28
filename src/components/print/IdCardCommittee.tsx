@@ -15,8 +15,8 @@ export interface CommitteeCardData {
   name?: string; // Optional: If empty, provides empty space area for physical sticker/handwritten name
   division: string; // e.g. "Sie Acara & Lomba", "Dewan Juri Tilawah", "Sie IT & Registrasi", "Koordinator Dewan Hakim"
   accessLevel?: string; // e.g. "ALL ACCESS", "PANITIA INTI", "RUANG HAKIM & JURI"
-  cardCategory?: 'panitia' | 'dewan_hakim';
-  customBadge?: string; // e.g. "PANITIA" or "DEWAN HAKIM"
+  cardCategory?: 'panitia' | 'dewan_hakim' | 'panitera';
+  customBadge?: string; // e.g. "PANITIA", "DEWAN HAKIM", or "PANITERA"
 }
 
 interface IdCardCommitteeProps {
@@ -31,12 +31,21 @@ export const IdCardCommittee: React.FC<IdCardCommitteeProps> = ({
   customTagline = 'Santri Hebat, Hebat Prestasi, Hebat Mengaji, & Berakhlakul Karimah.',
 }) => {
   const hasDigitalName = Boolean(data.name && data.name.trim().length > 0);
-  const isDewanHakim =
-    data.cardCategory === 'dewan_hakim' ||
-    (data.customBadge && /hakim|juri/i.test(data.customBadge)) ||
-    /hakim|juri/i.test(data.division || '');
+  const isPanitera =
+    data.cardCategory === 'panitera' ||
+    (data.customBadge && /panitera/i.test(data.customBadge)) ||
+    /panitera/i.test(data.division || '');
 
-  const badgeText = data.customBadge || (isDewanHakim ? 'DEWAN HAKIM' : 'PANITIA');
+  const isDewanHakim =
+    !isPanitera &&
+    (data.cardCategory === 'dewan_hakim' ||
+      (data.customBadge && /hakim|juri/i.test(data.customBadge)) ||
+      /hakim|juri/i.test(data.division || ''));
+
+  const badgeText = data.customBadge || (isPanitera ? 'PANITERA' : (isDewanHakim ? 'DEWAN HAKIM' : 'PANITIA'));
+
+  // Badge background color
+  const badgeBgColor = isPanitera ? '#0369a1' : (isDewanHakim ? '#831843' : theme.badgeBg);
 
   // Dynamic font sizing
   const nameLength = (data.name || '').trim().length;
@@ -99,11 +108,11 @@ export const IdCardCommittee: React.FC<IdCardCommitteeProps> = ({
 
       {/* 2. Middle Content: Divisi / Jabatan + Area Nama */}
       <div className="relative z-10 my-auto py-1 text-center flex flex-col items-center justify-center space-y-1.5">
-        {/* Badge: PANITIA atau DEWAN HAKIM */}
+        {/* Badge: PANITIA, DEWAN HAKIM, atau PANITERA */}
         <div
           className="inline-flex items-center justify-center px-4 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-2xs"
           style={{
-            backgroundColor: isDewanHakim ? '#831843' : theme.badgeBg,
+            backgroundColor: badgeBgColor,
             color: '#ffffff',
           }}
         >
@@ -113,13 +122,15 @@ export const IdCardCommittee: React.FC<IdCardCommitteeProps> = ({
         {/* Divisi / Bidang Lomba */}
         <div className="w-full pt-0.5">
           <span className="text-[5.5px] uppercase font-extrabold text-slate-500 block tracking-widest mb-0.5">
-            {isDewanHakim ? 'BIDANG PENILAIAN / JABATAN' : 'SEKSI / DIVISI'}
+            {isPanitera
+              ? 'TUGAS ARENA / CABANG LOMBA'
+              : (isDewanHakim ? 'BIDANG PENILAIAN / JABATAN' : 'SEKSI / DIVISI')}
           </span>
           <h3
             className="font-black text-[11px] uppercase tracking-tight leading-tight m-0"
             style={{ color: theme.primaryColor }}
           >
-            {data.division || (isDewanHakim ? 'DEWAN HAKIM FASI XIII' : 'PANITIA FASI XIII')}
+            {data.division || (isPanitera ? 'PANITERA ARENA LOMBA' : (isDewanHakim ? 'DEWAN HAKIM FASI XIII' : 'PANITIA FASI XIII'))}
           </h3>
         </div>
 
@@ -130,7 +141,9 @@ export const IdCardCommittee: React.FC<IdCardCommitteeProps> = ({
             style={{ borderColor: `${theme.borderColor}60` }}
           >
             <span className="text-[5.5px] uppercase font-bold block text-slate-500 tracking-wider">
-              {isDewanHakim ? 'NAMA LENGKAP DEWAN HAKIM' : 'NAMA LENGKAP PANITIA'}
+              {isPanitera
+                ? 'NAMA LENGKAP PANITERA'
+                : (isDewanHakim ? 'NAMA LENGKAP DEWAN HAKIM' : 'NAMA LENGKAP PANITIA')}
             </span>
             <h4
               className={`font-black uppercase font-sans tracking-tight line-clamp-2 ${nameFontSizeClass}`}
@@ -142,11 +155,11 @@ export const IdCardCommittee: React.FC<IdCardCommitteeProps> = ({
               <span
                 className="inline-block font-extrabold text-[7px] uppercase tracking-wider px-2 py-0.2 rounded"
                 style={{
-                  color: theme.accentColor,
-                  backgroundColor: `${theme.accentColor}18`,
+                  color: isPanitera ? '#0369a1' : theme.accentColor,
+                  backgroundColor: isPanitera ? '#e0f2fe' : `${theme.accentColor}18`,
                 }}
               >
-                {data.accessLevel || (isDewanHakim ? 'RUANG HAKIM & JURI' : 'ALL ACCESS')}
+                {data.accessLevel || (isPanitera ? 'ARENA LOMBA & MEJA PANITERA' : (isDewanHakim ? 'RUANG HAKIM & JURI' : 'ALL ACCESS'))}
               </span>
             </div>
           </div>
@@ -159,7 +172,9 @@ export const IdCardCommittee: React.FC<IdCardCommitteeProps> = ({
             }}
           >
             <span className="text-[6px] font-extrabold uppercase tracking-wider text-slate-600 mb-0.5">
-              {isDewanHakim ? '[ TEMPEL LABEL / NAMA DEWAN HAKIM ]' : '[ TEMPEL LABEL / TULIS NAMA ]'}
+              {isPanitera
+                ? '[ TEMPEL LABEL / NAMA PANITERA ]'
+                : (isDewanHakim ? '[ TEMPEL LABEL / NAMA DEWAN HAKIM ]' : '[ TEMPEL LABEL / TULIS NAMA ]')}
             </span>
             <div className="w-3/4 h-[1px] bg-slate-300 my-0.5" />
             <span className="text-[5.5px] font-bold text-slate-500">

@@ -37,6 +37,7 @@ import {
   CheckCircle2,
   HelpCircle,
   Scale,
+  FileText,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
@@ -140,10 +141,10 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
     isAdminRayon && session?.kemantrenId ? session.kemantrenId : kemantrenList[0]?.id || 'kem-1'
   );
 
-  // 5. State Generator untuk Panitia & Dewan Hakim (Superadmin Only)
-  const [committeeSubCategory, setCommitteeSubCategory] = useState<'ALL' | 'panitia' | 'dewan_hakim'>('ALL');
+  // 5. State Generator untuk Panitia, Dewan Hakim, & Panitera (Superadmin Only)
+  const [committeeSubCategory, setCommitteeSubCategory] = useState<'ALL' | 'panitia' | 'dewan_hakim' | 'panitera'>('ALL');
   const [committeeMode, setCommitteeMode] = useState<'preset' | 'custom' | 'blanko'>('preset');
-  const [blankoType, setBlankoType] = useState<'panitia' | 'dewan_hakim' | 'campuran'>('campuran');
+  const [blankoType, setBlankoType] = useState<'panitia' | 'dewan_hakim' | 'panitera' | 'campuran'>('campuran');
   const [blankoCount, setBlankoCount] = useState<number>(18);
 
   const [customCommittees, setCustomCommittees] = useState<CommitteeCardData[]>(() => {
@@ -151,7 +152,7 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
   });
 
   const [newComName, setNewComName] = useState('');
-  const [newComType, setNewComType] = useState<'panitia' | 'dewan_hakim'>('panitia');
+  const [newComType, setNewComType] = useState<'panitia' | 'dewan_hakim' | 'panitera'>('panitia');
   const [newComDivision, setNewComDivision] = useState('Sie Acara & Lomba');
   const [newComAccess, setNewComAccess] = useState('ALL ACCESS');
 
@@ -386,7 +387,26 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
     { id: 'com-h-18', name: 'Anggota Dewan Hakim III', division: 'Penilai Bidang Adab & Kerapian', accessLevel: 'RUANG HAKIM & JURI', cardCategory: 'dewan_hakim', customBadge: 'DEWAN HAKIM' },
   ], []);
 
-  // List Panitia & Dewan Hakim Tergenerate
+  // Preset Panitera Arena Lomba FASI XIII
+  const PRESET_PANITERA: CommitteeCardData[] = useMemo(() => [
+    { id: 'com-pan-1', name: 'Panitera Cabang Tilawah Al-Qur\'an', division: 'Panitera Arena Tilawah (TKA, TPA, TQA)', accessLevel: 'ARENA LOMBA & MEJA PANITERA', cardCategory: 'panitera', customBadge: 'PANITERA' },
+    { id: 'com-pan-2', name: 'Panitera Cabang Tartil Al-Qur\'an', division: 'Panitera Arena Tartil (TKA & TPA)', accessLevel: 'ARENA LOMBA & MEJA PANITERA', cardCategory: 'panitera', customBadge: 'PANITERA' },
+    { id: 'com-pan-3', name: 'Panitera Cabang Tahfidz Juz \'Amma', division: 'Panitera Arena Tahfidz (TPA & TQA)', accessLevel: 'ARENA LOMBA & MEJA PANITERA', cardCategory: 'panitera', customBadge: 'PANITERA' },
+    { id: 'com-pan-4', name: 'Panitera Cerdas Cermat Al-Qur\'an', division: 'Panitera Arena CCQ (TPA)', accessLevel: 'ARENA LOMBA & MEJA PANITERA', cardCategory: 'panitera', customBadge: 'PANITERA' },
+    { id: 'com-pan-5', name: 'Panitera Adzan & Iqamah', division: 'Panitera Arena Adzan (TKA & TPA)', accessLevel: 'ARENA LOMBA & MEJA PANITERA', cardCategory: 'panitera', customBadge: 'PANITERA' },
+    { id: 'com-pan-6', name: 'Panitera Nasyid Islami', division: 'Panitera Arena Nasyid (TPA)', accessLevel: 'ARENA LOMBA & MEJA PANITERA', cardCategory: 'panitera', customBadge: 'PANITERA' },
+    { id: 'com-pan-7', name: 'Panitera Peragaan Sholat', division: 'Panitera Arena Sholat (TKA & TPA)', accessLevel: 'ARENA LOMBA & MEJA PANITERA', cardCategory: 'panitera', customBadge: 'PANITERA' },
+    { id: 'com-pan-8', name: 'Panitera Ikrar & Puitisasi Tarjamah', division: 'Panitera Arena Ikrar (TPA)', accessLevel: 'ARENA LOMBA & MEJA PANITERA', cardCategory: 'panitera', customBadge: 'PANITERA' },
+    { id: 'com-pan-9', name: 'Panitera Ceramah Agama Islam', division: 'Panitera Arena Pidato (TQA)', accessLevel: 'ARENA LOMBA & MEJA PANITERA', cardCategory: 'panitera', customBadge: 'PANITERA' },
+    { id: 'com-pan-10', name: 'Panitera Kisah Islami', division: 'Panitera Arena Cerita (TPA)', accessLevel: 'ARENA LOMBA & MEJA PANITERA', cardCategory: 'panitera', customBadge: 'PANITERA' },
+    { id: 'com-pan-11', name: 'Panitera Kaligrafi Al-Qur\'an', division: 'Panitera Arena Kaligrafi (TQA)', accessLevel: 'ARENA LOMBA & MEJA PANITERA', cardCategory: 'panitera', customBadge: 'PANITERA' },
+    { id: 'com-pan-12', name: 'Panitera Menggambar & Mewarnai', division: 'Panitera Arena Gambar/Warna (TKA & TPA)', accessLevel: 'ARENA LOMBA & MEJA PANITERA', cardCategory: 'panitera', customBadge: 'PANITERA' },
+    { id: 'com-pan-13', name: 'Panitera Syarhil / Fahmil Qur\'an', division: 'Panitera Arena Syarhil (TQA)', accessLevel: 'ARENA LOMBA & MEJA PANITERA', cardCategory: 'panitera', customBadge: 'PANITERA' },
+    { id: 'com-pan-14', name: 'Panitera Arena Panggung Cadangan I', division: 'Petugas Panitera Panggung A', accessLevel: 'ARENA LOMBA & MEJA PANITERA', cardCategory: 'panitera', customBadge: 'PANITERA' },
+    { id: 'com-pan-15', name: 'Panitera Arena Panggung Cadangan II', division: 'Petugas Panitera Panggung B', accessLevel: 'ARENA LOMBA & MEJA PANITERA', cardCategory: 'panitera', customBadge: 'PANITERA' },
+  ], []);
+
+  // List Panitia, Dewan Hakim, & Panitera Tergenerate
   const generatedCommittees: CommitteeCardData[] = useMemo(() => {
     let rawList: CommitteeCardData[] = [];
 
@@ -411,10 +431,19 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
           cardCategory: 'dewan_hakim',
           customBadge: 'DEWAN HAKIM',
         }));
+      } else if (blankoType === 'panitera') {
+        rawList = Array.from({ length: blankoCount }, (_, idx) => ({
+          id: `com-blanko-pan-${idx + 1}`,
+          name: '',
+          division: idx % 3 === 0 ? 'Panitera Arena Cabang Tilawah/Tahfidz' : idx % 3 === 1 ? 'Panitera Arena Cerdas Cermat' : 'Panitera Arena Seni & Dakwah',
+          accessLevel: 'ARENA LOMBA & MEJA PANITERA',
+          cardCategory: 'panitera',
+          customBadge: 'PANITERA',
+        }));
       } else {
-        // Campuran
-        const half = Math.floor(blankoCount / 2);
-        const panitiaPart: CommitteeCardData[] = Array.from({ length: half }, (_, idx) => ({
+        // Campuran (Panitia, Dewan Hakim, & Panitera)
+        const part = Math.floor(blankoCount / 3);
+        const panitiaPart: CommitteeCardData[] = Array.from({ length: part }, (_, idx) => ({
           id: `com-mix-p-${idx + 1}`,
           name: '',
           division: idx % 2 === 0 ? 'Sie Acara & Lomba' : 'Sie IT & Logistik',
@@ -422,7 +451,7 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
           cardCategory: 'panitia',
           customBadge: 'PANITIA',
         }));
-        const hakimPart: CommitteeCardData[] = Array.from({ length: blankoCount - half }, (_, idx) => ({
+        const hakimPart: CommitteeCardData[] = Array.from({ length: part }, (_, idx) => ({
           id: `com-mix-h-${idx + 1}`,
           name: '',
           division: 'Dewan Hakim / Juri FASI XIII',
@@ -430,22 +459,33 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
           cardCategory: 'dewan_hakim',
           customBadge: 'DEWAN HAKIM',
         }));
-        rawList = [...panitiaPart, ...hakimPart];
+        const paniteraPart: CommitteeCardData[] = Array.from({ length: blankoCount - (part * 2) }, (_, idx) => ({
+          id: `com-mix-pan-${idx + 1}`,
+          name: '',
+          division: 'Panitera Arena Lomba FASI XIII',
+          accessLevel: 'ARENA LOMBA & MEJA PANITERA',
+          cardCategory: 'panitera',
+          customBadge: 'PANITERA',
+        }));
+        rawList = [...panitiaPart, ...hakimPart, ...paniteraPart];
       }
     } else {
-      // Preset Gabungan
-      rawList = [...PRESET_PANITIA, ...PRESET_DEWAN_HAKIM];
+      // Preset Gabungan (Panitia + Dewan Hakim + Panitera)
+      rawList = [...PRESET_PANITIA, ...PRESET_DEWAN_HAKIM, ...PRESET_PANITERA];
     }
 
-    // Filter berdasarkan subkategori (ALL, panitia, dewan_hakim)
+    // Filter berdasarkan subkategori (ALL, panitia, dewan_hakim, panitera)
     if (committeeSubCategory === 'panitia') {
       return rawList.filter((item) => item.cardCategory === 'panitia');
     }
     if (committeeSubCategory === 'dewan_hakim') {
       return rawList.filter((item) => item.cardCategory === 'dewan_hakim');
     }
+    if (committeeSubCategory === 'panitera') {
+      return rawList.filter((item) => item.cardCategory === 'panitera');
+    }
     return rawList;
-  }, [committeeMode, customCommittees, blankoType, blankoCount, PRESET_PANITIA, PRESET_DEWAN_HAKIM, committeeSubCategory]);
+  }, [committeeMode, customCommittees, blankoType, blankoCount, PRESET_PANITIA, PRESET_DEWAN_HAKIM, PRESET_PANITERA, committeeSubCategory]);
 
   // Handle Tambah Custom Official
   const handleAddCustomOfficial = async () => {
@@ -471,7 +511,7 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
     showToast('success', `Official "${off.name}" dihapus.`);
   };
 
-  // Handle Tambah Custom Committee / Dewan Hakim
+  // Handle Tambah Custom Committee / Dewan Hakim / Panitera
   const handleAddCustomCommittee = async () => {
     if (!newComName.trim()) return;
     const newCom: CommitteeCardData = {
@@ -480,7 +520,7 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
       division: newComDivision,
       accessLevel: newComAccess,
       cardCategory: newComType,
-      customBadge: newComType === 'dewan_hakim' ? 'DEWAN HAKIM' : 'PANITIA',
+      customBadge: newComType === 'dewan_hakim' ? 'DEWAN HAKIM' : (newComType === 'panitera' ? 'PANITERA' : 'PANITIA'),
     };
     await persistCommittee(newCom);
     setCustomCommittees((prev) => [...prev, newCom]);
@@ -549,7 +589,7 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
         );
       } else {
         fileNames = generatedCommittees.map(
-          (com, i) => `${com.cardCategory === 'dewan_hakim' ? 'Hakim' : 'Panitia'}_${i + 1}_${com.name ? com.name.replace(/\s+/g, '_') : 'Blanko'}`
+          (com, i) => `${com.cardCategory === 'panitera' ? 'Panitera' : (com.cardCategory === 'dewan_hakim' ? 'Hakim' : 'Panitia')}_${i + 1}_${com.name ? com.name.replace(/\s+/g, '_') : 'Blanko'}`
         );
       }
 
@@ -819,10 +859,10 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
                   ? 'bg-white text-rose-900 shadow-xs cursor-pointer'
                   : 'text-slate-600 hover:text-slate-900 cursor-pointer'
               }`}
-              title={!canAccessPanitia ? 'Hanya dapat diakses oleh Super Admin' : 'Cetak ID Card Panitia Pelaksana & Dewan Hakim'}
+              title={!canAccessPanitia ? 'Hanya dapat diakses oleh Super Admin' : 'Cetak ID Card Panitia Pelaksana, Dewan Hakim, & Panitera'}
             >
               <Award className="w-4 h-4 text-rose-700" />
-              <span>ID Card Panitia & Hakim</span>
+              <span>ID Card Panitia, Hakim & Panitera</span>
               {!canAccessPanitia ? (
                 <Lock className="w-3 h-3 text-slate-400" />
               ) : (
@@ -1152,29 +1192,29 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
           </div>
         )}
 
-        {/* C. JIKA MEMILIH ID CARD PANITIA & DEWAN HAKIM (SUPERADMIN ONLY) */}
+        {/* C. JIKA MEMILIH ID CARD PANITIA, DEWAN HAKIM, & PANITERA (SUPERADMIN ONLY) */}
         {activeCardType === 'panitia' && canAccessPanitia && (
           <div className="bg-rose-50/50 rounded-xl p-4 border border-rose-200/80 space-y-4">
             <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3">
               <div>
                 <span className="text-xs font-black text-rose-950 uppercase tracking-wider flex items-center gap-1.5">
                   <Award className="w-3.5 h-3.5 text-rose-700" />
-                  <span>Sistem Generator Kartu Panitia Pelaksana & Dewan Hakim</span>
+                  <span>Sistem Generator Kartu Panitia Pelaksana, Dewan Hakim, & Panitera</span>
                 </span>
                 <p className="text-[11px] text-slate-500 mt-0.5">
-                  Tersedia opsi kartu khusus <strong>Panitia Pelaksana</strong> (Badge Merah/Maroon) dan <strong>Dewan Hakim / Juri</strong> (Badge Khusus Ruang Hakim).
+                  Tersedia opsi kartu khusus <strong>Panitia Pelaksana</strong> (Badge Maroon), <strong>Dewan Hakim / Juri</strong> (Badge Pink/Wine), dan <strong>Panitera</strong> (Badge Biru Arena Lomba).
                 </p>
               </div>
 
-              {/* Sub-Kategori Filter (ALL, Panitia, Dewan Hakim) */}
-              <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-rose-200">
+              {/* Sub-Kategori Filter (ALL, Panitia, Dewan Hakim, Panitera) */}
+              <div className="flex flex-wrap items-center gap-1 bg-white p-1 rounded-lg border border-rose-200">
                 <button
                   onClick={() => setCommitteeSubCategory('ALL')}
                   className={`px-2.5 py-1 text-xs font-bold rounded-md transition-colors cursor-pointer ${
                     committeeSubCategory === 'ALL' ? 'bg-rose-900 text-white' : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  Semua ({PRESET_PANITIA.length + PRESET_DEWAN_HAKIM.length})
+                  Semua ({PRESET_PANITIA.length + PRESET_DEWAN_HAKIM.length + PRESET_PANITERA.length})
                 </button>
                 <button
                   onClick={() => setCommitteeSubCategory('panitia')}
@@ -1183,7 +1223,7 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
                   }`}
                 >
                   <Award className="w-3 h-3" />
-                  <span>Panitia Pelaksana</span>
+                  <span>Panitia ({PRESET_PANITIA.length})</span>
                 </button>
                 <button
                   onClick={() => setCommitteeSubCategory('dewan_hakim')}
@@ -1192,7 +1232,16 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
                   }`}
                 >
                   <Scale className="w-3 h-3" />
-                  <span>Dewan Hakim</span>
+                  <span>Dewan Hakim ({PRESET_DEWAN_HAKIM.length})</span>
+                </button>
+                <button
+                  onClick={() => setCommitteeSubCategory('panitera')}
+                  className={`px-2.5 py-1 text-xs font-bold rounded-md transition-colors cursor-pointer flex items-center gap-1 ${
+                    committeeSubCategory === 'panitera' ? 'bg-sky-700 text-white' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <FileText className="w-3 h-3" />
+                  <span>Panitera ({PRESET_PANITERA.length})</span>
                 </button>
               </div>
             </div>
@@ -1206,7 +1255,7 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
                     committeeMode === 'preset' ? 'bg-rose-900 text-white' : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  🏛️ Preset Resmi (Panitia + Hakim)
+                  🏛️ Preset Resmi (Panitia + Hakim + Panitera)
                 </button>
                 <button
                   onClick={() => setCommitteeMode('blanko')}
@@ -1227,7 +1276,7 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
               </div>
             </div>
 
-            {/* Sub Controls Blanko Panitia & Hakim */}
+            {/* Sub Controls Blanko Panitia, Hakim & Panitera */}
             {committeeMode === 'blanko' && (
               <div className="space-y-3 bg-white p-3 rounded-lg border border-rose-100">
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1238,9 +1287,10 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
                       onChange={(e) => setBlankoType(e.target.value as any)}
                       className="text-xs font-semibold bg-slate-50 border border-slate-300 rounded-lg p-1.5"
                     >
-                      <option value="campuran">Campuran (Panitia & Dewan Hakim)</option>
+                      <option value="campuran">Campuran (Panitia, Hakim & Panitera)</option>
                       <option value="panitia">Khusus Panitia Pelaksana</option>
                       <option value="dewan_hakim">Khusus Dewan Hakim / Juri</option>
+                      <option value="panitera">Khusus Panitera Arena Lomba</option>
                     </select>
                   </div>
 
@@ -1270,15 +1320,18 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
             {committeeMode === 'custom' && (
               <div className="space-y-3">
                 <div className="flex flex-wrap items-center gap-2 bg-white p-3 rounded-lg border border-rose-100">
-                  {/* Pilih Tipe Kartu (Panitia vs Dewan Hakim) */}
+                  {/* Pilih Tipe Kartu (Panitia vs Dewan Hakim vs Panitera) */}
                   <select
                     value={newComType}
                     onChange={(e) => {
-                      const val = e.target.value as 'panitia' | 'dewan_hakim';
+                      const val = e.target.value as 'panitia' | 'dewan_hakim' | 'panitera';
                       setNewComType(val);
                       if (val === 'dewan_hakim') {
                         setNewComDivision('Dewan Hakim Tilawah Al-Qur\'an');
                         setNewComAccess('RUANG HAKIM & JURI');
+                      } else if (val === 'panitera') {
+                        setNewComDivision('Panitera Arena Cabang Tilawah');
+                        setNewComAccess('ARENA LOMBA & MEJA PANITERA');
                       } else {
                         setNewComDivision('Sie Acara & Lomba');
                         setNewComAccess('ALL ACCESS');
@@ -1288,11 +1341,18 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
                   >
                     <option value="panitia">Kartu: Panitia Pelaksana</option>
                     <option value="dewan_hakim">Kartu: Dewan Hakim / Juri</option>
+                    <option value="panitera">Kartu: Panitera Arena Lomba</option>
                   </select>
 
                   <input
                     type="text"
-                    placeholder={newComType === 'dewan_hakim' ? 'Nama Lengkap Dewan Hakim...' : 'Nama Lengkap Panitia...'}
+                    placeholder={
+                      newComType === 'dewan_hakim'
+                        ? 'Nama Lengkap Dewan Hakim...'
+                        : newComType === 'panitera'
+                        ? 'Nama Lengkap Panitera...'
+                        : 'Nama Lengkap Panitia...'
+                    }
                     value={newComName}
                     onChange={(e) => setNewComName(e.target.value)}
                     className="text-xs font-semibold bg-slate-50 border border-slate-300 rounded-lg p-2 flex-1 min-w-[200px]"
@@ -1300,7 +1360,13 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
                   
                   <input
                     type="text"
-                    placeholder={newComType === 'dewan_hakim' ? 'Bidang Lomba (misal: Cabang Tahfidz)...' : 'Divisi (misal: Sie Acara)...'}
+                    placeholder={
+                      newComType === 'dewan_hakim'
+                        ? 'Bidang Lomba (misal: Cabang Tahfidz)...'
+                        : newComType === 'panitera'
+                        ? 'Arena Tugas (misal: Arena Tilawah)...'
+                        : 'Divisi (misal: Sie Acara)...'
+                    }
                     value={newComDivision}
                     onChange={(e) => setNewComDivision(e.target.value)}
                     className="text-xs font-semibold bg-slate-50 border border-slate-300 rounded-lg p-2 flex-1 min-w-[180px]"
@@ -1312,6 +1378,7 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
                     className="text-xs font-semibold bg-slate-50 border border-slate-300 rounded-lg p-2"
                   >
                     <option value="ALL ACCESS">ALL ACCESS</option>
+                    <option value="ARENA LOMBA & MEJA PANITERA">ARENA LOMBA & MEJA PANITERA</option>
                     <option value="RUANG HAKIM & JURI">RUANG HAKIM & JURI</option>
                     <option value="STAGE & LOMBA">STAGE & LOMBA</option>
                     <option value="MEDIA & PRESS">MEDIA & PRESS</option>
@@ -1330,16 +1397,20 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
 
                 {/* List Table Preview Custom */}
                 <div className="flex flex-wrap gap-2">
-                  {customCommittees.map((com, idx) => (
+                  {customCommittees.map((com) => (
                     <div
                       key={com.id}
                       className="bg-white px-2.5 py-1.5 rounded-lg border border-rose-200 text-xs flex items-center gap-2 shadow-2xs"
                     >
-                      <span className="font-bold text-slate-800">{com.name}</span>
+                      <span className="font-bold text-slate-800">{com.name || '[Blanko]'}</span>
                       <span className={`text-[10px] px-1.5 py-0.2 rounded font-medium ${
-                        com.cardCategory === 'dewan_hakim' ? 'bg-pink-100 text-pink-900' : 'bg-rose-50 text-rose-800'
+                        com.cardCategory === 'dewan_hakim'
+                          ? 'bg-pink-100 text-pink-900'
+                          : com.cardCategory === 'panitera'
+                          ? 'bg-sky-100 text-sky-900 font-bold'
+                          : 'bg-rose-50 text-rose-800'
                       }`}>
-                        {com.customBadge || (com.cardCategory === 'dewan_hakim' ? 'DEWAN HAKIM' : 'PANITIA')} - {com.division} ({com.accessLevel})
+                        {com.customBadge || (com.cardCategory === 'dewan_hakim' ? 'DEWAN HAKIM' : (com.cardCategory === 'panitera' ? 'PANITERA' : 'PANITIA'))} - {com.division} ({com.accessLevel})
                       </span>
                       <button
                         onClick={() => handleDeleteCommittee(com)}
@@ -1658,9 +1729,10 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
                   >
                     <div className="no-print flex items-center justify-between border-b border-slate-100 pb-2 mb-3 text-[11px] text-slate-400 font-mono">
                       <span className="font-semibold text-rose-800">
-                        ID Card Panitia & Dewan Hakim FASI XIII
+                        ID Card Panitia, Dewan Hakim, & Panitera FASI XIII
                         {committeeSubCategory === 'panitia' && ' (Khusus Panitia)'}
                         {committeeSubCategory === 'dewan_hakim' && ' (Khusus Dewan Hakim)'}
+                        {committeeSubCategory === 'panitera' && ' (Khusus Panitera)'}
                       </span>
                       <span>Lembar {pageIdx + 1} dari {committeePages.length} ({pageItems.length} Kartu)</span>
                     </div>
@@ -1672,8 +1744,10 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
                     >
                       {pageItems.map((com, idx) => {
                         const isHakim = com.cardCategory === 'dewan_hakim';
+                        const isPanitera = com.cardCategory === 'panitera';
                         const elementId = `card-panitia-${com.id || idx}`;
-                        const fileName = `${isHakim ? 'Dewan_Hakim' : 'Panitia'}_${idx + 1}_${com.name ? com.name.replace(/\s+/g, '_') : 'Blanko'}`;
+                        const prefix = isPanitera ? 'Panitera' : (isHakim ? 'Dewan_Hakim' : 'Panitia');
+                        const fileName = `${prefix}_${idx + 1}_${com.name ? com.name.replace(/\s+/g, '_') : 'Blanko'}`;
                         return (
                           <div key={com.id || idx} className="relative group flex justify-center">
                             <div id={elementId}>
@@ -1690,7 +1764,7 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
                                 onClick={() => handleDownloadSingleCard(elementId, fileName, com.id || String(idx))}
                                 disabled={downloadingCardId === (com.id || String(idx))}
                                 className="px-2 py-1 bg-slate-900/90 hover:bg-black text-white rounded-md text-[10px] font-bold shadow-md flex items-center gap-1 cursor-pointer transition-all active:scale-95"
-                                title={`Download kartu ${isHakim ? 'Dewan Hakim' : 'Panitia'} ini saja sebagai gambar PNG 300 DPI`}
+                                title={`Download kartu ${isPanitera ? 'Panitera' : (isHakim ? 'Dewan Hakim' : 'Panitia')} ini saja sebagai gambar PNG 300 DPI`}
                               >
                                 {downloadingCardId === (com.id || String(idx)) ? (
                                   <Loader2 className="w-3 h-3 animate-spin text-amber-300" />
