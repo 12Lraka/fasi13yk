@@ -15,7 +15,6 @@ import {
   CheckCircle2,
   AlertCircle,
   RotateCcw,
-  Printer,
   Sparkles,
   Users,
   Search,
@@ -23,11 +22,15 @@ import {
   ArrowLeft,
   ChevronRight,
   HelpCircle,
-  FileCheck2
+  FileCheck2,
+  FileDown,
+  Download,
+  Loader2
 } from 'lucide-react';
 import { Participant, UserSession } from '../../types/fasi';
 import { getStoredCategories, getStoredKemantren, saveParticipants, logAuditEvent } from '../../utils/storage';
 import { showToast, showSuccessAlert, showConfirmDialog } from '../../utils/sweetalert';
+import { downloadSingleLotteryPdf, downloadAllLotteryPdf } from '../../utils/lotteryPdfGenerator';
 
 interface UndianNomorTampilProps {
   session: UserSession;
@@ -60,6 +63,9 @@ export const UndianNomorTampil: React.FC<UndianNomorTampilProps> = ({
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [groupDrawMode, setGroupDrawMode] = useState<boolean>(true);
+  const [isExportingPdf, setIsExportingPdf] = useState<boolean>(false);
+  const [pdfProgress, setPdfProgress] = useState<{ current: number; total: number } | null>(null);
+  const [isSavingDb, setIsSavingDb] = useState<boolean>(false);
 
   // Keep local participants in sync when props change (if not dirty)
   React.useEffect(() => {
@@ -290,22 +296,30 @@ export const UndianNomorTampil: React.FC<UndianNomorTampilProps> = ({
     showToast('info', 'Nomor undian cabang ini telah di-reset. Klik Simpan ke Database untuk memperbarui.');
   };
 
-  // Save Drawn Numbers into the Database (Storage Engine)
-  const handleSaveToDatabase = () => {
-    onUpdateParticipants(localParticipants);
-    saveParticipants(localParticipants);
-    setHasUnsavedChanges(false);
+  // Save Drawn Numbers into the Database (Storage Engine & Supabase)
+  const handleSaveToDatabase = async () => {
+    setIsSavingDb(true);
+    try {
+      onUpdateParticipants(localParticipants);
+      saveParticipants(localParticipants);
+      setHasUnsavedChanges(false);
 
-    logAuditEvent(
-      session.name,
-      'SIMPAN_UNDIAN_DATABASE',
-      `Menyimpan hasil undian nomor tampil cabang [${currentCategory?.code}] ${currentCategory?.name} (${stats.drawn} santri).`
-    );
+      logAuditEvent(
+        session.name,
+        'SIMPAN_UNDIAN_DATABASE',
+        `Menyimpan hasil undian nomor tampil cabang [${currentCategory?.code}] ${currentCategory?.name} (${stats.drawn} santri).`
+      );
 
-    showSuccessAlert(
-      'Hasil Undian Tersimpan!',
-      `Nomor urut tampil cabang [${currentCategory?.code}] ${currentCategory?.name} berhasil disimpan ke database sistem.`
-    );
+      showSuccessAlert(
+        'Hasil Undian Berhasil Disimpan!',
+        `Nomor urut tampil cabang [${currentCategory?.code}] ${currentCategory?.name} telah tersimpan permanen ke database dan tersinkronisasi ke menu Rekap Cabang Lomba.`
+      );
+    } catch (err: any) {
+      console.error('Gagal menyimpan undian:', err);
+      showToast('error', `Gagal menyimpan ke database: ${err?.message || 'Error'}`);
+    } finally {
+      setIsSavingDb(false);
+    }
   };
 
   // Switch category tab
@@ -317,8 +331,38 @@ export const UndianNomorTampil: React.FC<UndianNomorTampilProps> = ({
     }
   };
 
-  const handlePrintSheet = () => {
-    window.print();
+  // Unduh Berkas PDF Resmi A4 Nomor Urut Tampil (Tanpa Tanda Tangan Juri - Siap Share WhatsApp / Rayon)
+  const handleDownloadPdf = async (allBranches = false) => {
+    if (!currentCategory && !allBranches) {
+      showToast('error', 'Pilih cabang lomba terlebih dahulu');
+      return;
+    }
+
+    setIsExportingPdf(true);
+    try {
+      if (allBranches) {
+        setPdfProgress({ current: 0, total: categoriesList.length });
+        await downloadAllLotteryPdf({
+          categories: categoriesList,
+          participants: localParticipants,
+          kemantrenList,
+          onProgress: (current, total) => setPdfProgress({ current, total }),
+        });
+        showToast('success', 'Buku PDF Nomor Urut Tampil Seluruh Cabang berhasil diunduh!');
+      } else if (currentCategory) {
+        if (stats.drawn === 0) {
+          showToast('info', 'Catatan: Nomor undian cabang ini belum diacak. PDF tetap diterbitkan memuat daftar peserta.');
+        }
+        await downloadSingleLotteryPdf(currentCategory, localParticipants, kemantrenList);
+        showToast('success', `PDF Nomor Urut Tampil Cabang [${currentCategory.code}] ${currentCategory.name} berhasil diunduh!`);
+      }
+    } catch (err: any) {
+      console.error('Gagal generate PDF nomor undian:', err);
+      showToast('error', `Gagal mengunduh PDF: ${err?.message || 'Terjadi kesalahan sistem'}`);
+    } finally {
+      setIsExportingPdf(false);
+      setPdfProgress(null);
+    }
   };
 
   // Filtered & Sorted participants for display
@@ -372,23 +416,51 @@ export const UndianNomorTampil: React.FC<UndianNomorTampilProps> = ({
           </div>
         </div>
 
-        {/* Global Save Indicator */}
-        <div className="flex items-center gap-2">
+        {/* Global Action Buttons */}
+        <div className="flex flex-wrap items-center gap-2">
           {hasUnsavedChanges && (
             <button
               onClick={handleSaveToDatabase}
-              className="px-4 py-2.5 bg-emerald-800 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md flex items-center gap-2 animate-pulse cursor-pointer"
+              disabled={isSavingDb}
+              className="px-4 py-2.5 bg-emerald-800 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md flex items-center gap-2 animate-pulse cursor-pointer disabled:opacity-50"
             >
-              <Save className="w-4 h-4" />
-              <span>Simpan ke Database</span>
+              {isSavingDb ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Save className="w-4 h-4" />
+              )}
+              <span>{isSavingDb ? 'Menyimpan...' : 'Simpan ke Database'}</span>
             </button>
           )}
+
+          {/* Unduh Lembar PDF A4 Cabang Aktif */}
           <button
-            onClick={handlePrintSheet}
-            className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
+            onClick={() => handleDownloadPdf(false)}
+            disabled={isExportingPdf || !currentCategory}
+            className="px-3.5 py-2.5 bg-amber-500 hover:bg-amber-400 text-emerald-950 font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-sm transition-all cursor-pointer disabled:opacity-50"
+            title="Unduh daftar nomor urut tampil cabang lomba ini dalam format PDF A4 (siap share WhatsApp)"
           >
-            <Printer className="w-4 h-4" />
-            <span>Cetak Lembar</span>
+            {isExportingPdf && !pdfProgress ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <FileDown className="w-4 h-4" />
+            )}
+            <span>{isExportingPdf && !pdfProgress ? 'Membuat PDF...' : 'Unduh PDF (A4)'}</span>
+          </button>
+
+          {/* Unduh Semua Cabang Lomba */}
+          <button
+            onClick={() => handleDownloadPdf(true)}
+            disabled={isExportingPdf}
+            className="px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+            title="Unduh rekap nomor urut tampil seluruh cabang lomba (buku undian A4)"
+          >
+            {pdfProgress ? (
+              <Loader2 className="w-4 h-4 animate-spin text-emerald-700" />
+            ) : (
+              <Download className="w-4 h-4" />
+            )}
+            <span>{pdfProgress ? `Proses (${pdfProgress.current}/${pdfProgress.total})` : 'Semua Cabang'}</span>
           </button>
         </div>
       </div>
@@ -588,9 +660,9 @@ export const UndianNomorTampil: React.FC<UndianNomorTampilProps> = ({
               </div>
             )}
 
-            {/* Action Bar (Undi, Reset, Simpan) */}
+            {/* Action Bar (Undi, Reset, Unduh PDF, Simpan) */}
             <div className="no-print pt-3 border-t border-emerald-700/60 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <button
                   onClick={handleDrawLottery}
                   disabled={isShuffling || categoryParticipants.length === 0}
@@ -613,20 +685,36 @@ export const UndianNomorTampil: React.FC<UndianNomorTampilProps> = ({
                 {stats.drawn > 0 && (
                   <button
                     onClick={handleResetLottery}
+                    title="Reset nomor undian cabang ini"
                     className="px-3.5 py-2.5 bg-emerald-950/80 hover:bg-rose-900/90 text-emerald-200 hover:text-white font-semibold text-xs rounded-xl border border-emerald-700 transition-colors cursor-pointer"
                   >
                     <RotateCcw className="w-4 h-4" />
                   </button>
                 )}
+
+                <button
+                  onClick={() => handleDownloadPdf(false)}
+                  disabled={isExportingPdf || !currentCategory}
+                  className="px-4 py-2.5 bg-emerald-800/80 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl border border-emerald-600 flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                  title="Unduh Lembar PDF A4 Siap Share WhatsApp"
+                >
+                  <FileDown className="w-4 h-4 text-amber-300" />
+                  <span>Unduh PDF A4</span>
+                </button>
               </div>
 
               {hasUnsavedChanges && (
                 <button
                   onClick={handleSaveToDatabase}
-                  className="px-5 py-2.5 bg-white text-emerald-950 hover:bg-emerald-100 font-extrabold text-xs rounded-xl shadow-md flex items-center gap-2 transition-all active:scale-95 cursor-pointer"
+                  disabled={isSavingDb}
+                  className="px-5 py-2.5 bg-white text-emerald-950 hover:bg-emerald-100 font-extrabold text-xs rounded-xl shadow-md flex items-center gap-2 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
                 >
-                  <Save className="w-4 h-4 text-emerald-800" />
-                  <span>Simpan ke Database</span>
+                  {isSavingDb ? (
+                    <Loader2 className="w-4 h-4 text-emerald-800 animate-spin" />
+                  ) : (
+                    <Save className="w-4 h-4 text-emerald-800" />
+                  )}
+                  <span>{isSavingDb ? 'Menyimpan...' : 'Simpan ke Database'}</span>
                 </button>
               )}
             </div>
