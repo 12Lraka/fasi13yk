@@ -176,14 +176,14 @@ export const RekapPesertaAdmin: React.FC<RekapPesertaAdminProps> = ({
         : 'Semua_Rayon';
 
       const mainTitle = docType === 'daftar_hadir'
-        ? 'DAFTAR HADIR PESERTA MEJA REGISTRASI FASI XIII'
+        ? 'DAFTAR HADIR PESERTA FASI XIII'
         : 'REKAPITULASI NOMINASI TETAP PESERTA LOMBA';
 
       const subTitle = isKemantrenAdmin
-        ? `KONTINGEN RAYON KEMANTREN ${currentKemantrenObj?.name?.toUpperCase() || ''} (${filteredParticipants.length} SANTRI)`
+        ? `KONTINGEN RAYON ${currentKemantrenObj?.name?.toUpperCase() || ''} (${filteredParticipants.length} SANTRI)`
         : selectedKemantren !== 'ALL'
         ? `KONTINGEN RAYON ${kemName.toUpperCase()} (${filteredParticipants.length} SANTRI)`
-        : `SEMUA KONTINGEN 14 RAYON KOTA YOGYAKARTA (${filteredParticipants.length} SANTRI)`;
+        : `SEMUA KONTINGEN 14 RAYON (${filteredParticipants.length} SANTRI)`;
 
       const filterInfo = `FASI XIII BADKO TKA-TPA Kota Yogyakarta • Dicetak pada ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`;
 

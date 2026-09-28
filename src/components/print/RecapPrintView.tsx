@@ -153,7 +153,7 @@ export const RecapPrintView: React.FC<RecapPrintViewProps> = ({
       setIsExportingSinglePdf(true);
       const selectedKemName = selectedKemantrenFilter !== 'ALL'
         ? kemantrenList.find((k) => k.id === selectedKemantrenFilter)?.name.toUpperCase()
-        : 'SEMUA KONTINGEN 14 KEMANTREN KOTA YOGYAKARTA';
+        : 'SEMUA KONTINGEN 14 RAYON';
 
       const filterInfoParts: string[] = [];
       if (selectedLevelFilter !== 'ALL') filterInfoParts.push(`Jenjang ${selectedLevelFilter}`);
@@ -168,7 +168,7 @@ export const RecapPrintView: React.FC<RecapPrintViewProps> = ({
       await downloadSingleRecapPdf({
         titleSubtitle: {
           mainTitle: 'REKAPITULASI NOMINASI TETAP PESERTA LOMBA',
-          subTitle: selectedKemantrenFilter !== 'ALL' ? `KONTINGEN KEMANTREN ${selectedKemName}` : selectedKemName,
+          subTitle: selectedKemantrenFilter !== 'ALL' ? `KONTINGEN RAYON ${selectedKemName}` : selectedKemName,
           filterInfo: filterInfoParts.length > 0 ? `Filter: ${filterInfoParts.join(' • ')}` : undefined,
         },
         participants: filteredParticipants,
@@ -288,7 +288,7 @@ export const RecapPrintView: React.FC<RecapPrintViewProps> = ({
           {/* Filter 1: Kemantren */}
           <div>
             <label className="block font-bold text-slate-700 mb-1 uppercase tracking-wider text-[10px]">
-              Kontingen Kemantren:
+              Kontingen Rayon:
             </label>
             <select
               value={selectedKemantrenFilter}
@@ -299,7 +299,7 @@ export const RecapPrintView: React.FC<RecapPrintViewProps> = ({
               {!isKemantrenAdmin && <option value="ALL">Semua 14 Kemantren (Kota Yogyakarta)</option>}
               {kemantrenList.map((k) => (
                 <option key={k.id} value={k.id}>
-                  Kemantren {k.name} ({k.code})
+                  Rayon {k.name} ({k.code})
                 </option>
               ))}
             </select>
@@ -508,7 +508,7 @@ export const RecapPrintView: React.FC<RecapPrintViewProps> = ({
                         </div>
                       </td>
                       <td className="border border-slate-300 py-1.5 px-2.5 text-slate-800">
-                        <div className="font-bold text-slate-900">Kem. {kem?.name || p.kemantrenId}</div>
+                        <div className="font-bold text-slate-900">Rayon. {kem?.name || p.kemantrenId}</div>
                         {p.tpaUnitName && (
                           <div className="text-[10px] text-slate-600 font-medium">{p.tpaUnitName}</div>
                         )}
