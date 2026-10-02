@@ -50,13 +50,14 @@ import {
   getStoredSettings,
   getStoredMasterTpa,
   getStoredKemantren,
+  getStoredParticipants,
   persistMasterTpa,
   syncMasterTpaFromCloud,
   formatTpaName,
 } from '../../utils/storage';
 import { showToast, showSuccessAlert, showConfirmDialog } from '../../utils/sweetalert';
 import { getThemeConfig } from '../../utils/theme';
-import { isSupabaseConfigured } from '../../lib/supabase';
+import { isSupabaseConfigured, fetchParticipantsFromSupabase } from '../../lib/supabase';
 
 interface ParticipantFormPageProps {
   session: UserSession;
@@ -368,9 +369,22 @@ export const ParticipantFormPage: React.FC<ParticipantFormPageProps> = ({
       return;
     }
 
+    // Pastikan data peserta paling mutakhir (lokal + cloud)
+    let currentList = [...(allParticipants || []), ...getStoredParticipants()];
+    if (isSupabaseConfigured()) {
+      try {
+        const cloudParticipants = await fetchParticipantsFromSupabase();
+        if (cloudParticipants && Array.isArray(cloudParticipants)) {
+          currentList = [...cloudParticipants, ...currentList];
+        }
+      } catch {
+        // Fallback ke data lokal
+      }
+    }
+
     const regNumber = editingParticipant
       ? editingParticipant.registrationNumber
-      : generateRegistrationNumber(kemantrenId, categoryId, allParticipants || []);
+      : generateRegistrationNumber(kemantrenId, categoryId, currentList);
 
     const participantData: Participant = {
       id: editingParticipant ? editingParticipant.id : `p-${Date.now()}`,
@@ -520,7 +534,19 @@ export const ParticipantFormPage: React.FC<ParticipantFormPageProps> = ({
 
     if (!confirmed) return;
 
-    const currentList = [...allParticipants];
+    // Pastikan daftar peserta sudah menyertakan data cloud Supabase & local storage paling mutakhir
+    let currentList = [...allParticipants, ...getStoredParticipants()];
+    if (isSupabaseConfigured()) {
+      try {
+        const cloudParticipants = await fetchParticipantsFromSupabase();
+        if (cloudParticipants && Array.isArray(cloudParticipants)) {
+          currentList = [...cloudParticipants, ...currentList];
+        }
+      } catch {
+        // Fallback ke data lokal
+      }
+    }
+
     const newParticipants: Participant[] = [];
 
     for (const draft of drafts) {

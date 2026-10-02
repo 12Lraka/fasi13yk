@@ -328,6 +328,10 @@ export function getCategoryPointsForRank(categoryId: string, rank: number): numb
  * Generate Nomor Registrasi Resmi FASI XIII
  * Format: {KODE_KEMANTREN}-{LEVEL}-{KODE_CABANG_NUM}-{URUTAN_2_DIGIT}
  * Contoh: KG-TPA-01-04
+ * 
+ * Menggunakan algoritma deteksi gap & nomor urut terkecil yang belum terpakai.
+ * Mencegah error duplicate key value violates unique constraint jika ada regu/peserta
+ * dengan nomor di bawahnya yang kosong (misal 01-03 kosong, sedangkan 04-09 sudah ada).
  */
 export function generateRegistrationNumber(
   kemantrenId: string,
@@ -340,14 +344,44 @@ export function generateRegistrationNumber(
   const kCode = kemantren ? kemantren.code : 'YK';
   const level = category ? category.level : 'TPA';
   const catCode = category ? category.code.replace(/[^\d]/g, '') : '01';
+  const prefix = `${kCode}-${level}-${catCode}-`;
 
-  // Hitung jumlah peserta terdaftar di kemantren & kategori ini
-  const existingCount = currentParticipants.filter(
-    (p) => p.kemantrenId === kemantrenId && p.categoryId === categoryId
-  ).length;
+  // Gabungkan currentParticipants dengan data yang tersimpan di localStorage
+  // untuk memastikan seluruh nomor terdaftar terlacak lengkap
+  const allKnown = new Map<string, Participant>();
+  (currentParticipants || []).forEach((p) => {
+    if (p && p.id) allKnown.set(p.id, p);
+  });
+  getStoredParticipants().forEach((p) => {
+    if (p && p.id) allKnown.set(p.id, p);
+  });
 
-  const sequence = String(existingCount + 1).padStart(2, '0');
-  return `${kCode}-${level}-${catCode}-${sequence}`;
+  // Himpun seluruh sequence number yang SUDAH digunakan pada cabang & rayon ini
+  const usedSequences = new Set<number>();
+  allKnown.forEach((p) => {
+    if (
+      (p.kemantrenId === kemantrenId && p.categoryId === categoryId) ||
+      (p.registrationNumber && p.registrationNumber.startsWith(prefix))
+    ) {
+      if (p.registrationNumber) {
+        const parts = p.registrationNumber.split('-');
+        const lastPart = parts[parts.length - 1];
+        const num = parseInt(lastPart, 10);
+        if (!isNaN(num) && num > 0) {
+          usedSequences.add(num);
+        }
+      }
+    }
+  });
+
+  // Cari nomor urut terkecil yang belum pernah dipakai (mulai dari 1)
+  let seq = 1;
+  while (usedSequences.has(seq)) {
+    seq++;
+  }
+
+  const sequence = String(seq).padStart(2, '0');
+  return `${prefix}${sequence}`;
 }
 
 /**
