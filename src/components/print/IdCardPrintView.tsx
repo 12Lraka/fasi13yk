@@ -575,9 +575,20 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
     }
 
     setIsGeneratingZip(true);
-    setZipProgress({ current: 1, total: cardElements.length });
+    document.body.classList.add('exporting-all-cards');
 
     try {
+      // Tunggu frame berikutnya agar browser menyelesaikan reflow off-screen
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      const cardElements = Array.from(document.querySelectorAll<HTMLElement>('.fasi-id-card'));
+      if (!cardElements.length) {
+        showToast('warning', 'Tidak ada kartu yang ter-render di layar.');
+        return;
+      }
+
+      setZipProgress({ current: 1, total: cardElements.length });
+
       let fileNames: string[] = [];
       if (activeCardType === 'peserta') {
         fileNames = filteredParticipants.map(
@@ -601,10 +612,11 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
       });
 
       showToast('success', `Berhasil mengunduh ${cardElements.length} kartu dalam berkas ZIP!`);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Gagal membuat ZIP ID Card:', err);
-      showToast('error', 'Gagal memproses berkas ZIP ID Card.');
+      showToast('error', `Gagal memproses berkas ZIP ID Card: ${err?.message || 'Error tidak diketahui'}`);
     } finally {
+      document.body.classList.remove('exporting-all-cards');
       setIsGeneratingZip(false);
     }
   };
@@ -613,18 +625,21 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
     if (currentTotalCards === 0 || isGeneratingPdf || isGeneratingZip) return;
     setIsGeneratingPdf(true);
     setPdfProgress({ current: 1, total: 1 });
+    document.body.classList.add('exporting-all-cards');
 
     try {
+      await new Promise((resolve) => setTimeout(resolve, 50));
       await generateIdCardsPdfFromDom({
         containerSelector: '.idcard-print-page',
         fileName: `ID_Card_FASI_XIII_${activeCardType}_A4.pdf`,
         onProgress: (cur, tot) => setPdfProgress({ current: cur, total: tot }),
       });
       showToast('success', 'File PDF ID Card (A4 - 9 Kartu/Lembar) berhasil diunduh!');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Gagal generate PDF ID Card:', err);
-      showToast('error', 'Gagal memproses dokumen PDF ID Card.');
+      showToast('error', `Gagal memproses dokumen PDF ID Card: ${err?.message || 'Error tidak diketahui'}`);
     } finally {
+      document.body.classList.remove('exporting-all-cards');
       setIsGeneratingPdf(false);
     }
   };
@@ -1475,6 +1490,16 @@ export const IdCardPrintView: React.FC<IdCardPrintViewProps> = ({
             }
             .screen-page-hidden {
               display: none !important;
+            }
+            /* Saat proses ekspor ZIP / PDF aktif, halaman non-aktif tetap dirender di luar viewport */
+            body.exporting-all-cards .screen-page-hidden {
+              display: block !important;
+              position: fixed !important;
+              left: -99999px !important;
+              top: -99999px !important;
+              visibility: visible !important;
+              opacity: 1 !important;
+              pointer-events: none !important;
             }
           }
         `}} />

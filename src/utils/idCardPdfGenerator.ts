@@ -49,6 +49,22 @@ export async function generateIdCardsPdfFromDom({
         onProgress(i + 1, totalPages);
       }
 
+      // Pastikan lembar halaman terlihat saat capture agar tidak menghasilkan 0x0 canvas
+      const isHidden = window.getComputedStyle(pageEl).display === 'none';
+      const prevDisplay = pageEl.style.display;
+      const prevPos = pageEl.style.position;
+      const prevLeft = pageEl.style.left;
+      const prevTop = pageEl.style.top;
+      const prevVis = pageEl.style.visibility;
+
+      if (isHidden) {
+        pageEl.style.setProperty('display', 'block', 'important');
+        pageEl.style.setProperty('position', 'fixed', 'important');
+        pageEl.style.setProperty('left', '-99999px', 'important');
+        pageEl.style.setProperty('top', '-99999px', 'important');
+        pageEl.style.setProperty('visibility', 'visible', 'important');
+      }
+
       // 1. Inline semua gambar ke Base64 agar tidak ada CORS delay
       const restoreImages = await inlineImagesAsBase64(pageEl);
 
@@ -70,6 +86,13 @@ export async function generateIdCardsPdfFromDom({
         doc.addImage(imgData, 'PNG', 0, 0, 210, 297, undefined, 'FAST');
       } finally {
         restoreImages();
+        if (isHidden) {
+          pageEl.style.display = prevDisplay;
+          pageEl.style.position = prevPos;
+          pageEl.style.left = prevLeft;
+          pageEl.style.top = prevTop;
+          pageEl.style.visibility = prevVis;
+        }
       }
     }
 

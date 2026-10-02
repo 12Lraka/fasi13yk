@@ -111,6 +111,28 @@ export async function inlineImagesAsBase64(rootElement: HTMLElement): Promise<()
 }
 
 /**
+ * Konversi Data URL base64 ke Uint8Array murni
+ * Mencegah error "Invalid base64 input, it looks like a data url" pada JSZip
+ */
+export function dataUrlToUint8Array(dataUrl: string): Uint8Array {
+  const commaIdx = dataUrl.indexOf(',');
+  if (commaIdx < 0) {
+    throw new Error('Format Data URL tidak valid (tidak ada koma pemisah)');
+  }
+  const base64 = dataUrl.slice(commaIdx + 1).replace(/\s/g, '');
+  if (!base64 || base64.length === 0) {
+    throw new Error('Data gambar kosong (0 bytes)');
+  }
+  const binaryString = atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+}
+
+/**
  * Capture satu elemen kartu ID card menjadi PNG Data URL berkualitas ultra-tinggi (~350 DPI)
  * Menggunakan html-to-image dengan native browser rendering engine.
  */
@@ -120,6 +142,37 @@ export async function captureCardToPngDataUrl(cardElement: HTMLElement): Promise
     (cardElement.classList.contains('fasi-id-card')
       ? cardElement
       : cardElement.querySelector<HTMLElement>('.fasi-id-card')) || cardElement;
+
+  // Pastikan elemen dan seluruh leluhurnya terlihat saat capture agar dimensi & canvas tidak bernilai 0
+  let current: HTMLElement | null = targetEl;
+  const temporarilyUnhidden: {
+    el: HTMLElement;
+    prevDisplay: string;
+    prevPosition: string;
+    prevLeft: string;
+    prevTop: string;
+    prevVisibility: string;
+  }[] = [];
+
+  while (current && current !== document.body) {
+    const computed = window.getComputedStyle(current);
+    if (computed.display === 'none') {
+      temporarilyUnhidden.push({
+        el: current,
+        prevDisplay: current.style.display,
+        prevPosition: current.style.position,
+        prevLeft: current.style.left,
+        prevTop: current.style.top,
+        prevVisibility: current.style.visibility,
+      });
+      current.style.setProperty('display', 'block', 'important');
+      current.style.setProperty('position', 'fixed', 'important');
+      current.style.setProperty('left', '-99999px', 'important');
+      current.style.setProperty('top', '-99999px', 'important');
+      current.style.setProperty('visibility', 'visible', 'important');
+    }
+    current = current.parentElement;
+  }
 
   const restoreImages = await inlineImagesAsBase64(targetEl);
 
@@ -138,6 +191,14 @@ export async function captureCardToPngDataUrl(cardElement: HTMLElement): Promise
     throw err;
   } finally {
     restoreImages();
+    // Kembalikan style elemen yang sempat di-unhide
+    temporarilyUnhidden.forEach(({ el, prevDisplay, prevPosition, prevLeft, prevTop, prevVisibility }) => {
+      el.style.display = prevDisplay;
+      el.style.position = prevPosition;
+      el.style.left = prevLeft;
+      el.style.top = prevTop;
+      el.style.visibility = prevVisibility;
+    });
   }
 }
 
@@ -149,6 +210,36 @@ export async function captureCardToCanvas(cardElement: HTMLElement): Promise<HTM
     (cardElement.classList.contains('fasi-id-card')
       ? cardElement
       : cardElement.querySelector<HTMLElement>('.fasi-id-card')) || cardElement;
+
+  let current: HTMLElement | null = targetEl;
+  const temporarilyUnhidden: {
+    el: HTMLElement;
+    prevDisplay: string;
+    prevPosition: string;
+    prevLeft: string;
+    prevTop: string;
+    prevVisibility: string;
+  }[] = [];
+
+  while (current && current !== document.body) {
+    const computed = window.getComputedStyle(current);
+    if (computed.display === 'none') {
+      temporarilyUnhidden.push({
+        el: current,
+        prevDisplay: current.style.display,
+        prevPosition: current.style.position,
+        prevLeft: current.style.left,
+        prevTop: current.style.top,
+        prevVisibility: current.style.visibility,
+      });
+      current.style.setProperty('display', 'block', 'important');
+      current.style.setProperty('position', 'fixed', 'important');
+      current.style.setProperty('left', '-99999px', 'important');
+      current.style.setProperty('top', '-99999px', 'important');
+      current.style.setProperty('visibility', 'visible', 'important');
+    }
+    current = current.parentElement;
+  }
 
   const restoreImages = await inlineImagesAsBase64(targetEl);
 
@@ -162,6 +253,13 @@ export async function captureCardToCanvas(cardElement: HTMLElement): Promise<HTM
     return canvas;
   } finally {
     restoreImages();
+    temporarilyUnhidden.forEach(({ el, prevDisplay, prevPosition, prevLeft, prevTop, prevVisibility }) => {
+      el.style.display = prevDisplay;
+      el.style.position = prevPosition;
+      el.style.left = prevLeft;
+      el.style.top = prevTop;
+      el.style.visibility = prevVisibility;
+    });
   }
 }
 
@@ -209,17 +307,27 @@ export async function downloadBatchCardsAsZip({
   const zip = new JSZip();
   const folder = zip.folder('ID_Cards_FASI_XIII') || zip;
   const total = cardElements.length;
+  const usedNames = new Map<string, number>();
 
   for (let i = 0; i < total; i++) {
     if (onProgress) onProgress(i + 1, total);
     const el = cardElements[i];
     const rawName = fileNames[i] || `ID_Card_${i + 1}`;
-    const safeName = rawName.replace(/[/\\?%*:|"<>]/g, '_') + '.png';
+    let safeName = rawName.replace(/[/\\?%*:|"<>]/g, '_') + '.png';
+
+    // Mencegah duplikasi nama file di dalam zip
+    if (usedNames.has(safeName)) {
+      const count = usedNames.get(safeName)! + 1;
+      usedNames.set(safeName, count);
+      safeName = safeName.replace(/\.png$/i, `_${count}.png`);
+    } else {
+      usedNames.set(safeName, 1);
+    }
 
     const dataUrl = await captureCardToPngDataUrl(el);
-    const base64Data = dataUrl.replace(/^data:image\/png;base64,/, '');
+    const binaryData = dataUrlToUint8Array(dataUrl);
 
-    folder.file(safeName, base64Data, { base64: true });
+    folder.file(safeName, binaryData);
   }
 
   const contentBlob = await zip.generateAsync({ type: 'blob' });
