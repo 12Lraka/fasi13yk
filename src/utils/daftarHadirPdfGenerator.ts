@@ -24,6 +24,7 @@ export interface ExportDaftarHadirPdfOptions {
   customTitle?: string;
   ketuaPanitiaName?: string;
   koordinatorHakimName?: string;
+  koordinatorLombaName?: string;
   sekretarisName?: string;
 }
 
@@ -49,26 +50,26 @@ function getCategoryMeta(categoryType: string) {
   switch (categoryType) {
     case 'dewan_hakim':
       return {
-        title: 'DAFTAR HADIR DEWAN HAKIM & JURI',
-        sub: 'FESTIVAL ANAK SHOLEH INDONESIA (FASI) XIII TAHUN 2027',
+        title: 'DAFTAR HADIR DEWAN HAKIM / JURI',
+        sub: 'FESTIVAL ANAK SHOLEH INDONESIA (FASI) XIII TAHUN 2026',
         roleLabel: 'Penugasan Cabang / Bidang',
         color: [136, 19, 55], // rose-900
-        signatoryRightRole: 'Koordinator Sie Juri & Panitera',
+        signatoryRightRole: 'Koordinator Dewan Hakim / Juri',
         signatoryRightDefault: 'Imam Muhtarom, S.S',
       };
     case 'panitera':
       return {
-        title: 'DAFTAR HADIR PANITERA & PETUGAS MEJA LOMBA',
-        sub: 'FESTIVAL ANAK SHOLEH INDONESIA (FASI) XIII TAHUN 2027',
+        title: 'DAFTAR HADIR PANITERA',
+        sub: 'FESTIVAL ANAK SHOLEH INDONESIA (FASI) XIII TAHUN 2026',
         roleLabel: 'Arena Lomba / Meja Sidang',
         color: [15, 118, 110], // teal-700
-        signatoryRightRole: 'Koordinator Sie Lomba',
+        signatoryRightRole: 'Koordinator Lomba',
         signatoryRightDefault: 'Ali Hafidh, S.Pd.I., M.Pd.',
       };
     case 'panitia':
       return {
         title: 'DAFTAR HADIR PANITIA PELAKSANA',
-        sub: 'FESTIVAL ANAK SHOLEH INDONESIA (FASI) XIII TAHUN 2027',
+        sub: 'FESTIVAL ANAK SHOLEH INDONESIA (FASI) XIII TAHUN 2026',
         roleLabel: 'Divisi / Seksi Kepanitiaan',
         color: [6, 78, 59], // emerald-900
         signatoryRightRole: 'Sekretaris',
@@ -77,7 +78,7 @@ function getCategoryMeta(categoryType: string) {
     default:
       return {
         title: 'DAFTAR HADIR PERANGKAT RESMI FASI XIII',
-        sub: 'PANITIA, DEWAN HAKIM, & PANITERA LOMBA',
+        sub: 'FESTIVAL ANAK SHOLEH INDONESIA (FASI) XIII TAHUN 2026',
         roleLabel: 'Jabatan / Penugasan',
         color: [15, 23, 42], // slate-900
         signatoryRightRole: 'Sekretaris',
@@ -180,7 +181,7 @@ async function renderSingleCategorySheet(
   pdfDoc.setFontSize(8);
   pdfDoc.setTextColor(30, 41, 59);
 
-  const eventDateText = options.eventDate || 'Minggu, 28 Maret 2027';
+  const eventDateText = options.eventDate || 'Minggu, 28 Maret 2026';
   const venueText = options.venueName || 'SMP N 1 Yogyakarta';
 
   pdfDoc.text('Hari / Tanggal :', marginX + 3, metaBoxY + 4.2);
@@ -315,14 +316,12 @@ async function renderSingleCategorySheet(
   pdfDoc.text(ketuaName, leftSignX, nameY);
   pdfDoc.setLineWidth(0.2);
   pdfDoc.line(leftSignX, nameY + 0.8, leftSignX + signColWidth, nameY + 0.8);
-  pdfDoc.setFont('helvetica', 'normal');
-  pdfDoc.setFontSize(7.5);
-  pdfDoc.setTextColor(100, 116, 139);
-  pdfDoc.text('NPA. BADKO-YK-001', leftSignX, nameY + 4.5);
 
   // Nama Pengesah Kanan
   const rightSignName = categoryType === 'dewan_hakim'
     ? (options.koordinatorHakimName || meta.signatoryRightDefault)
+    : categoryType === 'panitera'
+    ? (options.koordinatorLombaName || meta.signatoryRightDefault)
     : (options.sekretarisName || meta.signatoryRightDefault);
 
   pdfDoc.setFont('helvetica', 'bold');
@@ -331,10 +330,6 @@ async function renderSingleCategorySheet(
   pdfDoc.text(rightSignName, rightSignX, nameY);
   pdfDoc.setLineWidth(0.2);
   pdfDoc.line(rightSignX, nameY + 0.8, rightSignX + signColWidth, nameY + 0.8);
-  pdfDoc.setFont('helvetica', 'normal');
-  pdfDoc.setFontSize(7.5);
-  pdfDoc.setTextColor(100, 116, 139);
-  pdfDoc.text('Badko TKA-TPA Kota Yogyakarta', rightSignX, nameY + 4.5);
 }
 
 /**
