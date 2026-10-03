@@ -39,6 +39,7 @@ import {
   LayoutDashboard,
   Trophy,
   Maximize2,
+  Scale,
 } from 'lucide-react';
 import { Participant, UserSession, Kemantren, AppSettings } from '../../types/fasi';
 import {
@@ -57,6 +58,7 @@ import { RekapCabangLombaAdmin } from './RekapCabangLombaAdmin';
 import { HasilCabangLombaAdmin } from './HasilCabangLombaAdmin';
 import { BeritaAcaraAdmin } from './BeritaAcaraAdmin';
 import { MasterTpaAdmin } from './MasterTpaAdmin';
+import { PanitiaJuriAdmin } from './PanitiaJuriAdmin';
 import { PengaturanAdmin } from './PengaturanAdmin';
 import { LogAktivitasAdmin } from './LogAktivitasAdmin';
 import { AppRoute } from '../../utils/router';
@@ -96,7 +98,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   activeRoute = 'admin-dashboard',
   onNavigateRoute,
 }) => {
-  const getInitialTab = (): 'dashboard' | 'peserta' | 'rekap-peserta' | 'rekap-cabang' | 'hasil-cabang' | 'berita-acara' | 'master-tpa' | 'pengaturan' | 'log' => {
+  const getInitialTab = (): 'dashboard' | 'peserta' | 'rekap-peserta' | 'rekap-cabang' | 'hasil-cabang' | 'berita-acara' | 'master-tpa' | 'panitia-juri' | 'pengaturan' | 'log' => {
     if (activeRoute === 'admin-data-peserta') return 'peserta';
     if (activeRoute === 'admin-rekap-peserta') return 'rekap-peserta';
     if (activeRoute === 'admin-rekapcbg-lomba' && session.role === 'super_admin') return 'rekap-cabang';
@@ -106,12 +108,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
     if (activeRoute === 'berita-acara' && session.role === 'super_admin') return 'berita-acara';
     if (activeRoute === 'master-tpa') return 'master-tpa';
+    if (activeRoute === 'panitia-juri' && session.role === 'super_admin') return 'panitia-juri';
     if (activeRoute === 'pengaturan' && session.role === 'super_admin') return 'pengaturan';
     if (activeRoute === 'log' && session.role === 'super_admin') return 'log';
     return 'dashboard';
   };
 
-  const [activeAdminTab, setActiveAdminTab] = useState<'dashboard' | 'peserta' | 'rekap-peserta' | 'rekap-cabang' | 'hasil-cabang' | 'berita-acara' | 'master-tpa' | 'pengaturan' | 'log'>(getInitialTab);
+  const [activeAdminTab, setActiveAdminTab] = useState<'dashboard' | 'peserta' | 'rekap-peserta' | 'rekap-cabang' | 'hasil-cabang' | 'berita-acara' | 'master-tpa' | 'panitia-juri' | 'pengaturan' | 'log'>(getInitialTab);
   const [targetBeritaAcaraCabangId, setTargetBeritaAcaraCabangId] = useState<string | undefined>(undefined);
 
   const [kemantrenList, setKemantrenList] = useState<Kemantren[]>(() => getStoredKemantren());
@@ -132,14 +135,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
     else if (activeRoute === 'berita-acara' && session.role === 'super_admin') setActiveAdminTab('berita-acara');
     else if (activeRoute === 'master-tpa') setActiveAdminTab('master-tpa');
+    else if (activeRoute === 'panitia-juri' && session.role === 'super_admin') setActiveAdminTab('panitia-juri');
     else if (activeRoute === 'pengaturan' && session.role === 'super_admin') setActiveAdminTab('pengaturan');
     else if (activeRoute === 'log' && session.role === 'super_admin') setActiveAdminTab('log');
-    else if (session.role !== 'super_admin' && (activeRoute === 'admin-rekapcbg-lomba' || activeRoute === 'berita-acara' || activeRoute === 'pengaturan' || activeRoute === 'log')) {
+    else if (session.role !== 'super_admin' && (activeRoute === 'admin-rekapcbg-lomba' || activeRoute === 'berita-acara' || activeRoute === 'panitia-juri' || activeRoute === 'pengaturan' || activeRoute === 'log')) {
       setActiveAdminTab('dashboard');
     }
   }, [activeRoute, session.role, appSettings.publishResultsToRayon]);
 
-  const handleTabChange = (tab: 'dashboard' | 'peserta' | 'rekap-peserta' | 'rekap-cabang' | 'hasil-cabang' | 'berita-acara' | 'master-tpa' | 'pengaturan' | 'log') => {
+  const handleTabChange = (tab: 'dashboard' | 'peserta' | 'rekap-peserta' | 'rekap-cabang' | 'hasil-cabang' | 'berita-acara' | 'master-tpa' | 'panitia-juri' | 'pengaturan' | 'log') => {
     setActiveAdminTab(tab);
     if (onNavigateRoute) {
       if (tab === 'dashboard') onNavigateRoute('admin-dashboard');
@@ -149,6 +153,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       else if (tab === 'hasil-cabang') onNavigateRoute('hasil-cabang');
       else if (tab === 'berita-acara') onNavigateRoute('berita-acara');
       else if (tab === 'master-tpa') onNavigateRoute('master-tpa');
+      else if (tab === 'panitia-juri') onNavigateRoute('panitia-juri');
       else if (tab === 'pengaturan') onNavigateRoute('pengaturan');
       else if (tab === 'log') onNavigateRoute('log');
     }
@@ -486,6 +491,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </button>
           )}
 
+          {/* Data Panitia & Juri Tab (Super Admin Only) */}
+          {session.role === 'super_admin' && (
+            <button
+              onClick={() => handleTabChange('panitia-juri')}
+              className={`w-full px-3 py-2 font-bold rounded-xl flex items-center justify-between transition-all cursor-pointer text-left ${
+                activeAdminTab === 'panitia-juri'
+                  ? 'bg-emerald-800 text-white shadow-xs'
+                  : 'text-slate-700 hover:text-emerald-900 hover:bg-slate-100'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Scale className="w-4 h-4 shrink-0 text-amber-400" />
+                <span>Panitia & Dewan Hakim</span>
+              </div>
+              <span className="px-1.5 py-0.2 bg-amber-400 text-emerald-950 text-[9px] font-extrabold rounded">
+                Super
+              </span>
+            </button>
+          )}
+
           {/* Master Data TPA Tab (Super Admin & Admin Rayon) */}
           <button
             onClick={() => handleTabChange('master-tpa')}
@@ -695,6 +720,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         {/* VIEW: MASTER DATA TPA */}
         {activeAdminTab === 'master-tpa' && (
           <MasterTpaAdmin session={session} />
+        )}
+
+        {/* VIEW: DATA PANITIA, PANITERA & DEWAN HAKIM (SUPERADMIN ONLY) */}
+        {activeAdminTab === 'panitia-juri' && session.role === 'super_admin' && (
+          <PanitiaJuriAdmin
+            session={session}
+            onNavigateToIdCard={() => {
+              if (onNavigateRoute) onNavigateRoute('cetak');
+            }}
+          />
         )}
 
         {/* VIEW: PENGATURAN */}

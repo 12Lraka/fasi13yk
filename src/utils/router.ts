@@ -29,6 +29,7 @@ export type AppRoute =
   | 'rekapitulasi'
   | 'cetak'
   | 'master-tpa'
+  | 'panitia-juri'
   | 'pengaturan'
   | 'log';
 
@@ -72,6 +73,12 @@ export const ROUTE_PATH_MAP: Record<string, AppRoute> = {
   '/admin/master-tpa': 'master-tpa',
   '/admin/tpa': 'master-tpa',
   '/tpa': 'master-tpa',
+  '/admin/panitia-juri': 'panitia-juri',
+  '/admin/dewan-hakim': 'panitia-juri',
+  '/admin/hakim': 'panitia-juri',
+  '/admin/juri': 'panitia-juri',
+  '/admin/panitia': 'panitia-juri',
+  '/panitia-juri': 'panitia-juri',
   '/admin/rekapitulasi': 'rekapitulasi',
   '/admin/rekap': 'rekapitulasi',
   '/admin/pengaturan': 'pengaturan',
@@ -91,7 +98,6 @@ export const ROUTE_PATH_MAP: Record<string, AppRoute> = {
   '/checkin': 'presensi',
   '/scan': 'presensi',
   '/penjurian': 'penjurian',
-  '/juri': 'penjurian',
   '/rekapitulasi': 'rekapitulasi',
   '/rekap': 'rekapitulasi',
   '/cetak': 'cetak',
@@ -127,6 +133,7 @@ export const CANONICAL_PATH_MAP: Record<AppRoute, string> = {
   rekapitulasi: '/admin/rekapitulasi',
   cetak: '/admin/cetak-kartu',
   'master-tpa': '/admin/master-tpa',
+  'panitia-juri': '/admin/panitia-juri',
   pengaturan: '/admin/pengaturan',
   log: '/admin/log-audit',
 };

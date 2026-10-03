@@ -127,6 +127,7 @@ export default function App() {
       route === 'hasil-cabang' ||
       route === 'berita-acara' ||
       route === 'master-tpa' ||
+      route === 'panitia-juri' ||
       route === 'pengaturan' ||
       route === 'log' ||
       route === 'superadmin' ||
@@ -141,6 +142,7 @@ export default function App() {
           route === 'admin-rekapcbg-lomba' ||
           (route === 'hasil-cabang' && !settings.publishResultsToRayon) ||
           route === 'berita-acara' ||
+          route === 'panitia-juri' ||
           route === 'pengaturan' ||
           route === 'log';
         if (isSuperOnly && session.role !== 'super_admin') {
@@ -475,6 +477,7 @@ export default function App() {
           activeTab === 'hasil-cabang' ||
           activeTab === 'berita-acara' ||
           activeTab === 'master-tpa' ||
+          activeTab === 'panitia-juri' ||
           activeTab === 'pengaturan' ||
           activeTab === 'log') &&
           session && (
