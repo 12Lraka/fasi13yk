@@ -328,6 +328,76 @@ export const ParticipantFormPage: React.FC<ParticipantFormPageProps> = ({
     return categoryStatusAnalysis.filter((item) => !item.isComplete).length;
   }, [categoryStatusAnalysis]);
 
+  /**
+   * Normalisasi string nama untuk perbandingan anti-duplikasi
+   * Menghilangkan tanda baca, spasi ganda, dan case-insensitive
+   */
+  const normalizeFullName = (str: string): string => {
+    return (str || '')
+      .toLowerCase()
+      .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
+  /**
+   * Normalisasi format tanggal lahir (mendukung DD/MM/YYYY dan YYYY-MM-DD)
+   */
+  const normalizeBirthDate = (d: string): string => {
+    if (!d) return '';
+    const clean = d.trim();
+    if (clean.includes('/')) {
+      const parts = clean.split('/');
+      if (parts.length === 3) {
+        return `${parts[0].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[2]}`;
+      }
+    } else if (clean.includes('-')) {
+      const parts = clean.split('-');
+      if (parts.length === 3) {
+        return `${parts[2].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[0]}`;
+      }
+    }
+    return clean;
+  };
+
+  /**
+   * Validasi Anti-Santri Ganda:
+   * Menolak pendaftaran jika santri dengan Nama Lengkap + Tanggal Lahir yang sama sudah terdaftar di sistem FASI
+   * (baik di cabang lomba yang sama maupun cabang lomba lain).
+   */
+  const checkDuplicateParticipant = (
+    name: string,
+    bDate: string,
+    currentId?: string | null,
+    participantPool: Participant[] = []
+  ): { isDuplicate: boolean; duplicateInfo?: string; existingParticipant?: Participant } => {
+    const normName = normalizeFullName(name);
+    const normDate = normalizeBirthDate(bDate);
+
+    if (!normName || !normDate || normDate.length < 10) {
+      return { isDuplicate: false };
+    }
+
+    const found = participantPool.find((p) => {
+      // Abaikan jika sedang mengedit peserta itu sendiri
+      if (currentId && p.id === currentId) return false;
+
+      const pName = normalizeFullName(p.fullName);
+      const pDate = normalizeBirthDate(p.birthDate);
+
+      return pName === normName && pDate === normDate;
+    });
+
+    if (found) {
+      const existingCat = CATEGORIES_LIST.find((c) => c.id === found.categoryId);
+      const existingKem = KEMANTREN_LIST.find((k) => k.id === found.kemantrenId);
+      const info = `Santri "${found.fullName}" (Lahir: ${found.birthDate}) SUDAH TERDAFTAR di FASI XIII pada cabang "${existingCat?.name || found.categoryId}" dari Rayon ${existingKem?.name || found.kemantrenId} (No. Reg: ${found.registrationNumber}). Sesuai aturan FASI, satu santri hanya dapat mengikuti 1 cabang lomba.`;
+      return { isDuplicate: true, duplicateInfo: info, existingParticipant: found };
+    }
+
+    return { isDuplicate: false };
+  };
+
   const validateFormData = (): string | null => {
     if (!validateHoneypot(honeypot)) {
       return 'Terdeteksi pengisian otomatis bot spam.';
@@ -353,6 +423,14 @@ export const ParticipantFormPage: React.FC<ParticipantFormPageProps> = ({
     if (!whatsappNumber.trim() || whatsappNumber.length < 9) {
       return 'Nomor WhatsApp Penanggung Jawab wajib diisi dengan benar.';
     }
+
+    // Validasi Anti-Santri Ganda (Nama Lengkap + Tanggal Lahir)
+    const localPool = [...(allParticipants || []), ...getStoredParticipants()];
+    const dupCheck = checkDuplicateParticipant(fullName, birthDate, editingParticipant?.id, localPool);
+    if (dupCheck.isDuplicate) {
+      return dupCheck.duplicateInfo || 'Santri sudah terdaftar di cabang lomba lain.';
+    }
+
     return null;
   };
 
@@ -360,10 +438,12 @@ export const ParticipantFormPage: React.FC<ParticipantFormPageProps> = ({
   const handleSaveDirect = async (e: React.FormEvent, andKeepContext: boolean = false) => {
     e.preventDefault();
     if (isSubmitting) return;
+    setIsSubmitting(true); // Kunci instan sejak milidetik pertama untuk cegah klik ganda
     setFormError('');
 
     const error = validateFormData();
     if (error) {
+      setIsSubmitting(false);
       setFormError(error);
       showToast('warning', error);
       return;
@@ -380,6 +460,15 @@ export const ParticipantFormPage: React.FC<ParticipantFormPageProps> = ({
       } catch {
         // Fallback ke data lokal
       }
+    }
+
+    // Pengecekan Ulang Anti-Santri Ganda terhadap data cloud paling mutakhir
+    const cloudDupCheck = checkDuplicateParticipant(fullName, birthDate, editingParticipant?.id, currentList);
+    if (cloudDupCheck.isDuplicate) {
+      setIsSubmitting(false);
+      setFormError(cloudDupCheck.duplicateInfo!);
+      showToast('warning', cloudDupCheck.duplicateInfo!);
+      return;
     }
 
     const regNumber = editingParticipant
@@ -415,7 +504,6 @@ export const ParticipantFormPage: React.FC<ParticipantFormPageProps> = ({
       updatedAt: new Date().toISOString(),
     };
 
-    setIsSubmitting(true);
     try {
       const res = await onSave(participantData);
       if (res && typeof res === 'object' && res.success === false) {
@@ -453,6 +541,21 @@ export const ParticipantFormPage: React.FC<ParticipantFormPageProps> = ({
     if (error) {
       setFormError(error);
       showToast('warning', error);
+      return;
+    }
+
+    // Validasi Anti-Santri Ganda terhadap antrian draft yang sedang ada
+    const inDraft = drafts.find((d) => {
+      if (editingDraftId && d.id === editingDraftId) return false;
+      return (
+        normalizeFullName(d.fullName) === normalizeFullName(fullName) &&
+        normalizeBirthDate(d.birthDate) === normalizeBirthDate(birthDate)
+      );
+    });
+    if (inDraft) {
+      const draftMsg = `Santri "${inDraft.fullName}" (Lahir: ${inDraft.birthDate}) sudah ada di dalam antrian draft. Mohon tidak menduplikasi data santri.`;
+      setFormError(draftMsg);
+      showToast('warning', draftMsg);
       return;
     }
 
@@ -550,6 +653,18 @@ export const ParticipantFormPage: React.FC<ParticipantFormPageProps> = ({
     const newParticipants: Participant[] = [];
 
     for (const draft of drafts) {
+      // Validasi Anti-Santri Ganda sebelum registrasi batch
+      const batchDup = checkDuplicateParticipant(
+        draft.fullName,
+        draft.birthDate,
+        null,
+        [...currentList, ...newParticipants]
+      );
+      if (batchDup.isDuplicate) {
+        showToast('warning', `Draft ${draft.fullName} dilewati karena sudah terdaftar di sistem.`);
+        continue;
+      }
+
       const regNumber = generateRegistrationNumber(
         draft.kemantrenId,
         draft.categoryId,

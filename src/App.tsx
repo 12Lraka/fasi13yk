@@ -300,6 +300,22 @@ export default function App() {
   };
 
   const handleSaveParticipant = async (savedParticipant: Participant): Promise<{ success: boolean; error?: string }> => {
+    // Validasi Anti-Santri Ganda (Nama Lengkap + Tanggal Lahir)
+    const normSaveName = savedParticipant.fullName.trim().toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, '').replace(/\s+/g, ' ');
+    const normSaveDate = savedParticipant.birthDate.trim();
+    const duplicate = participants.find((p) => {
+      if (p.id === savedParticipant.id) return false;
+      const pName = p.fullName.trim().toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, '').replace(/\s+/g, ' ');
+      const pDate = p.birthDate.trim();
+      return pName === normSaveName && pDate === normSaveDate;
+    });
+
+    if (duplicate) {
+      const err = `Pendaftaran ditolak: Santri "${savedParticipant.fullName}" (Lahir: ${savedParticipant.birthDate}) sudah terdaftar di sistem dengan No. Reg ${duplicate.registrationNumber}. Setiap santri hanya berhak mengikuti 1 cabang lomba.`;
+      showErrorAlert('Pendaftaran Ganda Ditolak', err);
+      return { success: false, error: err };
+    }
+
     // 1. Simpan langsung ke database Supabase jika kredensial aktif
     if (isSupabaseConfigured()) {
       const res = await upsertParticipantToSupabase(savedParticipant);

@@ -53,8 +53,8 @@ function getCategoryMeta(categoryType: string) {
         sub: 'FESTIVAL ANAK SHOLEH INDONESIA (FASI) XIII TAHUN 2027',
         roleLabel: 'Penugasan Cabang / Bidang',
         color: [136, 19, 55], // rose-900
-        signatoryRightRole: 'Koordinator Dewan Hakim',
-        signatoryRightDefault: 'K.H. Ahmad Syukri, M.S.I',
+        signatoryRightRole: 'Koordinator Sie Juri & Panitera',
+        signatoryRightDefault: 'Imam Muhtarom, S.S',
       };
     case 'panitera':
       return {
@@ -63,7 +63,7 @@ function getCategoryMeta(categoryType: string) {
         roleLabel: 'Arena Lomba / Meja Sidang',
         color: [15, 118, 110], // teal-700
         signatoryRightRole: 'Koordinator Sie Lomba',
-        signatoryRightDefault: 'Ustadz Farhan Al-Ghifari, S.Pd',
+        signatoryRightDefault: 'Ali Hafidh, S.Pd.I., M.Pd.',
       };
     case 'panitia':
       return {
@@ -71,8 +71,8 @@ function getCategoryMeta(categoryType: string) {
         sub: 'FESTIVAL ANAK SHOLEH INDONESIA (FASI) XIII TAHUN 2027',
         roleLabel: 'Divisi / Seksi Kepanitiaan',
         color: [6, 78, 59], // emerald-900
-        signatoryRightRole: 'Sekretaris Panitia',
-        signatoryRightDefault: 'Ustadz Ridwan Hakim, S.T',
+        signatoryRightRole: 'Sekretaris',
+        signatoryRightDefault: 'Viko Saputra',
       };
     default:
       return {
@@ -80,8 +80,8 @@ function getCategoryMeta(categoryType: string) {
         sub: 'PANITIA, DEWAN HAKIM, & PANITERA LOMBA',
         roleLabel: 'Jabatan / Penugasan',
         color: [15, 23, 42], // slate-900
-        signatoryRightRole: 'Sekretaris Panitia',
-        signatoryRightDefault: 'Ustadz Ridwan Hakim, S.T',
+        signatoryRightRole: 'Sekretaris',
+        signatoryRightDefault: 'Viko Saputra',
       };
   }
 }
@@ -144,7 +144,7 @@ async function renderSingleCategorySheet(
   pdfDoc.setFontSize(7.5);
   pdfDoc.setTextColor(71, 85, 105);
   pdfDoc.text(
-    'Sekretariat : Jln. Kenari No. 56 Muja Muju, Umbulharjo, Kota Yogyakarta | Website: fasi-jogja.web.id',
+    'Sekretariat : Jln. Kenari No. 56 Muja Muju, Umbulharjo, Kota Yogyakarta | Telp. 085179928551 / 085647392525',
     pageWidth / 2,
     topY + 14,
     { align: 'center' }
@@ -181,7 +181,7 @@ async function renderSingleCategorySheet(
   pdfDoc.setTextColor(30, 41, 59);
 
   const eventDateText = options.eventDate || 'Minggu, 28 Maret 2027';
-  const venueText = options.venueName || 'Kompleks Balai Kota & Masjid Pangeran Diponegoro Yogyakarta';
+  const venueText = options.venueName || 'SMP N 1 Yogyakarta';
 
   pdfDoc.text('Hari / Tanggal :', marginX + 3, metaBoxY + 4.2);
   pdfDoc.setFont('helvetica', 'normal');
@@ -308,7 +308,7 @@ async function renderSingleCategorySheet(
   const nameY = signatureY + 22;
 
   // Nama Pengesah Kiri
-  const ketuaName = options.ketuaPanitiaName || 'Dr. H. Muhammad Asrori, M.Ag';
+  const ketuaName = options.ketuaPanitiaName || 'Andry Sunny, S.E';
   pdfDoc.setFont('helvetica', 'bold');
   pdfDoc.setFontSize(8.5);
   pdfDoc.setTextColor(15, 23, 42);
