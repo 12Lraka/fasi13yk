@@ -134,22 +134,41 @@ export const UndianNomorTampil: React.FC<UndianNomorTampilProps> = ({
       const parts = byKemantren[kemId];
       const kemName = getKemantrenName(kemId);
       
-      // Chunk per memberCountPerGroup (default 3)
-      for (let i = 0; i < parts.length; i += memberCountPerGroup) {
-        const chunk = parts.slice(i, i + memberCountPerGroup);
-        const groupIndex = Math.floor(i / memberCountPerGroup) + 1;
-        const firstLotteryNum = chunk.find((m) => m.lotteryNumber != null)?.lotteryNumber ?? null;
-        
-        groups.push({
-          groupId: `${kemId}-grp-${groupIndex}`,
-          groupLabel: `Regu ${groupIndex} - Kemantren ${kemName}`,
-          kemantrenId: kemId,
-          kemantrenName: kemName,
-          tpaUnitName: chunk[0]?.tpaUnitName || `Kontingen ${kemName}`,
-          lotteryNumber: firstLotteryNum,
-          members: chunk,
-        });
-      }
+      // Kelompokkan santri dalam satu kemantren berdasarkan Unit TPA terlebih dahulu
+      const byTpa: Record<string, Participant[]> = {};
+      parts.forEach((p) => {
+        const tpaKey = (p.tpaUnitName || `Kontingen ${kemName}`).trim().toLowerCase();
+        if (!byTpa[tpaKey]) {
+          byTpa[tpaKey] = [];
+        }
+        byTpa[tpaKey].push(p);
+      });
+
+      let reguCounter = 1;
+      Object.keys(byTpa).forEach((tpaKey) => {
+        const tpaParts = byTpa[tpaKey];
+        // Urutkan berdasarkan nomor registrasi agar urutan pendaftaran santri konsisten
+        tpaParts.sort((a, b) =>
+          (a.registrationNumber || '').localeCompare(b.registrationNumber || '', undefined, { numeric: true })
+        );
+
+        for (let i = 0; i < tpaParts.length; i += memberCountPerGroup) {
+          const chunk = tpaParts.slice(i, i + memberCountPerGroup);
+          const firstLotteryNum = chunk.find((m) => m.lotteryNumber != null)?.lotteryNumber ?? null;
+          const displayTpa = chunk[0]?.tpaUnitName || `Kontingen ${kemName}`;
+
+          groups.push({
+            groupId: `${kemId}-${tpaKey.replace(/[^a-z0-9]/g, '_')}-${reguCounter}`,
+            groupLabel: `Regu ${reguCounter} - ${displayTpa} (${kemName})`,
+            kemantrenId: kemId,
+            kemantrenName: kemName,
+            tpaUnitName: displayTpa,
+            lotteryNumber: firstLotteryNum,
+            members: chunk,
+          });
+          reguCounter++;
+        }
+      });
     });
 
     return groups;

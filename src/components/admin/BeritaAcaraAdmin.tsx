@@ -137,30 +137,46 @@ export const BeritaAcaraAdmin: React.FC<BeritaAcaraAdminProps> = ({ participants
       const kem = KEMANTREN_LIST.find((k) => k.id === kemId);
       const kemName = kem ? kem.name : kemId;
 
-      for (let i = 0; i < parts.length; i += memberCount) {
-        const chunk = parts.slice(i, i + memberCount);
-        const groupIndex = Math.floor(i / memberCount) + 1;
-        const memberNames = chunk.map((m) => m.fullName);
-        const unitTpa = chunk[0]?.tpaUnitName || '';
-        const avgScore = chunk.length > 0
-          ? chunk.reduce((sum, m) => sum + (m.totalScore || 0), 0) / chunk.length
-          : 0;
+      // Kelompokkan per Unit TPA
+      const byTpa: Record<string, Participant[]> = {};
+      parts.forEach((p) => {
+        const tpaKey = (p.tpaUnitName || `Kontingen ${kemName}`).trim().toLowerCase();
+        if (!byTpa[tpaKey]) {
+          byTpa[tpaKey] = [];
+        }
+        byTpa[tpaKey].push(p);
+      });
 
-        const groupLabel = parts.length > memberCount
-          ? `Regu ${groupIndex} Rayon ${kemName}`
-          : `Regu Rayon ${kemName}`;
+      let reguCounter = 1;
+      Object.keys(byTpa).forEach((tpaKey) => {
+        const tpaParts = byTpa[tpaKey];
+        tpaParts.sort((a, b) =>
+          (a.registrationNumber || '').localeCompare(b.registrationNumber || '', undefined, { numeric: true })
+        );
 
-        groups.push({
-          groupId: `${kemId}-grp-${groupIndex}`,
-          kemantrenId: kemId,
-          kemantrenName: kemName,
-          unitTpa: unitTpa,
-          members: chunk,
-          memberNames: memberNames,
-          formattedName: `${groupLabel} (${memberNames.join(', ')})`,
-          averageScore: parseFloat(avgScore.toFixed(1)),
-        });
-      }
+        for (let i = 0; i < tpaParts.length; i += memberCount) {
+          const chunk = tpaParts.slice(i, i + memberCount);
+          const memberNames = chunk.map((m) => m.fullName);
+          const unitTpa = chunk[0]?.tpaUnitName || '';
+          const avgScore = chunk.length > 0
+            ? chunk.reduce((sum, m) => sum + (m.totalScore || 0), 0) / chunk.length
+            : 0;
+
+          const groupLabel = `Regu ${reguCounter} - ${unitTpa || kemName} (${kemName})`;
+
+          groups.push({
+            groupId: `${kemId}-${tpaKey.replace(/[^a-z0-9]/g, '_')}-${reguCounter}`,
+            kemantrenId: kemId,
+            kemantrenName: kemName,
+            unitTpa: unitTpa,
+            members: chunk,
+            memberNames: memberNames,
+            formattedName: `${groupLabel} (${memberNames.join(', ')})`,
+            averageScore: parseFloat(avgScore.toFixed(1)),
+          });
+          reguCounter++;
+        }
+      });
     });
 
     return groups;

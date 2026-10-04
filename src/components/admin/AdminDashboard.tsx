@@ -40,6 +40,8 @@ import {
   Trophy,
   Maximize2,
   Scale,
+  Table,
+  AlertTriangle,
 } from 'lucide-react';
 import { Participant, UserSession, Kemantren, AppSettings } from '../../types/fasi';
 import {
@@ -257,6 +259,111 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const start = (currentPage - 1) * pageSize;
     return visibleParticipants.slice(start, start + pageSize);
   }, [visibleParticipants, currentPage, pageSize]);
+
+  // View Mode: 'table' (Standar Individu) | 'group' (Tampilan Khusus Per Regu)
+  const [participantViewMode, setParticipantViewMode] = useState<'table' | 'group'>('table');
+
+  const selectedCategoryObj = useMemo(() => {
+    if (selectedCategoryFilter === 'ALL') return null;
+    return categoriesList.find((c) => c.id === selectedCategoryFilter) || null;
+  }, [categoriesList, selectedCategoryFilter]);
+
+  const isSelectedCategoryGroup = Boolean(selectedCategoryObj?.isGroup);
+
+  const totalGroupParticipantsCount = useMemo(() => {
+    const groupCatIds = new Set(categoriesList.filter((c) => c.isGroup).map((c) => c.id));
+    return visibleParticipants.filter((p) => groupCatIds.has(p.categoryId)).length;
+  }, [categoriesList, visibleParticipants]);
+
+  // Data Pengelompokan Khusus Beregu (Grouped by Kemantren -> Unit TPA -> Per 3 Santri)
+  const groupViewData = useMemo(() => {
+    const groupCategories = categoriesList.filter((c) => c.isGroup);
+    const targetCategories = selectedCategoryFilter !== 'ALL'
+      ? groupCategories.filter((c) => c.id === selectedCategoryFilter)
+      : groupCategories;
+
+    return targetCategories.map((cat) => {
+      const catParts = visibleParticipants.filter((p) => p.categoryId === cat.id);
+      const memberCount = cat.groupMemberCount || 3;
+
+      const byKem: Record<string, Participant[]> = {};
+      catParts.forEach((p) => {
+        if (!byKem[p.kemantrenId]) byKem[p.kemantrenId] = [];
+        byKem[p.kemantrenId].push(p);
+      });
+
+      const kemantrenGroups: {
+        kemantrenId: string;
+        kemantrenName: string;
+        reguList: {
+          reguNumber: number;
+          tpaUnitName: string;
+          lotteryNumber: number | null;
+          members: Participant[];
+          isComplete: boolean;
+        }[];
+      }[] = [];
+
+      Object.keys(byKem).forEach((kId) => {
+        const kParts = byKem[kId];
+        const kem = kemantrenList.find((k) => k.id === kId);
+        const kemName = kem ? kem.name : kId;
+
+        // Kelompokkan per Unit TPA
+        const byTpa: Record<string, Participant[]> = {};
+        kParts.forEach((p) => {
+          const tpaKey = (p.tpaUnitName || `Kontingen ${kemName}`).trim().toLowerCase();
+          if (!byTpa[tpaKey]) byTpa[tpaKey] = [];
+          byTpa[tpaKey].push(p);
+        });
+
+        const reguList: {
+          reguNumber: number;
+          tpaUnitName: string;
+          lotteryNumber: number | null;
+          members: Participant[];
+          isComplete: boolean;
+        }[] = [];
+
+        let reguIdx = 1;
+        Object.keys(byTpa).forEach((tpaKey) => {
+          const tpaParts = byTpa[tpaKey];
+          tpaParts.sort((a, b) =>
+            (a.registrationNumber || '').localeCompare(b.registrationNumber || '', undefined, { numeric: true })
+          );
+
+          for (let i = 0; i < tpaParts.length; i += memberCount) {
+            const chunk = tpaParts.slice(i, i + memberCount);
+            const firstLottery = chunk.find((m) => m.lotteryNumber != null)?.lotteryNumber ?? null;
+            const displayTpa = chunk[0]?.tpaUnitName || `Kontingen ${kemName}`;
+
+            reguList.push({
+              reguNumber: reguIdx,
+              tpaUnitName: displayTpa,
+              lotteryNumber: firstLottery,
+              members: chunk,
+              isComplete: chunk.length >= memberCount,
+            });
+            reguIdx++;
+          }
+        });
+
+        if (reguList.length > 0) {
+          kemantrenGroups.push({
+            kemantrenId: kId,
+            kemantrenName: kemName,
+            reguList,
+          });
+        }
+      });
+
+      return {
+        category: cat,
+        totalParticipants: catParts.length,
+        kemantrenGroups,
+      };
+    });
+  }, [categoriesList, selectedCategoryFilter, visibleParticipants, kemantrenList]);
 
   const currentKemantren = useMemo(() => {
     if (session?.role === 'kemantren_admin' && session?.kemantrenId) {
@@ -924,199 +1031,444 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
             </div>
 
-            {/* Participants Table */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="bg-slate-100/90 text-slate-800 font-bold border-b border-slate-200">
-                      <th className="py-3 px-3 text-center w-12">No</th>
-                      <th className="py-3 px-3">No. Registrasi</th>
-                      <th className="py-3 px-3">Nama Santri</th>
-                      <th className="py-3 px-3">Rayon / Unit TPA</th>
-                      <th className="py-3 px-3">Cabang Lomba</th>
-                      <th className="py-3 px-3 text-center">No. Undian</th>
-                      <th className="py-3 px-3 text-center">Kehadiran</th>
-                      <th className="py-3 px-3 text-center w-36">Aksi</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200">
-                    {paginatedParticipants.length === 0 ? (
-                      <tr>
-                        <td colSpan={8} className="py-12 text-center text-slate-400">
-                          <div className="max-w-xs mx-auto space-y-2">
-                            <Users className="w-8 h-8 text-slate-300 mx-auto" />
-                            <p className="font-semibold text-slate-600">Tidak ada data santri ditemukan</p>
-                            <p className="text-[11px] text-slate-400">
-                              Silakan sesuaikan kata kunci pencarian atau daftarkan santri baru.
-                            </p>
-                          </div>
-                        </td>
-                      </tr>
-                    ) : (
-                      paginatedParticipants.map((participant, index) => {
-                        const cat = getCat(participant.categoryId);
-                        const kem = getKem(participant.kemantrenId);
-                        const rowNumber = (currentPage - 1) * pageSize + index + 1;
-
-                        return (
-                          <tr key={participant.id} className="hover:bg-slate-50/80 transition-colors">
-                            {/* Row Number */}
-                            <td className="py-3 px-3 text-center font-mono text-[11px] text-slate-400">
-                              {rowNumber}
-                            </td>
-
-                            {/* Reg Number */}
-                            <td className="py-3 px-3">
-                              <span className="font-mono font-bold text-[11px] text-emerald-950 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                                {participant.registrationNumber}
-                              </span>
-                            </td>
-
-                            {/* Full Name & Gender */}
-                            <td className="py-3 px-3">
-                              <div className="font-bold text-slate-900">{participant.fullName}</div>
-                              <div className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
-                                <span
-                                  className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
-                                    participant.gender === 'L'
-                                      ? 'bg-blue-100 text-blue-800'
-                                      : 'bg-pink-100 text-pink-800'
-                                  }`}
-                                >
-                                  {participant.gender === 'L' ? 'Putra' : 'Putri'}
-                                </span>
-                                <span>• PJ: {participant.pjName}</span>
-                              </div>
-                            </td>
-
-                            {/* Kemantren & TPA */}
-                            <td className="py-3 px-3">
-                              <div className="font-semibold text-slate-800">
-                                Rayon {kem?.name || participant.kemantrenId}
-                              </div>
-                              <div className="text-[11px] text-slate-500 truncate max-w-[150px]">
-                                {participant.tpaUnitName}
-                              </div>
-                            </td>
-
-                            {/* Category */}
-                            <td className="py-3 px-3">
-                              <div className="font-semibold text-emerald-900">
-                                {cat?.name || participant.categoryId}
-                              </div>
-                              <div className="text-[10px] text-slate-400">
-                                Tingkat: <span className="font-bold text-slate-600">{cat?.level || '-'}</span>
-                              </div>
-                            </td>
-
-                            {/* Lottery */}
-                            <td className="py-3 px-3 text-center">
-                              {participant.lotteryNumber ? (
-                                <span className="inline-block px-2.5 py-1 bg-amber-400 text-emerald-950 font-black rounded-lg text-xs shadow-2xs">
-                                  #{participant.lotteryNumber}
-                                </span>
-                              ) : (
-                                <span className="text-[11px] text-slate-400 italic">Belum undi</span>
-                              )}
-                            </td>
-
-                            {/* Attendance */}
-                            <td className="py-3 px-3 text-center">
-                              {participant.attendance === 'hadir' ? (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-emerald-100 text-emerald-800 rounded-full text-[10px] font-bold">
-                                  <CheckCircle2 className="w-3 h-3" />
-                                  <span>Hadir</span>
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-slate-100 text-slate-500 rounded-full text-[10px] font-medium">
-                                  <span>Belum Hadir</span>
-                                </span>
-                              )}
-                            </td>
-
-                            {/* Action Buttons */}
-                            <td className="py-3 px-3 text-center">
-                              <div className="flex items-center justify-center gap-1">
-                                <button
-                                  onClick={() => onViewSingleCard(participant)}
-                                  title="Lihat Kartu Santri"
-                                  className="p-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 transition-colors cursor-pointer"
-                                >
-                                  <Eye className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  onClick={() => onOpenEditModal(participant)}
-                                  title="Edit Santri"
-                                  className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer"
-                                >
-                                  <Edit className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  onClick={() => handleDelete(participant)}
-                                  title="Hapus Santri"
-                                  className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 transition-colors cursor-pointer"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })
+            {/* Mode Tampilan: Tabel Standar Individu vs Tampilan Khusus Beregu */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200 shadow-xs">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-700">Mode Tampilan:</span>
+                <div className="inline-flex p-1 bg-slate-100 rounded-xl border border-slate-200/80">
+                  <button
+                    type="button"
+                    onClick={() => setParticipantViewMode('table')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      participantViewMode === 'table'
+                        ? 'bg-emerald-900 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Table className="w-3.5 h-3.5" />
+                    <span>Tabel Individu</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setParticipantViewMode('group')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      participantViewMode === 'group'
+                        ? 'bg-emerald-900 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Users className="w-3.5 h-3.5" />
+                    <span>Tampilan Khusus Beregu</span>
+                    {totalGroupParticipantsCount > 0 && (
+                      <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-400 text-emerald-950 font-black">
+                        {totalGroupParticipantsCount}
+                      </span>
                     )}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Pagination Controls */}
-              <div className="bg-slate-50/80 px-4 py-3 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
-                <div>
-                  Halaman <span className="font-bold text-slate-900">{currentPage}</span> dari{' '}
-                  <span className="font-bold text-slate-900">{totalPages}</span> (Total {visibleParticipants.length} data)
-                </div>
-
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={() => setCurrentPage(1)}
-                    disabled={currentPage === 1}
-                    className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
-                    title="Halaman Pertama"
-                  >
-                    <ChevronsLeft className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                    disabled={currentPage === 1}
-                    className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
-                    title="Sebelumnya"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-
-                  <span className="px-3 py-1 font-bold text-emerald-950 bg-emerald-100 rounded-lg">
-                    {currentPage} / {totalPages}
-                  </span>
-
-                  <button
-                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={currentPage === totalPages}
-                    className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
-                    title="Berikutnya"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setCurrentPage(totalPages)}
-                    disabled={currentPage === totalPages}
-                    className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
-                    title="Halaman Terakhir"
-                  >
-                    <ChevronsRight className="w-4 h-4" />
                   </button>
                 </div>
               </div>
+
+              {isSelectedCategoryGroup && participantViewMode === 'table' && (
+                <div className="flex items-center gap-2 text-xs bg-amber-50 text-amber-900 px-3 py-1.5 rounded-xl border border-amber-200">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>Cabang beregu dipilih. Ingin melihat pengelompokan Regu 1, Regu 2, dst.?</span>
+                  <button
+                    type="button"
+                    onClick={() => setParticipantViewMode('group')}
+                    className="font-bold underline hover:text-amber-950 cursor-pointer"
+                  >
+                    Buka Mode Regu
+                  </button>
+                </div>
+              )}
             </div>
+
+            {participantViewMode === 'group' ? (
+              /* VIEW KHUSUS BEREGU (REGU 1, REGU 2, DST.) */
+              <div className="space-y-6">
+                {groupViewData.filter((item) => item.kemantrenGroups.length > 0).length === 0 ? (
+                  <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-sm">
+                    <Users className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                    <h3 className="text-base font-bold text-slate-700">Tidak Ada Data Regu Ditemukan</h3>
+                    <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+                      Belum ada peserta terdaftar pada cabang lomba beregu yang sesuai dengan filter pencarian / rayon saat ini.
+                    </p>
+                    {selectedCategoryFilter !== 'ALL' && !isSelectedCategoryGroup && (
+                      <p className="text-xs text-amber-700 font-semibold mt-2">
+                        Catatan: Cabang yang Anda filter saat ini adalah cabang individu. Pilih cabang beregu atau pilih &quot;Semua Cabang Lomba&quot;.
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  groupViewData
+                    .filter((item) => item.kemantrenGroups.length > 0)
+                    .map((catGroup) => (
+                      <div
+                        key={catGroup.category.id}
+                        className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"
+                      >
+                        {/* Header Cabang Lomba */}
+                        <div className="bg-gradient-to-r from-emerald-900 to-emerald-800 text-white px-5 py-3.5 flex flex-wrap items-center justify-between gap-3">
+                          <div className="flex items-center gap-2.5">
+                            <span className="px-2.5 py-0.5 rounded-md text-[10px] font-black tracking-wider bg-amber-400 text-emerald-950 uppercase">
+                              {catGroup.category.level}
+                            </span>
+                            <h3 className="text-sm font-bold tracking-tight">
+                              {catGroup.category.name}
+                            </h3>
+                            <span className="text-xs text-emerald-200">
+                              (Kuota {catGroup.category.groupMemberCount || 3} Santri / Regu)
+                            </span>
+                          </div>
+                          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-800/80 border border-emerald-600/50">
+                            Total {catGroup.totalParticipants} Santri Terdaftar
+                          </span>
+                        </div>
+
+                        {/* List of Kemantren & Regu Cards */}
+                        <div className="p-5 space-y-6">
+                          {catGroup.kemantrenGroups.map((kemGroup) => (
+                            <div key={kemGroup.kemantrenId} className="space-y-3">
+                              {session.role === 'super_admin' && (
+                                <div className="flex items-center gap-2 pb-1 border-b border-slate-200">
+                                  <Building2 className="w-4 h-4 text-emerald-700" />
+                                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                                    Rayon {kemGroup.kemantrenName}
+                                  </h4>
+                                </div>
+                              )}
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {kemGroup.reguList.map((regu) => {
+                                  const reqCount = catGroup.category.groupMemberCount || 3;
+                                  return (
+                                    <div
+                                      key={`${kemGroup.kemantrenId}-${regu.reguNumber}-${regu.tpaUnitName}`}
+                                      className={`rounded-2xl border transition-all shadow-2xs flex flex-col justify-between ${
+                                        regu.isComplete
+                                          ? 'bg-slate-50/70 border-emerald-300/80 hover:border-emerald-500'
+                                          : 'bg-amber-50/40 border-amber-300 hover:border-amber-400'
+                                      }`}
+                                    >
+                                      {/* Header Regu */}
+                                      <div className="p-3.5 border-b border-slate-200/70 bg-white rounded-t-2xl">
+                                        <div className="flex items-center justify-between gap-2">
+                                          <div className="flex items-center gap-1.5">
+                                            <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-200">
+                                              Regu {regu.reguNumber}
+                                            </span>
+                                            {regu.lotteryNumber ? (
+                                              <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-amber-400 text-emerald-950">
+                                                #{regu.lotteryNumber}
+                                              </span>
+                                            ) : null}
+                                          </div>
+                                          <span
+                                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                              regu.isComplete
+                                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                                : 'bg-amber-100 text-amber-900 border border-amber-300'
+                                            }`}
+                                          >
+                                            {regu.isComplete
+                                              ? `Lengkap (${regu.members.length}/${reqCount})`
+                                              : `Kurang ${reqCount - regu.members.length} Santri (${regu.members.length}/${reqCount})`}
+                                          </span>
+                                        </div>
+
+                                        <h5 className="text-xs font-bold text-slate-900 mt-2 truncate" title={regu.tpaUnitName}>
+                                          {regu.tpaUnitName}
+                                        </h5>
+                                        <p className="text-[10px] text-slate-500">
+                                          Rayon {kemGroup.kemantrenName}
+                                        </p>
+                                      </div>
+
+                                      {/* Daftar Anggota Santri */}
+                                      <div className="p-3 space-y-2 flex-1">
+                                        {regu.members.map((member, mIdx) => (
+                                          <div
+                                            key={member.id}
+                                            className="p-2.5 rounded-xl bg-white border border-slate-200/80 hover:border-slate-300 transition-all flex items-center justify-between gap-2"
+                                          >
+                                            <div className="flex items-center gap-2 min-w-0">
+                                              <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-black flex items-center justify-center shrink-0">
+                                                {mIdx + 1}
+                                              </span>
+                                              <div className="min-w-0">
+                                                <div className="text-xs font-bold text-slate-800 truncate" title={member.fullName}>
+                                                  {member.fullName}
+                                                </div>
+                                                <div className="text-[10px] text-slate-500 flex items-center gap-1.5 flex-wrap">
+                                                  <span className="font-mono font-semibold text-emerald-800">
+                                                    {member.registrationNumber}
+                                                  </span>
+                                                  <span>•</span>
+                                                  <span>{member.gender === 'L' ? 'Putra' : 'Putri'}</span>
+                                                  {member.attendance === 'hadir' && (
+                                                    <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                                                      Hadir
+                                                    </span>
+                                                  )}
+                                                </div>
+                                              </div>
+                                            </div>
+
+                                            {/* Action Buttons for this Member */}
+                                            <div className="flex items-center gap-1 shrink-0">
+                                              <button
+                                                type="button"
+                                                onClick={() => onViewSingleCard(member)}
+                                                title="Lihat Kartu Santri"
+                                                className="p-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 transition-colors cursor-pointer"
+                                              >
+                                                <Eye className="w-3.5 h-3.5" />
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={() => onOpenEditModal(member)}
+                                                title="Edit Santri ini (jika tertukar nama / data)"
+                                                className="p-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer"
+                                              >
+                                                <Edit className="w-3.5 h-3.5 text-emerald-700" />
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={() => handleDelete(member)}
+                                                title="Hapus Santri"
+                                                className="p-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 transition-colors cursor-pointer"
+                                              >
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                              </button>
+                                            </div>
+                                          </div>
+                                        ))}
+
+                                        {/* Placeholder jika anggota kurang dari kuota */}
+                                        {Array.from({ length: Math.max(0, reqCount - regu.members.length) }).map((_, emptyIdx) => (
+                                          <div
+                                            key={`empty-${emptyIdx}`}
+                                            className="p-2.5 rounded-xl border border-dashed border-amber-300 bg-amber-50/30 flex items-center justify-between text-[11px] text-amber-800"
+                                          >
+                                            <span className="italic">
+                                              Slot Anggota #{regu.members.length + emptyIdx + 1} belum terisi
+                                            </span>
+                                            <button
+                                              type="button"
+                                              onClick={onOpenAddModal}
+                                              className="px-2 py-0.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[10px] font-bold cursor-pointer transition-all"
+                                            >
+                                              + Tambah
+                                            </button>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))
+                )}
+              </div>
+            ) : (
+              /* TABEL REGULER INDIVIDU */
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-100/90 text-slate-800 font-bold border-b border-slate-200">
+                        <th className="py-3 px-3 text-center w-12">No</th>
+                        <th className="py-3 px-3">No. Registrasi</th>
+                        <th className="py-3 px-3">Nama Santri</th>
+                        <th className="py-3 px-3">Rayon / Unit TPA</th>
+                        <th className="py-3 px-3">Cabang Lomba</th>
+                        <th className="py-3 px-3 text-center">No. Undian</th>
+                        <th className="py-3 px-3 text-center">Kehadiran</th>
+                        <th className="py-3 px-3 text-center w-36">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200">
+                      {paginatedParticipants.length === 0 ? (
+                        <tr>
+                          <td colSpan={8} className="py-12 text-center text-slate-400">
+                            <div className="max-w-xs mx-auto space-y-2">
+                              <Users className="w-8 h-8 text-slate-300 mx-auto" />
+                              <p className="font-semibold text-slate-600">Tidak ada data santri ditemukan</p>
+                              <p className="text-[11px] text-slate-400">
+                                Silakan sesuaikan kata kunci pencarian atau daftarkan santri baru.
+                              </p>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : (
+                        paginatedParticipants.map((participant, index) => {
+                          const cat = getCat(participant.categoryId);
+                          const kem = getKem(participant.kemantrenId);
+                          const rowNumber = (currentPage - 1) * pageSize + index + 1;
+
+                          return (
+                            <tr key={participant.id} className="hover:bg-slate-50/80 transition-colors">
+                              {/* Row Number */}
+                              <td className="py-3 px-3 text-center font-mono text-[11px] text-slate-400">
+                                {rowNumber}
+                              </td>
+
+                              {/* Reg Number */}
+                              <td className="py-3 px-3">
+                                <span className="font-mono font-bold text-[11px] text-emerald-950 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                  {participant.registrationNumber}
+                                </span>
+                              </td>
+
+                              {/* Full Name & Gender */}
+                              <td className="py-3 px-3">
+                                <div className="font-bold text-slate-900">{participant.fullName}</div>
+                                <div className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
+                                  <span
+                                    className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
+                                      participant.gender === 'L'
+                                        ? 'bg-blue-100 text-blue-800'
+                                        : 'bg-pink-100 text-pink-800'
+                                    }`}
+                                  >
+                                    {participant.gender === 'L' ? 'Putra' : 'Putri'}
+                                  </span>
+                                  <span>• PJ: {participant.pjName}</span>
+                                </div>
+                              </td>
+
+                              {/* Kemantren & TPA */}
+                              <td className="py-3 px-3">
+                                <div className="font-semibold text-slate-800">
+                                  Rayon {kem?.name || participant.kemantrenId}
+                                </div>
+                                <div className="text-[11px] text-slate-500 truncate max-w-[150px]">
+                                  {participant.tpaUnitName}
+                                </div>
+                              </td>
+
+                              {/* Category */}
+                              <td className="py-3 px-3">
+                                <div className="font-semibold text-emerald-900">
+                                  {cat?.name || participant.categoryId}
+                                </div>
+                                <div className="text-[10px] text-slate-400">
+                                  Tingkat: <span className="font-bold text-slate-600">{cat?.level || '-'}</span>
+                                </div>
+                              </td>
+
+                              {/* Lottery */}
+                              <td className="py-3 px-3 text-center">
+                                {participant.lotteryNumber ? (
+                                  <span className="inline-block px-2.5 py-1 bg-amber-400 text-emerald-950 font-black rounded-lg text-xs shadow-2xs">
+                                    #{participant.lotteryNumber}
+                                  </span>
+                                ) : (
+                                  <span className="text-[11px] text-slate-400 italic">Belum undi</span>
+                                )}
+                              </td>
+
+                              {/* Attendance */}
+                              <td className="py-3 px-3 text-center">
+                                {participant.attendance === 'hadir' ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-emerald-100 text-emerald-800 rounded-full text-[10px] font-bold">
+                                    <CheckCircle2 className="w-3 h-3" />
+                                    <span>Hadir</span>
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-slate-100 text-slate-500 rounded-full text-[10px] font-medium">
+                                    <span>Belum Hadir</span>
+                                  </span>
+                                )}
+                              </td>
+
+                              {/* Action Buttons */}
+                              <td className="py-3 px-3 text-center">
+                                <div className="flex items-center justify-center gap-1">
+                                  <button
+                                    onClick={() => onViewSingleCard(participant)}
+                                    title="Lihat Kartu Santri"
+                                    className="p-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 transition-colors cursor-pointer"
+                                  >
+                                    <Eye className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={() => onOpenEditModal(participant)}
+                                    title="Edit Santri"
+                                    className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer"
+                                  >
+                                    <Edit className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDelete(participant)}
+                                    title="Hapus Santri"
+                                    className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 transition-colors cursor-pointer"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination Controls */}
+                <div className="bg-slate-50/80 px-4 py-3 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
+                  <div>
+                    Halaman <span className="font-bold text-slate-900">{currentPage}</span> dari{' '}
+                    <span className="font-bold text-slate-900">{totalPages}</span> (Total {visibleParticipants.length} data)
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => setCurrentPage(1)}
+                      disabled={currentPage === 1}
+                      className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                      title="Halaman Pertama"
+                    >
+                      <ChevronsLeft className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                      title="Sebelumnya"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+
+                    <span className="px-3 py-1 font-bold text-emerald-950 bg-emerald-100 rounded-lg">
+                      {currentPage} / {totalPages}
+                    </span>
+
+                    <button
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                      className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                      title="Berikutnya"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => setCurrentPage(totalPages)}
+                      disabled={currentPage === totalPages}
+                      className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                      title="Halaman Terakhir"
+                    >
+                      <ChevronsRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>
