@@ -49,7 +49,8 @@ import {
   logAuditEvent,
   getStoredKemantren,
   getStoredCategories,
-  getStoredSettings
+  getStoredSettings,
+  getEffectiveRegistrationStatus,
 } from '../../utils/storage';
 import { deleteParticipantFromSupabase } from '../../lib/supabase';
 import { exportParticipantsToExcel } from '../../utils/excelExport';
@@ -259,6 +260,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const start = (currentPage - 1) * pageSize;
     return visibleParticipants.slice(start, start + pageSize);
   }, [visibleParticipants, currentPage, pageSize]);
+
+  // Status Buka/Tutup Pendaftaran & Kunci Data
+  const effectiveRegStatus = useMemo(() => {
+    return getEffectiveRegistrationStatus(appSettings);
+  }, [appSettings]);
+
+  const canAddParticipant = useMemo(() => {
+    if (session.role === 'super_admin' && appSettings.allowSuperAdminBypass !== false) {
+      return true;
+    }
+    return effectiveRegStatus === 'open';
+  }, [session.role, appSettings.allowSuperAdminBypass, effectiveRegStatus]);
+
+  const canEditParticipant = useMemo(() => {
+    if (session.role === 'super_admin' && appSettings.allowSuperAdminBypass !== false) {
+      return true;
+    }
+    return effectiveRegStatus !== 'lockdown';
+  }, [session.role, appSettings.allowSuperAdminBypass, effectiveRegStatus]);
 
   // View Mode: 'table' (Standar Individu) | 'group' (Tampilan Khusus Per Regu)
   const [participantViewMode, setParticipantViewMode] = useState<'table' | 'group'>('table');
@@ -886,16 +906,96 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <span>Download Excel (.csv)</span>
                 </button>
 
-                <button
-                  onClick={onOpenAddModal}
-                  className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-emerald-950 font-bold text-xs rounded-xl shadow-sm flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer whitespace-nowrap"
-                  title="Buka formulir pendaftaran santri baru FASI XIII"
-                >
-                  <UserPlus className="w-4 h-4" />
-                  <span>+ Daftarkan Santri</span>
-                </button>
+                {canAddParticipant ? (
+                  <button
+                    onClick={onOpenAddModal}
+                    className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-emerald-950 font-bold text-xs rounded-xl shadow-sm flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer whitespace-nowrap"
+                    title={
+                      session.role === 'super_admin' && effectiveRegStatus !== 'open'
+                        ? 'Buka formulir pendaftaran santri baru (Khusus Superadmin)'
+                        : 'Buka formulir pendaftaran santri baru FASI XIII'
+                    }
+                  >
+                    <UserPlus className="w-4 h-4" />
+                    <span>+ Daftarkan Santri</span>
+                    {session.role === 'super_admin' && effectiveRegStatus !== 'open' && (
+                      <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-emerald-950 text-amber-300 ml-1">
+                        Bypass
+                      </span>
+                    )}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      showToast(
+                        'warning',
+                        appSettings.registrationClosedMessage ||
+                          'Pendaftaran santri baru telah ditutup oleh Panitia Pusat.'
+                      );
+                    }}
+                    className="px-4 py-2 bg-slate-100 text-slate-500 font-bold text-xs rounded-xl shadow-xs border border-slate-300 flex items-center gap-1.5 cursor-not-allowed opacity-90 whitespace-nowrap"
+                    title="Pendaftaran santri baru telah ditutup oleh Panitia Pusat"
+                  >
+                    <Lock className="w-4 h-4 text-slate-400" />
+                    <span>Pendaftaran Ditutup</span>
+                  </button>
+                )}
               </div>
             </div>
+
+            {/* Banner Status Pendaftaran Ditutup / Lockdown */}
+            {effectiveRegStatus !== 'open' && (
+              <div
+                className={`p-4 rounded-2xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs shadow-xs ${
+                  effectiveRegStatus === 'closed'
+                    ? 'bg-amber-50/90 border-amber-300 text-amber-950'
+                    : 'bg-rose-50/90 border-rose-300 text-rose-950'
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <div
+                    className={`p-2 rounded-xl shrink-0 ${
+                      effectiveRegStatus === 'closed'
+                        ? 'bg-amber-200/80 text-amber-900'
+                        : 'bg-rose-200/80 text-rose-900'
+                    }`}
+                  >
+                    <Lock className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="font-bold flex items-center gap-2">
+                      <span>
+                        {effectiveRegStatus === 'closed'
+                          ? '🟡 Masa Pendaftaran Santri Baru Telah Ditutup (Batas 5 Okt 12.00)'
+                          : '🔴 Data Santri Resmi Dikunci Total (Tahap Final Technical Meeting)'}
+                      </span>
+                      {session.role === 'super_admin' && appSettings.allowSuperAdminBypass !== false && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-800 text-amber-300">
+                          ⚡ Superadmin Bypass Aktif
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-0.5 text-slate-700 leading-relaxed">
+                      {effectiveRegStatus === 'closed'
+                        ? appSettings.registrationClosedMessage ||
+                          'Pendaftaran santri baru ditutup. Admin Rayon masih diperbolehkan mengoreksi / mengedit data santri yang sudah terdaftar hingga TM dimulai.'
+                        : 'Sistem dalam mode Read-Only bagi seluruh Admin Rayon. Seluruh perubahan, penambahan, dan penghapusan data santri telah dikunci oleh Panitia Pusat untuk kepastian nomor undian dan pencetakan Berita Acara.'}
+                    </p>
+                  </div>
+                </div>
+
+                {session.role === 'super_admin' && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveAdminTab('pengaturan')}
+                    className="px-3 py-1.5 rounded-lg bg-white border border-slate-300 text-slate-800 font-bold hover:bg-slate-50 transition-all shrink-0 cursor-pointer self-end sm:self-center"
+                  >
+                    Ubah Status di Pengaturan
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* Filter & Search Bar */}
             <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3">
@@ -1226,17 +1326,39 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                               </button>
                                               <button
                                                 type="button"
-                                                onClick={() => onOpenEditModal(member)}
-                                                title="Edit Santri ini (jika tertukar nama / data)"
-                                                className="p-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer"
+                                                onClick={() => {
+                                                  if (!canEditParticipant) {
+                                                    showToast('warning', 'Data santri telah dikunci total oleh Panitia Pusat (Tahap Final TM).');
+                                                    return;
+                                                  }
+                                                  onOpenEditModal(member);
+                                                }}
+                                                disabled={!canEditParticipant}
+                                                title={canEditParticipant ? 'Edit Santri ini (jika tertukar nama / data)' : 'Data dikunci (Tahap Final TM)'}
+                                                className={`p-1 rounded-lg transition-colors cursor-pointer ${
+                                                  canEditParticipant
+                                                    ? 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                                                    : 'bg-slate-100 text-slate-300 cursor-not-allowed'
+                                                }`}
                                               >
                                                 <Edit className="w-3.5 h-3.5 text-emerald-700" />
                                               </button>
                                               <button
                                                 type="button"
-                                                onClick={() => handleDelete(member)}
-                                                title="Hapus Santri"
-                                                className="p-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 transition-colors cursor-pointer"
+                                                onClick={() => {
+                                                  if (!canEditParticipant) {
+                                                    showToast('warning', 'Data santri telah dikunci total oleh Panitia Pusat (Tahap Final TM).');
+                                                    return;
+                                                  }
+                                                  handleDelete(member);
+                                                }}
+                                                disabled={!canEditParticipant}
+                                                title={canEditParticipant ? 'Hapus Santri' : 'Data dikunci (Tahap Final TM)'}
+                                                className={`p-1 rounded-lg transition-colors cursor-pointer ${
+                                                  canEditParticipant
+                                                    ? 'bg-rose-50 hover:bg-rose-100 text-rose-700'
+                                                    : 'bg-slate-100 text-slate-300 cursor-not-allowed'
+                                                }`}
                                               >
                                                 <Trash2 className="w-3.5 h-3.5" />
                                               </button>
@@ -1253,13 +1375,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                             <span className="italic">
                                               Slot Anggota #{regu.members.length + emptyIdx + 1} belum terisi
                                             </span>
-                                            <button
-                                              type="button"
-                                              onClick={onOpenAddModal}
-                                              className="px-2 py-0.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[10px] font-bold cursor-pointer transition-all"
-                                            >
-                                              + Tambah
-                                            </button>
+                                            {canAddParticipant ? (
+                                              <button
+                                                type="button"
+                                                onClick={onOpenAddModal}
+                                                className="px-2 py-0.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[10px] font-bold cursor-pointer transition-all"
+                                              >
+                                                + Tambah
+                                              </button>
+                                            ) : (
+                                              <span className="text-[10px] text-slate-400 font-medium italic">
+                                                (Pendaftaran Ditutup)
+                                              </span>
+                                            )}
                                           </div>
                                         ))}
                                       </div>
@@ -1397,16 +1525,38 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                     <Eye className="w-3.5 h-3.5" />
                                   </button>
                                   <button
-                                    onClick={() => onOpenEditModal(participant)}
-                                    title="Edit Santri"
-                                    className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer"
+                                    onClick={() => {
+                                      if (!canEditParticipant) {
+                                        showToast('warning', 'Data santri telah dikunci total oleh Panitia Pusat (Tahap Final TM).');
+                                        return;
+                                      }
+                                      onOpenEditModal(participant);
+                                    }}
+                                    disabled={!canEditParticipant}
+                                    title={canEditParticipant ? 'Edit Santri' : 'Data dikunci (Tahap Final TM)'}
+                                    className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                                      canEditParticipant
+                                        ? 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                                        : 'bg-slate-100 text-slate-300 cursor-not-allowed'
+                                    }`}
                                   >
                                     <Edit className="w-3.5 h-3.5" />
                                   </button>
                                   <button
-                                    onClick={() => handleDelete(participant)}
-                                    title="Hapus Santri"
-                                    className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 transition-colors cursor-pointer"
+                                    onClick={() => {
+                                      if (!canEditParticipant) {
+                                        showToast('warning', 'Data santri telah dikunci total oleh Panitia Pusat (Tahap Final TM).');
+                                        return;
+                                      }
+                                      handleDelete(participant);
+                                    }}
+                                    disabled={!canEditParticipant}
+                                    title={canEditParticipant ? 'Hapus Santri' : 'Data dikunci (Tahap Final TM)'}
+                                    className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                                      canEditParticipant
+                                        ? 'bg-rose-50 hover:bg-rose-100 text-rose-700'
+                                        : 'bg-slate-100 text-slate-300 cursor-not-allowed'
+                                    }`}
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
                                   </button>

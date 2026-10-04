@@ -92,6 +92,12 @@ export interface AppSettings {
   eventLogoUrl?: string;
   fontFamily?: string;
   publishResultsToRayon?: boolean;
+  registrationStatus?: 'open' | 'closed' | 'lockdown';
+  allowSuperAdminBypass?: boolean;
+  registrationDeadlineDate?: string;
+  registrationDeadlineTime?: string;
+  registrationAutoClose?: boolean;
+  registrationClosedMessage?: string;
 }
 
 export interface CompetitionCategory {

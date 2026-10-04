@@ -36,6 +36,7 @@ import {
   FileText,
   Clock,
   Sparkle,
+  Lock,
 } from 'lucide-react';
 import { Participant, ParticipantDraft, UserSession, Gender, MasterTpa } from '../../types/fasi';
 import { KEMANTREN_LIST, CATEGORIES_LIST } from '../../data/fasiMasterData';
@@ -48,6 +49,7 @@ import {
   clearDrafts,
   logAuditEvent,
   getStoredSettings,
+  getEffectiveRegistrationStatus,
   getStoredMasterTpa,
   getStoredKemantren,
   getStoredParticipants,
@@ -78,6 +80,23 @@ export const ParticipantFormPage: React.FC<ParticipantFormPageProps> = ({
 }) => {
   const settings = getStoredSettings();
   const theme = getThemeConfig(settings?.themeColor);
+
+  const effectiveRegStatus = useMemo(() => {
+    return getEffectiveRegistrationStatus(settings);
+  }, [settings]);
+
+  const isFormBlocked = useMemo(() => {
+    if (session.role === 'super_admin' && settings.allowSuperAdminBypass !== false) {
+      return false; // Superadmin bypass enabled
+    }
+    if (effectiveRegStatus === 'lockdown') {
+      return true;
+    }
+    if (effectiveRegStatus === 'closed' && !editingParticipant) {
+      return true;
+    }
+    return false;
+  }, [session.role, settings.allowSuperAdminBypass, effectiveRegStatus, editingParticipant]);
 
   const [activeTab, setActiveTab] = useState<'form' | 'drafts'>('form');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -742,6 +761,53 @@ export const ParticipantFormPage: React.FC<ParticipantFormPageProps> = ({
   const getCategoryName = (id: string) => CATEGORIES_LIST.find((c) => c.id === id)?.name || id;
   const getKemantrenName = (id: string) => KEMANTREN_LIST.find((k) => k.id === id)?.name || id;
 
+  if (isFormBlocked) {
+    return (
+      <div className="max-w-2xl mx-auto py-12 px-4 space-y-6">
+        <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm text-center space-y-5">
+          <div className="w-16 h-16 rounded-2xl bg-amber-100 text-amber-900 flex items-center justify-center mx-auto shadow-xs">
+            <Lock className="w-8 h-8" />
+          </div>
+          <div>
+            <span
+              className={`px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider ${
+                effectiveRegStatus === 'lockdown'
+                  ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                  : 'bg-amber-100 text-amber-900 border border-amber-300'
+              }`}
+            >
+              {effectiveRegStatus === 'lockdown'
+                ? 'Data Resmi Dikunci Total (Lockdown TM)'
+                : 'Pendaftaran Santri Baru Telah Ditutup'}
+            </span>
+            <h2 className="text-xl font-bold text-slate-900 mt-3">
+              {effectiveRegStatus === 'lockdown'
+                ? 'Formulir Dikunci oleh Panitia Pusat'
+                : 'Masa Pendaftaran Santri Baru Telah Berakhir'}
+            </h2>
+            <p className="text-xs text-slate-600 mt-2 max-w-md mx-auto leading-relaxed">
+              {effectiveRegStatus === 'lockdown'
+                ? 'Seluruh data peserta FASI XIII telah dikunci total untuk persiapan pengundian nomor tampil dan pencetakan Berita Acara Dewan Hakim pada tahap Technical Meeting (TM).'
+                : settings.registrationClosedMessage ||
+                  'Pendaftaran santri baru resmi ditutup pada 5 Oktober 2026 pukul 12.00 WIB. Saat ini hanya tahap perbaikan data santri yang sudah terdaftar menjelang Technical Meeting (TM).'}
+            </p>
+          </div>
+
+          <div className="pt-2 flex items-center justify-center">
+            <button
+              type="button"
+              onClick={onBack}
+              className="px-6 py-2.5 bg-emerald-800 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer flex items-center gap-2 active:scale-95"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Kembali ke Data Peserta</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 pb-12">
       {/* Top Header Banner */}
@@ -847,6 +913,18 @@ export const ParticipantFormPage: React.FC<ParticipantFormPageProps> = ({
           </div>
         )}
       </div>
+
+      {/* Superadmin Emergency Bypass Notice Banner */}
+      {session.role === 'super_admin' && effectiveRegStatus !== 'open' && (
+        <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-300/80 text-amber-950 flex items-center gap-3 text-xs shadow-2xs">
+          <span className="px-2 py-0.5 rounded-md bg-amber-400 text-emerald-950 font-black text-[10px] uppercase shrink-0">
+            ⚡ Superadmin Bypass
+          </span>
+          <p className="text-slate-800">
+            Sistem saat ini berstatus <strong>{effectiveRegStatus === 'closed' ? 'Tutup Daftar Baru' : 'Kunci Total (Lockdown TM)'}</strong> bagi seluruh rayon. Khusus akun Superadmin tetap diberikan hak akses input/edit darurat atas instruksi pimpinan.
+          </p>
+        </div>
+      )}
 
       {/* Dismissible Tutorial Card */}
       {showTutorial && !editingParticipant && (

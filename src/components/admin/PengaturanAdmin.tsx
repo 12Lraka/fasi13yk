@@ -39,7 +39,9 @@ import {
   FlaskConical,
   Trash,
   AlertTriangle,
-  Trophy
+  Trophy,
+  Clock,
+  Calendar,
 } from 'lucide-react';
 import { AppSettings, CompetitionCategory, Kemantren, UserSession } from '../../types/fasi';
 import {
@@ -79,7 +81,7 @@ export const PengaturanAdmin: React.FC<PengaturanAdminProps> = ({
   session,
   onSettingsChanged,
 }) => {
-  const [activeTab, setActiveTab] = useState<'tagline' | 'tema' | 'kemantren' | 'cabang' | 'database'>('tagline');
+  const [activeTab, setActiveTab] = useState<'pendaftaran' | 'tagline' | 'tema' | 'kemantren' | 'cabang' | 'database'>('pendaftaran');
 
   // 1. Settings State
   const [settings, setSettings] = useState<AppSettings>(() => getStoredSettings());
@@ -91,6 +93,39 @@ export const PengaturanAdmin: React.FC<PengaturanAdminProps> = ({
   const [superAdminPassInput, setSuperAdminPassInput] = useState<string>(settings.superAdminPassword || '');
   const [showPass, setShowPass] = useState<boolean>(false);
   const [publishResultsToRayon, setPublishResultsToRayon] = useState<boolean>(!!settings.publishResultsToRayon);
+
+  // Registration Control State (Buka/Tutup & Lockdown)
+  const [regStatus, setRegStatus] = useState<'open' | 'closed' | 'lockdown'>(settings.registrationStatus || 'open');
+  const [allowBypass, setAllowBypass] = useState<boolean>(settings.allowSuperAdminBypass ?? true);
+  const [deadlineDate, setDeadlineDate] = useState<string>(settings.registrationDeadlineDate || '2026-10-05');
+  const [deadlineTime, setDeadlineTime] = useState<string>(settings.registrationDeadlineTime || '12:00');
+  const [autoClose, setAutoClose] = useState<boolean>(!!settings.registrationAutoClose);
+  const [closedMsg, setClosedMsg] = useState<string>(
+    settings.registrationClosedMessage ||
+      'Pendaftaran santri baru resmi ditutup pada 5 Oktober 2026 pukul 12.00 WIB. Saat ini hanya tahap perbaikan/penyesuaian data santri yang sudah terdaftar menjelang Technical Meeting (TM).'
+  );
+
+  const handleSaveRegistrationSettings = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const updated: AppSettings = {
+      ...settings,
+      registrationStatus: regStatus,
+      allowSuperAdminBypass: allowBypass,
+      registrationDeadlineDate: deadlineDate,
+      registrationDeadlineTime: deadlineTime,
+      registrationAutoClose: autoClose,
+      registrationClosedMessage: closedMsg.trim(),
+    };
+    setSettings(updated);
+    saveSettings(updated);
+    logAuditEvent(
+      session.name,
+      'UPDATE_REGISTRATION_STATUS',
+      `Memperbarui status pendaftaran menjadi: ${regStatus.toUpperCase()} (Bypass Superadmin: ${allowBypass ? 'Ya' : 'Tidak'}).`
+    );
+    showToast('success', 'Pengaturan status pendaftaran berhasil disimpan.');
+    onSettingsChanged?.();
+  };
 
   // 2. Kemantren Admin CRUD State
   const [kemantrenList, setKemantrenList] = useState<Kemantren[]>(() => getStoredKemantren());
@@ -735,6 +770,29 @@ export const PengaturanAdmin: React.FC<PengaturanAdminProps> = ({
       <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <button
+            onClick={() => setActiveTab('pendaftaran')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
+              activeTab === 'pendaftaran'
+                ? 'bg-emerald-800 text-white shadow-xs'
+                : 'bg-amber-100 text-amber-900 hover:bg-amber-200 border border-amber-300/80'
+            }`}
+          >
+            <Lock className="w-4 h-4 text-amber-700" />
+            <span>Buka / Tutup Pendaftaran</span>
+            <span
+              className={`px-1.5 py-0.2 rounded-full text-[9px] font-black uppercase ${
+                regStatus === 'open'
+                  ? 'bg-emerald-200 text-emerald-950'
+                  : regStatus === 'closed'
+                  ? 'bg-amber-300 text-amber-950'
+                  : 'bg-rose-200 text-rose-950'
+              }`}
+            >
+              {regStatus === 'open' ? 'Buka' : regStatus === 'closed' ? 'Tutup Baru' : 'Lockdown'}
+            </span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('tagline')}
             className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
               activeTab === 'tagline'
@@ -799,6 +857,246 @@ export const PengaturanAdmin: React.FC<PengaturanAdminProps> = ({
           Panel Super Administrator
         </div>
       </div>
+
+      {/* TAB KHUSUS: BUKA / TUTUP PENDAFTARAN & KUNCI DATA */}
+      {activeTab === 'pendaftaran' && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full text-xs font-black uppercase tracking-wider ${
+                      regStatus === 'open'
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                        : regStatus === 'closed'
+                        ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                        : 'bg-rose-100 text-rose-900 border border-rose-300'
+                    }`}
+                  >
+                    Status:{' '}
+                    {regStatus === 'open'
+                      ? '🟢 Pendaftaran Buka Penuh'
+                      : regStatus === 'closed'
+                      ? '🟡 Pendaftaran Baru Ditutup (Hanya Edit Data)'
+                      : '🔴 Kunci Total Data (Lockdown Final TM)'}
+                  </span>
+                </div>
+                <h3 className="text-base font-bold text-slate-900 mt-1">
+                  Kontrol Buka / Tutup Pendaftaran & Kunci Data FASI XIII
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5 max-w-2xl">
+                  Atur hak akses input santri baru bagi 14 Admin Rayon, batas waktu penutupan (rencana 5 Oktober 2026 pukul 12.00 WIB), dan penguncian total menjelang Technical Meeting (TM 5 Oktober 19.30 WIB).
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => handleSaveRegistrationSettings()}
+                className="px-5 py-2.5 bg-emerald-800 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm flex items-center gap-2 transition-all cursor-pointer self-start sm:self-auto shrink-0 active:scale-95"
+              >
+                <Save className="w-4 h-4" />
+                <span>Simpan Pengaturan</span>
+              </button>
+            </div>
+
+            {/* 3 Status Pilihan Utama */}
+            <div className="space-y-3">
+              <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-emerald-700" />
+                <span>Pilih Mode Status Pendaftaran Saat Ini:</span>
+              </label>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* 1. BUKA PENUH */}
+                <div
+                  onClick={() => setRegStatus('open')}
+                  className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex flex-col justify-between ${
+                    regStatus === 'open'
+                      ? 'bg-emerald-50/70 border-emerald-600 shadow-sm ring-2 ring-emerald-500/20'
+                      : 'bg-slate-50/60 border-slate-200 hover:border-slate-300 hover:bg-slate-100/50'
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                        Masa Reguler
+                      </span>
+                    </div>
+                    <h4 className="text-sm font-bold text-slate-900 mt-2">1. Buka Penuh (Open)</h4>
+                    <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                      14 Admin Rayon bebas mendaftarkan santri baru, mengubah anggota regu, dan mengoreksi data kapan saja.
+                    </p>
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-emerald-200/60 flex items-center gap-1.5 text-xs font-semibold text-emerald-800">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Daftar Baru: BUKA | Edit: BUKA</span>
+                  </div>
+                </div>
+
+                {/* 2. TUTUP PENDAFTARAN BARU */}
+                <div
+                  onClick={() => setRegStatus('closed')}
+                  className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex flex-col justify-between ${
+                    regStatus === 'closed'
+                      ? 'bg-amber-50/70 border-amber-500 shadow-sm ring-2 ring-amber-500/20'
+                      : 'bg-slate-50/60 border-slate-200 hover:border-slate-300 hover:bg-slate-100/50'
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="w-3 h-3 rounded-full bg-amber-500"></span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-200 text-amber-900">
+                        5 Okt, 12.00 Siang
+                      </span>
+                    </div>
+                    <h4 className="text-sm font-bold text-slate-900 mt-2">2. Tutup Daftar Baru</h4>
+                    <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                      Tombol pendaftaran baru dikunci untuk rayon. Rayon <strong>hanya boleh mengedit/memperbaiki</strong> data santri yang sudah terdaftar hingga TM.
+                    </p>
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-amber-200/60 flex items-center gap-1.5 text-xs font-semibold text-amber-900">
+                    <Lock className="w-4 h-4 text-amber-700" />
+                    <span>Daftar Baru: KUNCI | Edit: BUKA</span>
+                  </div>
+                </div>
+
+                {/* 3. KUNCI TOTAL DATA */}
+                <div
+                  onClick={() => setRegStatus('lockdown')}
+                  className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex flex-col justify-between ${
+                    regStatus === 'lockdown'
+                      ? 'bg-rose-50/70 border-rose-600 shadow-sm ring-2 ring-rose-500/20'
+                      : 'bg-slate-50/60 border-slate-200 hover:border-slate-300 hover:bg-slate-100/50'
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="w-3 h-3 rounded-full bg-rose-500"></span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-200 text-rose-900">
+                        5 Okt, 19.30 (Saat TM)
+                      </span>
+                    </div>
+                    <h4 className="text-sm font-bold text-slate-900 mt-2">3. Kunci Total (Lockdown)</h4>
+                    <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                      Seluruh data terkunci beku (Read-Only) bagi rayon. Rayon tidak bisa menambah, mengedit, ataupun menghapus. Siap untuk undian dan cetak dewan hakim.
+                    </p>
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-rose-200/60 flex items-center gap-1.5 text-xs font-semibold text-rose-900">
+                    <Lock className="w-4 h-4 text-rose-700" />
+                    <span>Daftar Baru: KUNCI | Edit: KUNCI</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Opsi Hak Akses Superadmin (Bypass) */}
+            <div className="p-4 rounded-2xl bg-amber-50/60 border border-amber-200/80 space-y-2">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={allowBypass}
+                  onChange={(e) => setAllowBypass(e.target.checked)}
+                  className="w-4 h-4 mt-0.5 text-emerald-800 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer"
+                />
+                <div>
+                  <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                    <span>Izinkan Akun Superadmin Melakukan Input & Edit Darurat Saat Pendaftaran Ditutup / Terkunci (Pilihan 1)</span>
+                    <span className="px-2 py-0.2 rounded-full text-[10px] font-bold bg-amber-200 text-amber-950">
+                      Rekomendasi
+                    </span>
+                  </span>
+                  <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">
+                    Memberikan wewenang khusus bagi Panitia Pusat (Superadmin) untuk menangani kasus khusus saat TM atau hari-H (seperti pergantian santri sakit dengan surat dokter atau instruksi ketua panitia) tanpa harus membuka kunci pendaftaran bagi seluruh 14 rayon.
+                  </p>
+                </div>
+              </label>
+            </div>
+
+            {/* Otomatisasi Penutupan Berdasarkan Batas Waktu */}
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={autoClose}
+                    onChange={(e) => setAutoClose(e.target.checked)}
+                    className="w-4 h-4 text-emerald-800 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer"
+                  />
+                  <span className="text-xs font-bold text-slate-900">
+                    Aktifkan Penutupan Otomatis Berdasarkan Waktu Deadline (Timer)
+                  </span>
+                </label>
+                <span className="text-[11px] text-slate-500 italic">
+                  Otomatis beralih ke &quot;Tutup Daftar Baru&quot; saat waktu tiba
+                </span>
+              </div>
+
+              <div
+                className={`grid grid-cols-1 sm:grid-cols-2 gap-3 transition-opacity ${
+                  autoClose ? 'opacity-100' : 'opacity-50 pointer-events-none'
+                }`}
+              >
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1">
+                    <Calendar className="w-3.5 h-3.5 text-emerald-700" />
+                    <span>Tanggal Penutupan Pendaftaran:</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={deadlineDate}
+                    onChange={(e) => setDeadlineDate(e.target.value)}
+                    className="w-full p-2.5 text-xs bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none font-medium"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1">
+                    <Clock className="w-3.5 h-3.5 text-emerald-700" />
+                    <span>Jam Batas Waktu (WIB):</span>
+                  </label>
+                  <input
+                    type="time"
+                    value={deadlineTime}
+                    onChange={(e) => setDeadlineTime(e.target.value)}
+                    className="w-full p-2.5 text-xs bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none font-medium"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Pesan Pengumuman untuk Admin Rayon */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                <Info className="w-3.5 h-3.5 text-emerald-700" />
+                <span>Pesan Pengumuman Penutupan untuk Admin Rayon:</span>
+              </label>
+              <textarea
+                rows={2}
+                value={closedMsg}
+                onChange={(e) => setClosedMsg(e.target.value)}
+                placeholder="Pendaftaran santri baru resmi ditutup..."
+                className="w-full p-3 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:bg-white focus:outline-none"
+              />
+              <p className="text-[11px] text-slate-400">
+                Pesan ini akan ditampilkan di banner dashboard dan formulir pendaftaran saat admin rayon membuka aplikasi.
+              </p>
+            </div>
+
+            {/* Tombol Simpan Bawah */}
+            <div className="pt-3 border-t border-slate-100 flex items-center justify-end">
+              <button
+                type="button"
+                onClick={() => handleSaveRegistrationSettings()}
+                className="px-6 py-2.5 bg-emerald-800 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm flex items-center gap-2 transition-all cursor-pointer active:scale-95"
+              >
+                <Save className="w-4 h-4" />
+                <span>Simpan Pengaturan Pendaftaran</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* TAB 1: IDENTITAS & TAGLINE */}
       {activeTab === 'tagline' && (

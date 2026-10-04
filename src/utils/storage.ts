@@ -64,7 +64,39 @@ export const DEFAULT_SETTINGS: AppSettings = {
   publishResultsToRayon: false,
   superAdminPassword: 'badko2026',
   superAdminSecondaryPassword: 'BadkoJogja2026!',
+  registrationStatus: 'open',
+  allowSuperAdminBypass: true,
+  registrationDeadlineDate: '2026-10-05',
+  registrationDeadlineTime: '12:00',
+  registrationAutoClose: false,
+  registrationClosedMessage: 'Pendaftaran santri baru resmi ditutup pada 5 Oktober 2026 pukul 12.00 WIB. Saat ini hanya tahap perbaikan/penyesuaian data santri yang sudah terdaftar menjelang Technical Meeting (TM).',
 };
+
+/**
+ * Mendapatkan status pendaftaran aktif (memperhitungkan waktu deadline otomatis jika diaktifkan)
+ */
+export function getEffectiveRegistrationStatus(settings?: AppSettings): 'open' | 'closed' | 'lockdown' {
+  const s = settings || getStoredSettings();
+  const currentStatus = s.registrationStatus || 'open';
+
+  if (currentStatus === 'lockdown') return 'lockdown';
+  if (currentStatus === 'closed') return 'closed';
+
+  // Cek apakah fitur auto-close aktif dan telah melewati deadline
+  if (s.registrationAutoClose && s.registrationDeadlineDate) {
+    try {
+      const timeStr = s.registrationDeadlineTime || '12:00';
+      const deadlineDate = new Date(`${s.registrationDeadlineDate}T${timeStr}:00`);
+      if (!isNaN(deadlineDate.getTime()) && Date.now() >= deadlineDate.getTime()) {
+        return 'closed';
+      }
+    } catch (e) {
+      console.warn('Error parsing registration deadline:', e);
+    }
+  }
+
+  return currentStatus;
+}
 
 /**
  * Pengaturan Aplikasi (Tagline, Warna Tema, Event Info)

@@ -863,21 +863,41 @@ export async function fetchSettingsFromSupabase(): Promise<AppSettings | null> {
     const { data, error } = await client
       .from('app_settings')
       .select('*')
-      .eq('id', 1)
-      .maybeSingle();
+      .in('id', [1, 2]);
 
     if (error) throw error;
-    if (!data) return null;
+    if (!data || data.length === 0) return null;
+
+    const row1 = data.find((r: any) => r.id === 1) || {};
+    const row2 = data.find((r: any) => r.id === 2);
+
+    let extraSettings: Partial<AppSettings> = {};
+    if (row2?.tagline) {
+      try {
+        extraSettings = JSON.parse(row2.tagline);
+      } catch (e) {
+        console.warn('Gagal parse extra app_settings dari Supabase:', e);
+      }
+    }
 
     return {
-      eventName: data.event_name || 'FESTIVAL ANAK SHOLEH INDONESIA - XIII',
-      eventSubtitle: data.event_subtitle || 'Kota Yogyakarta 2026',
-      tagline: data.tagline || 'Santri Hebat, Hebat Prestasi, Hebat Mengaji, & Berakhlakul Karimah.',
-      eventDate: data.event_date || 'Ahad, 11 Oktober 2026',
-      eventLocation: data.event_location || 'SMPN 1 Yogyakarta (Jl. Cik Di Tiro No. 29, Terban, Gondokusuman)',
-      themeColor: data.theme_color || 'emerald',
-      superAdminPassword: data.superadmin_password || 'badko2026',
+      eventName: row1.event_name || 'FESTIVAL ANAK SHOLEH INDONESIA - XIII',
+      eventSubtitle: row1.event_subtitle || 'Kota Yogyakarta 2026',
+      tagline: row1.tagline || 'Santri Hebat, Hebat Prestasi, Hebat Mengaji, & Berakhlakul Karimah.',
+      eventDate: row1.event_date || 'Ahad, 11 Oktober 2026',
+      eventLocation: row1.event_location || 'SMPN 1 Yogyakarta (Jl. Cik Di Tiro No. 29, Terban, Gondokusuman)',
+      themeColor: row1.theme_color || 'emerald',
+      superAdminPassword: row1.superadmin_password || 'badko2026',
       superAdminSecondaryPassword: 'BadkoJogja2026!',
+      publishResultsToRayon: extraSettings.publishResultsToRayon ?? false,
+      registrationStatus: extraSettings.registrationStatus || 'open',
+      allowSuperAdminBypass: extraSettings.allowSuperAdminBypass ?? true,
+      registrationDeadlineDate: extraSettings.registrationDeadlineDate || '2026-10-05',
+      registrationDeadlineTime: extraSettings.registrationDeadlineTime || '12:00',
+      registrationAutoClose: Boolean(extraSettings.registrationAutoClose),
+      registrationClosedMessage:
+        extraSettings.registrationClosedMessage ||
+        'Pendaftaran santri baru resmi ditutup pada 5 Oktober 2026 pukul 12.00 WIB. Saat ini hanya tahap perbaikan/penyesuaian data santri yang sudah terdaftar menjelang Technical Meeting (TM).',
     };
   } catch (error: any) {
     console.error('Gagal mengambil data pengaturan dari Supabase:', error);
@@ -893,7 +913,7 @@ export async function saveSettingsToSupabase(settings: AppSettings): Promise<{ s
   if (!client) return { success: false, error: 'Supabase belum terkonfigurasi' };
 
   try {
-    const payload = {
+    const payloadRow1 = {
       id: 1,
       event_name: settings.eventName,
       event_subtitle: settings.eventSubtitle,
@@ -905,8 +925,34 @@ export async function saveSettingsToSupabase(settings: AppSettings): Promise<{ s
       updated_at: new Date().toISOString(),
     };
 
-    const { error } = await client.from('app_settings').upsert(payload, { onConflict: 'id' });
-    if (error) throw error;
+    const extraConfig = {
+      registrationStatus: settings.registrationStatus || 'open',
+      allowSuperAdminBypass: settings.allowSuperAdminBypass ?? true,
+      registrationDeadlineDate: settings.registrationDeadlineDate || '2026-10-05',
+      registrationDeadlineTime: settings.registrationDeadlineTime || '12:00',
+      registrationAutoClose: Boolean(settings.registrationAutoClose),
+      registrationClosedMessage: settings.registrationClosedMessage || '',
+      publishResultsToRayon: Boolean(settings.publishResultsToRayon),
+    };
+
+    const payloadRow2 = {
+      id: 2,
+      event_name: 'FASI_CONFIG_REGISTRATION',
+      event_subtitle: 'Kota Yogyakarta 2026',
+      tagline: JSON.stringify(extraConfig),
+      event_date: settings.eventDate || 'Ahad, 11 Oktober 2026',
+      event_location: settings.eventLocation || '',
+      theme_color: settings.themeColor || 'emerald',
+      superadmin_password: settings.superAdminPassword || 'badko2026',
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error: err1 } = await client.from('app_settings').upsert(payloadRow1, { onConflict: 'id' });
+    if (err1) throw err1;
+
+    const { error: err2 } = await client.from('app_settings').upsert(payloadRow2, { onConflict: 'id' });
+    if (err2) throw err2;
+
     return { success: true };
   } catch (error: any) {
     console.error('Gagal menyimpan app_settings ke Supabase:', error);
