@@ -52,9 +52,9 @@ import {
   getStoredSettings,
   getEffectiveRegistrationStatus,
 } from '../../utils/storage';
-import { deleteParticipantFromSupabase } from '../../lib/supabase';
+import { deleteParticipantFromSupabase, isSupabaseConfigured } from '../../lib/supabase';
 import { exportParticipantsToExcel } from '../../utils/excelExport';
-import { showToast, showConfirmDialog, showSuccessAlert } from '../../utils/sweetalert';
+import { showToast, showConfirmDialog, showSuccessAlert, showErrorAlert } from '../../utils/sweetalert';
 import { AdminOverviewDashboard } from './AdminOverviewDashboard';
 import { RekapPesertaAdmin } from './RekapPesertaAdmin';
 import { RekapCabangLombaAdmin } from './RekapCabangLombaAdmin';
@@ -401,14 +401,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     );
 
     if (confirmed) {
+      // 1. Hapus langsung dari Supabase database dan pastikan sukses
+      if (isSupabaseConfigured()) {
+        const success = await deleteParticipantFromSupabase(participant.id);
+        if (!success) {
+          showErrorAlert(
+            'Gagal Menghapus Data',
+            `Terjadi kendala saat menghapus data "${participant.fullName}" dari database cloud Supabase. Periksa koneksi internet Anda.`
+          );
+          return;
+        }
+      }
+
+      // 2. Perbarui state lokal dan storage
       const updated = participants.filter((p) => p.id !== participant.id);
       onUpdateParticipants(updated);
       saveParticipants(updated);
-      
-      // Hapus langsung dari Supabase database
-      deleteParticipantFromSupabase(participant.id).catch((err) =>
-        console.warn('Gagal menghapus santri dari Supabase:', err)
-      );
 
       logAuditEvent(
         session.name,

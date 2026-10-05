@@ -247,17 +247,14 @@ export function getStoredParticipants(): Participant[] {
 }
 
 /**
- * Simpan Data Peserta ke LocalStorage dan Supabase (jika aktif)
+ * Simpan Data Peserta ke LocalStorage dan kirim sinyal update lokal.
+ * Catatan: Sinkronisasi ke Supabase dilakukan spesifik per-aksi (upsertParticipantToSupabase / deleteParticipantFromSupabase)
+ * agar cache perangkat lain tidak menimpa atau memulihkan santri yang telah dihapus oleh Superadmin.
  */
 export function saveParticipants(participants: Participant[]): void {
   try {
     localStorage.setItem(PARTICIPANTS_KEY, JSON.stringify(participants));
     window.dispatchEvent(new CustomEvent('fasi_participants_updated'));
-    if (isSupabaseConfigured()) {
-      bulkSyncParticipantsToSupabase(participants).catch((err) =>
-        console.warn('Gagal sinkronisasi background ke Supabase:', err)
-      );
-    }
   } catch (err) {
     console.error('Gagal menyimpan data peserta:', err);
   }
