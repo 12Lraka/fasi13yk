@@ -14,8 +14,14 @@ import {
 } from 'lucide-react';
 import { Participant, BeritaAcaraKejuaraan, AppSettings, Jenjang } from '../../types/fasi';
 import { KEMANTREN_LIST, CATEGORIES_LIST } from '../../data/fasiMasterData';
-import { getStoredBeritaAcara, getStoredSettings } from '../../utils/storage';
+import { getStoredBeritaAcara, saveBeritaAcaraList, getStoredSettings } from '../../utils/storage';
 import { getThemeConfig } from '../../utils/theme';
+import {
+  fetchBeritaAcaraFromSupabase,
+  subscribeToBeritaAcaraRealtime,
+  isSupabaseConfigured
+} from '../../lib/supabase';
+import { showToast } from '../../utils/sweetalert';
 
 interface LiveScoreboardProps {
   participants: Participant[];
@@ -39,21 +45,84 @@ export const LiveScoreboard: React.FC<LiveScoreboardProps> = ({ participants, se
 
   const [activeTab, setActiveTab] = useState<'umum' | 'tka' | 'tpa' | 'tqa'>('umum');
   const [beritaAcaraList, setBeritaAcaraList] = useState<BeritaAcaraKejuaraan[]>(() => getStoredBeritaAcara());
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastRefreshedAt, setLastRefreshedAt] = useState<string>(() =>
+    new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  );
 
-  // Listen to local / storage events for live updates
+  // Sinkronisasi data awal dari Supabase & langganan realtime
   useEffect(() => {
-    const handleUpdate = () => {
-      setBeritaAcaraList(getStoredBeritaAcara());
+    let isMounted = true;
+
+    const syncInitialData = async () => {
+      if (!isSupabaseConfigured()) return;
+      try {
+        const cloudData = await fetchBeritaAcaraFromSupabase();
+        if (cloudData && isMounted) {
+          setBeritaAcaraList(cloudData);
+          saveBeritaAcaraList(cloudData);
+        }
+      } catch (err) {
+        console.warn('Gagal memuat berita acara live score dari Supabase:', err);
+      }
+    };
+
+    syncInitialData();
+
+    // Listen to local / storage events for live updates
+    const handleUpdate = (e: any) => {
+      if (e?.detail && Array.isArray(e.detail)) {
+        setBeritaAcaraList(e.detail);
+      } else {
+        setBeritaAcaraList(getStoredBeritaAcara());
+      }
     };
 
     window.addEventListener('fasi_berita_acara_updated', handleUpdate);
     window.addEventListener('storage', handleUpdate);
 
+    // Direct Realtime Supabase Subscription
+    const unsubscribe = subscribeToBeritaAcaraRealtime((updatedList) => {
+      if (isMounted && updatedList) {
+        setBeritaAcaraList(updatedList);
+        saveBeritaAcaraList(updatedList);
+        setLastRefreshedAt(
+          new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+        );
+      }
+    });
+
     return () => {
+      isMounted = false;
       window.removeEventListener('fasi_berita_acara_updated', handleUpdate);
       window.removeEventListener('storage', handleUpdate);
+      if (unsubscribe) unsubscribe();
     };
   }, []);
+
+  // Handler Refresh Manual (Murni Membaca/SELECT Data Terbaru Tanpa Resiko Duplikasi)
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      if (isSupabaseConfigured()) {
+        const cloudData = await fetchBeritaAcaraFromSupabase();
+        if (cloudData) {
+          setBeritaAcaraList(cloudData);
+          saveBeritaAcaraList(cloudData);
+        }
+      } else {
+        setBeritaAcaraList(getStoredBeritaAcara());
+      }
+      setLastRefreshedAt(
+        new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      );
+      showToast('success', 'Papan klasemen & perolehan poin berhasil disinkronkan dengan data terbaru!');
+    } catch {
+      showToast('error', 'Gagal menyegarkan data klasemen.');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   // Filter hanya berita acara yang sudah "Disahkan" oleh dewan juri/superadmin
   const validatedBeritaAcara = useMemo(() => {
@@ -163,11 +232,26 @@ export const LiveScoreboard: React.FC<LiveScoreboardProps> = ({ participants, se
             </p>
           </div>
 
-          <div className="flex items-center gap-2 bg-black/30 backdrop-blur px-4 py-2 rounded-2xl border border-white/20 text-xs">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
-            <span className="text-slate-200 font-semibold">
-              {validatedBeritaAcara.length} dari {CATEGORIES_LIST.length} Cabang Disahkan
-            </span>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <div className="flex items-center gap-2 bg-black/30 backdrop-blur px-3.5 py-2 rounded-2xl border border-white/20 text-xs">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+              <span className="text-slate-200 font-semibold">
+                {validatedBeritaAcara.length} dari {CATEGORIES_LIST.length} Cabang Disahkan
+              </span>
+            </div>
+
+            <button
+              onClick={handleManualRefresh}
+              disabled={isRefreshing}
+              className="px-3.5 py-2 rounded-2xl bg-white/15 hover:bg-white/25 active:scale-95 transition-all text-xs font-bold text-white border border-white/25 shadow-xs flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              title="Perbarui data perolehan poin langsung dari database cloud Supabase"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-amber-300 ${isRefreshing ? 'animate-spin' : ''}`} />
+              <span>{isRefreshing ? 'Menyinkronkan...' : 'Refresh Poin'}</span>
+              <span className="text-[10px] text-amber-200 font-mono opacity-80 hidden sm:inline">
+                ({lastRefreshedAt})
+              </span>
+            </button>
           </div>
         </div>
       </div>
