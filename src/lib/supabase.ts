@@ -316,24 +316,42 @@ export async function fetchParticipantsFromSupabase(): Promise<Participant[] | n
   if (!client) return null;
 
   try {
-    const { data, error } = await client
-      .from('participants')
-      .select('*')
-      .order('created_at', { ascending: true });
+    const allData: any[] = [];
+    const pageSize = 1000;
+    let from = 0;
+    let hasMore = true;
 
-    if (error) {
-      if (error.code === '42P01' || error.message?.includes('does not exist')) {
-        console.warn(
-          'Tabel "participants" belum dibuat di database Supabase. Silakan jalankan DDL SQL dari src/db/schema.sql pada Supabase SQL Editor.'
-        );
-      } else {
-        console.warn('Gagal mengambil data peserta dari Supabase:', error.message || error);
+    while (hasMore) {
+      const { data, error } = await client
+        .from('participants')
+        .select('*')
+        .order('created_at', { ascending: true })
+        .range(from, from + pageSize - 1);
+
+      if (error) {
+        if (error.code === '42P01' || error.message?.includes('does not exist')) {
+          console.warn(
+            'Tabel "participants" belum dibuat di database Supabase. Silakan jalankan DDL SQL dari src/db/schema.sql pada Supabase SQL Editor.'
+          );
+        } else {
+          console.warn('Gagal mengambil data peserta dari Supabase:', error.message || error);
+        }
+        return null;
       }
-      return null;
-    }
-    if (!data) return [];
 
-    return data.map(mapDbToParticipant);
+      if (!data || data.length === 0) {
+        hasMore = false;
+      } else {
+        allData.push(...data);
+        if (data.length < pageSize) {
+          hasMore = false;
+        } else {
+          from += pageSize;
+        }
+      }
+    }
+
+    return allData.map(mapDbToParticipant);
   } catch (error: any) {
     console.warn('Gagal mengambil data peserta dari Supabase:', error?.message || error);
     return null;
