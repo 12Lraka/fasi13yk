@@ -29,7 +29,8 @@ import {
 } from 'lucide-react';
 import { Participant, UserSession } from '../../types/fasi';
 import { getStoredCategories, getStoredKemantren, saveParticipants, logAuditEvent } from '../../utils/storage';
-import { showToast, showSuccessAlert, showConfirmDialog } from '../../utils/sweetalert';
+import { bulkSyncParticipantsToSupabase, isSupabaseConfigured } from '../../lib/supabase';
+import { showToast, showSuccessAlert, showConfirmDialog, showErrorAlert } from '../../utils/sweetalert';
 import { downloadSingleLotteryPdf, downloadAllLotteryPdf } from '../../utils/lotteryPdfGenerator';
 
 interface UndianNomorTampilProps {
@@ -315,10 +316,30 @@ export const UndianNomorTampil: React.FC<UndianNomorTampilProps> = ({
     showToast('info', 'Nomor undian cabang ini telah di-reset. Klik Simpan ke Database untuk memperbarui.');
   };
 
-  // Save Drawn Numbers into the Database (Storage Engine & Supabase)
+  // Save Drawn Numbers into the Database (Storage Engine & Supabase Cloud)
   const handleSaveToDatabase = async () => {
     setIsSavingDb(true);
     try {
+      // 1. Sinkronisasi langsung data nomor undian ke database Supabase Cloud
+      if (isSupabaseConfigured() && currentCategory) {
+        const modifiedParticipants = localParticipants.filter((local) => {
+          const original = participants.find((p) => p.id === local.id);
+          return original ? original.lotteryNumber !== local.lotteryNumber : false;
+        });
+
+        const toSync = modifiedParticipants.length > 0
+          ? modifiedParticipants
+          : localParticipants.filter((p) => p.categoryId === currentCategory.id);
+
+        if (toSync.length > 0) {
+          const syncRes = await bulkSyncParticipantsToSupabase(toSync);
+          if (!syncRes.success) {
+            throw new Error(syncRes.error || 'Gagal menyimpan nomor undian ke Cloud Supabase.');
+          }
+        }
+      }
+
+      // 2. Perbarui state induk dan storage lokal
       onUpdateParticipants(localParticipants);
       saveParticipants(localParticipants);
       setHasUnsavedChanges(false);
@@ -326,16 +347,19 @@ export const UndianNomorTampil: React.FC<UndianNomorTampilProps> = ({
       logAuditEvent(
         session.name,
         'SIMPAN_UNDIAN_DATABASE',
-        `Menyimpan hasil undian nomor tampil cabang [${currentCategory?.code}] ${currentCategory?.name} (${stats.drawn} santri).`
+        `Menyimpan hasil undian nomor tampil cabang [${currentCategory?.code}] ${currentCategory?.name} (${stats.drawn} santri) ke database Supabase Cloud.`
       );
 
       showSuccessAlert(
         'Hasil Undian Berhasil Disimpan!',
-        `Nomor urut tampil cabang [${currentCategory?.code}] ${currentCategory?.name} telah tersimpan permanen ke database dan tersinkronisasi ke menu Rekap Cabang Lomba.`
+        `Nomor urut tampil cabang [${currentCategory?.code}] ${currentCategory?.name} telah tersimpan permanen ke Cloud Supabase dan seketika aktif di Data Peserta, Rekap Cabang Lomba, serta Direktori Publik.`
       );
     } catch (err: any) {
       console.error('Gagal menyimpan undian:', err);
-      showToast('error', `Gagal menyimpan ke database: ${err?.message || 'Error'}`);
+      showErrorAlert(
+        'Gagal Menyimpan Undian',
+        `Terjadi kendala saat menyimpan ke database Supabase: ${err?.message || 'Koneksi terputus'}`
+      );
     } finally {
       setIsSavingDb(false);
     }

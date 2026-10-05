@@ -11,6 +11,7 @@ import { X, Dices, Sparkles, CheckCircle2, Lock, Shuffle, AlertCircle } from 'lu
 import { Participant, UserSession } from '../../types/fasi';
 import { CATEGORIES_LIST, KEMANTREN_LIST } from '../../data/fasiMasterData';
 import { shuffleLotteryNumbers, logAuditEvent } from '../../utils/storage';
+import { bulkSyncParticipantsToSupabase, isSupabaseConfigured } from '../../lib/supabase';
 import { showSuccessAlert, showToast } from '../../utils/sweetalert';
 
 interface LotteryDrawModalProps {
@@ -49,10 +50,20 @@ export const LotteryDrawModal: React.FC<LotteryDrawModalProps> = ({
 
     setTimeout(() => {
       const { updatedList, drawnCount } = shuffleLotteryNumbers(selectedCategoryId, participants);
+      
+      if (isSupabaseConfigured()) {
+        const targetCategoryParticipants = updatedList.filter(
+          (p) => p.categoryId === selectedCategoryId
+        );
+        bulkSyncParticipantsToSupabase(targetCategoryParticipants).catch((err) =>
+          console.warn('Gagal sync undian ke Supabase:', err)
+        );
+      }
+
       onUpdateParticipants(updatedList);
       setIsShuffling(false);
       setSuccessMessage(`Berhasil mengundi secara acak nomor tampil ${drawnCount} santri.`);
-      showToast('success', `Pengundian nomor tampil untuk ${drawnCount} santri berhasil diacak.`);
+      showToast('success', `Pengundian nomor tampil untuk ${drawnCount} santri berhasil diacak dan disimpan ke Supabase.`);
 
       logAuditEvent(
         session.name,
