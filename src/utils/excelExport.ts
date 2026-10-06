@@ -92,7 +92,7 @@ export function exportParticipantsToExcel(
   });
 
   // Footer signature rows in Excel
-  const dateStrId = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+  const dateStrId = '11 Oktober 2026';
   const footerRows = [
     [],
     [],

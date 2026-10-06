@@ -24,18 +24,10 @@ interface ExportLotteryPdfOptions {
 }
 
 /**
- * Format tanggal Indonesia lengkap: "28 September 2026"
+ * Format tanggal Indonesia lengkap resmi pelaksanaan FASI XIII: 11 Oktober 2026
  */
 function getIndonesianDate(): string {
-  const months = [
-    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
-  ];
-  const now = new Date();
-  const day = now.getDate();
-  const month = months[now.getMonth()];
-  const year = now.getFullYear();
-  return `${day} ${month} ${year}`;
+  return '11 Oktober 2026';
 }
 
 /**

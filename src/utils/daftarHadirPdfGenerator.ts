@@ -29,18 +29,10 @@ export interface ExportDaftarHadirPdfOptions {
 }
 
 /**
- * Format tanggal Indonesia hari ini / default
+ * Format tanggal Indonesia resmi pelaksanaan FASI XIII: 11 Oktober 2026
  */
 function getIndonesianDate(): string {
-  const months = [
-    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
-  ];
-  const now = new Date();
-  const day = now.getDate();
-  const month = months[now.getMonth()];
-  const year = now.getFullYear();
-  return `${day} ${month} ${year}`;
+  return '11 Oktober 2026';
 }
 
 /**
@@ -301,7 +293,7 @@ async function renderSingleCategorySheet(
 
   // Kanan: Titimangsa Yogyakarta & Penanggung Jawab Kategori
   pdfDoc.setFont('helvetica', 'normal');
-  pdfDoc.text(`Yogyakarta, ${options.eventDate ? options.eventDate.split(',')[1]?.trim() || getIndonesianDate() : getIndonesianDate()}`, rightSignX, signatureY);
+  pdfDoc.text('Yogyakarta, 11 Oktober 2026', rightSignX, signatureY);
   pdfDoc.setFont('helvetica', 'bold');
   pdfDoc.text(meta.signatoryRightRole, rightSignX, signatureY + 4);
 

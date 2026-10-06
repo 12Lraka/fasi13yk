@@ -84,9 +84,7 @@ export const BeritaAcaraAdmin: React.FC<BeritaAcaraAdminProps> = ({ participants
   const [isSyncing, setIsSyncing] = useState(false);
 
   // Form State untuk Cabang terpilih
-  const [tanggalPenetapan, setTanggalPenetapan] = useState<string>(
-    new Date().toISOString().split('T')[0]
-  );
+  const [tanggalPenetapan, setTanggalPenetapan] = useState<string>('2026-10-11');
   const [juriSatu, setJuriSatu] = useState<string>('');
   const [juriDua, setJuriDua] = useState<string>('');
   const [catatanJuri, setCatatanJuri] = useState<string>('');
@@ -229,7 +227,7 @@ export const BeritaAcaraAdmin: React.FC<BeritaAcaraAdminProps> = ({ participants
       setJuara3(existing.pemenang.juara3 || { nama: '', kemantren: '', unitTpa: '', totalNilai: 0 });
     } else {
       // Reset form default
-      setTanggalPenetapan(new Date().toISOString().split('T')[0]);
+      setTanggalPenetapan('2026-10-11');
       setJuriSatu('');
       setJuriDua('');
       setCatatanJuri('');
@@ -523,8 +521,13 @@ export const BeritaAcaraAdmin: React.FC<BeritaAcaraAdminProps> = ({ participants
           Demikian Berita Acara ini dibuat dengan sebenarnya dan ditandatangani oleh Dewan Juri untuk dipergunakan sebagaimana mestinya. Keputusan Dewan Juri bersifat mutlak dan tidak dapat diganggu gugat.
         </p>
 
+        {/* Titimangsa Tempat & Tanggal */}
+        <div className="text-right text-xs font-sans mb-3 font-semibold text-slate-800 pr-4">
+          Yogyakarta, 11 Oktober 2026
+        </div>
+
         {/* Tanda Tangan Juri I & Juri II */}
-        <div className="grid grid-cols-2 gap-8 text-center text-xs font-sans mt-8">
+        <div className="grid grid-cols-2 gap-8 text-center text-xs font-sans mt-2">
           <div>
             <div className="font-bold text-slate-800">Dewan Juri I,</div>
             <div className="h-20 flex items-end justify-center">

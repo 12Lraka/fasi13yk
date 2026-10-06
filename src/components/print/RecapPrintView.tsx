@@ -552,7 +552,7 @@ export const RecapPrintView: React.FC<RecapPrintViewProps> = ({
           <div className="flex flex-col items-center justify-between min-h-[100px]">
             <div>
               <p className="text-slate-600 font-medium">
-                Yogyakarta, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                Yogyakarta, 11 Oktober 2026
               </p>
               <p className="font-bold text-slate-900 mt-0.5">Ketua Panitia FASI XIII</p>
             </div>

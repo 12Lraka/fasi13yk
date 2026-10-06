@@ -264,11 +264,7 @@ export async function exportPemenangToPdf(
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(71, 85, 105);
   doc.text(
-    `Dokumen Sah Penetapan Dewan Juri • Tanggal Cetak: ${new Date().toLocaleDateString('id-ID', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-    })}`,
+    'Dokumen Sah Penetapan Dewan Juri • Pelaksanaan: Ahad, 11 Oktober 2026',
     pageWidth / 2,
     titleY + 4.5,
     { align: 'center' }
@@ -481,8 +477,7 @@ export async function exportSingleCabangPdf(
   const signY = finalY + 14;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
-  doc.setTextColor(15, 23, 42);
-  doc.text('Yogyakarta, ' + (beritaAcara?.tanggalPenetapan || new Date().toLocaleDateString('id-ID')), pageWidth - marginX - 10, signY, { align: 'right' });
+  doc.text('Yogyakarta, 11 Oktober 2026', pageWidth - marginX - 10, signY, { align: 'right' });
   doc.text('Dewan Juri / Hakim Lomba,', pageWidth - marginX - 10, signY + 5, { align: 'right' });
 
   doc.setFont('helvetica', 'bold');
