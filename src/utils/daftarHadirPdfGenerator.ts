@@ -43,7 +43,7 @@ function getCategoryMeta(categoryType: string) {
     case 'dewan_hakim':
       return {
         title: 'DAFTAR HADIR DEWAN HAKIM / JURI',
-        sub: 'FESTIVAL ANAK SHOLEH INDONESIA (FASI) XIII TAHUN 2026',
+        sub: 'FESTIVAL ANAK SHOLEH INDONESIA (FASI) XIII KOTA YOGYAKARTA TAHUN 2026',
         roleLabel: 'Penugasan Cabang / Bidang',
         color: [136, 19, 55], // rose-900
         signatoryRightRole: 'Koordinator Dewan Hakim / Juri',
@@ -52,7 +52,7 @@ function getCategoryMeta(categoryType: string) {
     case 'panitera':
       return {
         title: 'DAFTAR HADIR PANITERA',
-        sub: 'FESTIVAL ANAK SHOLEH INDONESIA (FASI) XIII TAHUN 2026',
+        sub: 'FESTIVAL ANAK SHOLEH INDONESIA (FASI) XIII KOTA YOGYAKARTA TAHUN 2026',
         roleLabel: 'Arena Lomba / Meja Sidang',
         color: [15, 118, 110], // teal-700
         signatoryRightRole: 'Koordinator Lomba',
@@ -61,7 +61,7 @@ function getCategoryMeta(categoryType: string) {
     case 'panitia':
       return {
         title: 'DAFTAR HADIR PANITIA PELAKSANA',
-        sub: 'FESTIVAL ANAK SHOLEH INDONESIA (FASI) XIII TAHUN 2026',
+        sub: 'FESTIVAL ANAK SHOLEH INDONESIA (FASI) XIII KOTA YOGYAKARTA TAHUN 2026',
         roleLabel: 'Divisi / Seksi Kepanitiaan',
         color: [6, 78, 59], // emerald-900
         signatoryRightRole: 'Sekretaris',
@@ -70,7 +70,7 @@ function getCategoryMeta(categoryType: string) {
     default:
       return {
         title: 'DAFTAR HADIR PERANGKAT RESMI FASI XIII',
-        sub: 'FESTIVAL ANAK SHOLEH INDONESIA (FASI) XIII TAHUN 2026',
+        sub: 'FESTIVAL ANAK SHOLEH INDONESIA (FASI) XIII KOTA YOGYAKARTA TAHUN 2026',
         roleLabel: 'Jabatan / Penugasan',
         color: [15, 23, 42], // slate-900
         signatoryRightRole: 'Sekretaris',
@@ -174,7 +174,7 @@ async function renderSingleCategorySheet(
   pdfDoc.setTextColor(30, 41, 59);
 
   const eventDateText = options.eventDate || 'Minggu, 28 Maret 2026';
-  const venueText = options.venueName || 'SMP N 1 Yogyakarta';
+  const venueText = options.venueName || 'SMP Negeri 1 Yogyakarta';
 
   pdfDoc.text('Hari / Tanggal :', marginX + 3, metaBoxY + 4.2);
   pdfDoc.setFont('helvetica', 'normal');
@@ -289,7 +289,7 @@ async function renderSingleCategorySheet(
   // Kiri: Mengetahui Ketua Panitia
   pdfDoc.text('Mengetahui,', leftSignX, signatureY);
   pdfDoc.setFont('helvetica', 'bold');
-  pdfDoc.text('Ketua Panitia FASI XIII Kota', leftSignX, signatureY + 4);
+  pdfDoc.text('Ketua Panitia', leftSignX, signatureY + 4);
 
   // Kanan: Titimangsa Yogyakarta & Penanggung Jawab Kategori
   pdfDoc.setFont('helvetica', 'normal');
