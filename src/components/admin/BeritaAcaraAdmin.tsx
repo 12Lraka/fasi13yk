@@ -92,12 +92,10 @@ export const BeritaAcaraAdmin: React.FC<BeritaAcaraAdminProps> = ({ participants
   const [catatanJuri, setCatatanJuri] = useState<string>('');
   const [status, setStatus] = useState<'Draft' | 'Disahkan'>('Draft');
 
-  // Winner slots
+  // Winner slots (Hanya Juara I, II, dan III sesuai arahan Sie Lomba)
   const [juara1, setJuara1] = useState<WinnerSlot>({ nama: '', kemantren: '', unitTpa: '', totalNilai: 0 });
   const [juara2, setJuara2] = useState<WinnerSlot>({ nama: '', kemantren: '', unitTpa: '', totalNilai: 0 });
   const [juara3, setJuara3] = useState<WinnerSlot>({ nama: '', kemantren: '', unitTpa: '', totalNilai: 0 });
-  const [harapan1, setHarapan1] = useState<WinnerSlot>({ nama: '', kemantren: '', unitTpa: '', totalNilai: 0 });
-  const [harapan2, setHarapan2] = useState<WinnerSlot>({ nama: '', kemantren: '', unitTpa: '', totalNilai: 0 });
 
   // Cabang Lomba yang sedang aktif
   const currentCategory = useMemo(() => {
@@ -229,8 +227,6 @@ export const BeritaAcaraAdmin: React.FC<BeritaAcaraAdminProps> = ({ participants
       setJuara1(existing.pemenang.juara1 || { nama: '', kemantren: '', unitTpa: '', totalNilai: 0 });
       setJuara2(existing.pemenang.juara2 || { nama: '', kemantren: '', unitTpa: '', totalNilai: 0 });
       setJuara3(existing.pemenang.juara3 || { nama: '', kemantren: '', unitTpa: '', totalNilai: 0 });
-      setHarapan1(existing.pemenang.harapan1 || { nama: '', kemantren: '', unitTpa: '', totalNilai: 0 });
-      setHarapan2(existing.pemenang.harapan2 || { nama: '', kemantren: '', unitTpa: '', totalNilai: 0 });
     } else {
       // Reset form default
       setTanggalPenetapan(new Date().toISOString().split('T')[0]);
@@ -241,14 +237,12 @@ export const BeritaAcaraAdmin: React.FC<BeritaAcaraAdminProps> = ({ participants
       setJuara1({ nama: '', kemantren: '', unitTpa: '', totalNilai: 0 });
       setJuara2({ nama: '', kemantren: '', unitTpa: '', totalNilai: 0 });
       setJuara3({ nama: '', kemantren: '', unitTpa: '', totalNilai: 0 });
-      setHarapan1({ nama: '', kemantren: '', unitTpa: '', totalNilai: 0 });
-      setHarapan2({ nama: '', kemantren: '', unitTpa: '', totalNilai: 0 });
     }
   }, [selectedCabangId, beritaAcaraList]);
 
   // Helper autofill from individual participant select
   const handleSelectIndividual = (
-    slotKey: 'juara1' | 'juara2' | 'juara3' | 'harapan1' | 'harapan2',
+    slotKey: 'juara1' | 'juara2' | 'juara3',
     participantId: string
   ) => {
     if (!participantId) return;
@@ -269,13 +263,11 @@ export const BeritaAcaraAdmin: React.FC<BeritaAcaraAdminProps> = ({ participants
     if (slotKey === 'juara1') setJuara1(updatedSlot);
     if (slotKey === 'juara2') setJuara2(updatedSlot);
     if (slotKey === 'juara3') setJuara3(updatedSlot);
-    if (slotKey === 'harapan1') setHarapan1(updatedSlot);
-    if (slotKey === 'harapan2') setHarapan2(updatedSlot);
   };
 
   // Helper autofill from group/regu select (3 santri per regu)
   const handleSelectGroup = (
-    slotKey: 'juara1' | 'juara2' | 'juara3' | 'harapan1' | 'harapan2',
+    slotKey: 'juara1' | 'juara2' | 'juara3',
     groupId: string
   ) => {
     if (!groupId) return;
@@ -293,8 +285,6 @@ export const BeritaAcaraAdmin: React.FC<BeritaAcaraAdminProps> = ({ participants
     if (slotKey === 'juara1') setJuara1(updatedSlot);
     if (slotKey === 'juara2') setJuara2(updatedSlot);
     if (slotKey === 'juara3') setJuara3(updatedSlot);
-    if (slotKey === 'harapan1') setHarapan1(updatedSlot);
-    if (slotKey === 'harapan2') setHarapan2(updatedSlot);
   };
 
   // Simpan Berita Acara
@@ -335,8 +325,6 @@ export const BeritaAcaraAdmin: React.FC<BeritaAcaraAdminProps> = ({ participants
           juara1: juara1.nama.trim() ? juara1 : undefined,
           juara2: juara2.nama.trim() ? juara2 : undefined,
           juara3: juara3.nama.trim() ? juara3 : undefined,
-          harapan1: harapan1.nama.trim() ? harapan1 : undefined,
-          harapan2: harapan2.nama.trim() ? harapan2 : undefined,
         },
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -414,8 +402,6 @@ export const BeritaAcaraAdmin: React.FC<BeritaAcaraAdminProps> = ({ participants
       setJuara1({ nama: '', kemantren: '', unitTpa: '', totalNilai: 0 });
       setJuara2({ nama: '', kemantren: '', unitTpa: '', totalNilai: 0 });
       setJuara3({ nama: '', kemantren: '', unitTpa: '', totalNilai: 0 });
-      setHarapan1({ nama: '', kemantren: '', unitTpa: '', totalNilai: 0 });
-      setHarapan2({ nama: '', kemantren: '', unitTpa: '', totalNilai: 0 });
 
       if (onDataChanged) onDataChanged();
       showToast('success', 'Berita acara berhasil dihapus.');
@@ -521,20 +507,6 @@ export const BeritaAcaraAdmin: React.FC<BeritaAcaraAdminProps> = ({ participants
               <td className="border border-black px-2 py-1.5">{juara3.kemantren || '-'}</td>
               <td className="border border-black px-2 py-1.5">{juara3.unitTpa || '-'}</td>
               <td className="border border-black px-2 py-1.5 font-mono font-bold text-center">{juara3.totalNilai || '-'}</td>
-            </tr>
-            <tr>
-              <td className="border border-black px-2 py-1.5 text-center">Harapan I</td>
-              <td className="border border-black px-2 py-1.5">{harapan1.nama || '-'}</td>
-              <td className="border border-black px-2 py-1.5">{harapan1.kemantren || '-'}</td>
-              <td className="border border-black px-2 py-1.5">{harapan1.unitTpa || '-'}</td>
-              <td className="border border-black px-2 py-1.5 font-mono text-center">{harapan1.totalNilai || '-'}</td>
-            </tr>
-            <tr>
-              <td className="border border-black px-2 py-1.5 text-center">Harapan II</td>
-              <td className="border border-black px-2 py-1.5">{harapan2.nama || '-'}</td>
-              <td className="border border-black px-2 py-1.5">{harapan2.kemantren || '-'}</td>
-              <td className="border border-black px-2 py-1.5">{harapan2.unitTpa || '-'}</td>
-              <td className="border border-black px-2 py-1.5 font-mono text-center">{harapan2.totalNilai || '-'}</td>
             </tr>
           </tbody>
         </table>
@@ -896,34 +868,6 @@ export const BeritaAcaraAdmin: React.FC<BeritaAcaraAdminProps> = ({ participants
                   availableGroups={categoryGroups}
                   onAutofillIndividual={(pid) => handleSelectIndividual('juara3', pid)}
                   onAutofillGroup={(gid) => handleSelectGroup('juara3', gid)}
-                />
-
-                {/* SLOT 4: HARAPAN 1 */}
-                <WinnerRow
-                  label="Juara Harapan I"
-                  badgeColor="bg-slate-100 text-slate-700 border-slate-300"
-                  points={0}
-                  slot={harapan1}
-                  onChange={setHarapan1}
-                  isGroupCategory={isGroupCategory}
-                  availableParticipants={categoryParticipants}
-                  availableGroups={categoryGroups}
-                  onAutofillIndividual={(pid) => handleSelectIndividual('harapan1', pid)}
-                  onAutofillGroup={(gid) => handleSelectGroup('harapan1', gid)}
-                />
-
-                {/* SLOT 5: HARAPAN 2 */}
-                <WinnerRow
-                  label="Juara Harapan II"
-                  badgeColor="bg-slate-100 text-slate-700 border-slate-300"
-                  points={0}
-                  slot={harapan2}
-                  onChange={setHarapan2}
-                  isGroupCategory={isGroupCategory}
-                  availableParticipants={categoryParticipants}
-                  availableGroups={categoryGroups}
-                  onAutofillIndividual={(pid) => handleSelectIndividual('harapan2', pid)}
-                  onAutofillGroup={(gid) => handleSelectGroup('harapan2', gid)}
                 />
               </div>
 

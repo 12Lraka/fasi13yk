@@ -85,8 +85,6 @@ export function extractWinnerRows(
       checkAndAdd('Juara I', ba.pemenang.juara1);
       checkAndAdd('Juara II', ba.pemenang.juara2);
       checkAndAdd('Juara III', ba.pemenang.juara3);
-      checkAndAdd('Harapan I', ba.pemenang.harapan1);
-      checkAndAdd('Harapan II', ba.pemenang.harapan2);
     }
   });
 
@@ -451,8 +449,6 @@ export async function exportSingleCabangPdf(
     ['Juara I', p?.juara1?.nama || '-', p?.juara1?.kemantren ? `Kem. ${p?.juara1?.kemantren}` : '-', p?.juara1?.unitTpa || '-', p?.juara1?.totalNilai || '-'],
     ['Juara II', p?.juara2?.nama || '-', p?.juara2?.kemantren ? `Kem. ${p?.juara2?.kemantren}` : '-', p?.juara2?.unitTpa || '-', p?.juara2?.totalNilai || '-'],
     ['Juara III', p?.juara3?.nama || '-', p?.juara3?.kemantren ? `Kem. ${p?.juara3?.kemantren}` : '-', p?.juara3?.unitTpa || '-', p?.juara3?.totalNilai || '-'],
-    ['Harapan I', p?.harapan1?.nama || '-', p?.harapan1?.kemantren ? `Kem. ${p?.harapan1?.kemantren}` : '-', p?.harapan1?.unitTpa || '-', p?.harapan1?.totalNilai || '-'],
-    ['Harapan II', p?.harapan2?.nama || '-', p?.harapan2?.kemantren ? `Kem. ${p?.harapan2?.kemantren}` : '-', p?.harapan2?.unitTpa || '-', p?.harapan2?.totalNilai || '-'],
   ];
 
   autoTable(doc, {

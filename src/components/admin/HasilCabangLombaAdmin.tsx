@@ -253,7 +253,7 @@ export const HasilCabangLombaAdmin: React.FC<HasilCabangLombaAdminProps> = ({
               Hasil Pemenang Per Cabang Lomba
             </h2>
             <p className="text-emerald-100/80 text-xs sm:text-sm max-w-2xl leading-relaxed">
-              Daftar resmi juara 1, 2, 3 dan harapan per cabang lomba.
+              Daftar resmi Juara I, II, dan III per cabang lomba berdasarkan Berita Acara yang telah disahkan.
             </p>
           </div>
 
@@ -601,26 +601,6 @@ export const HasilCabangLombaAdmin: React.FC<HasilCabangLombaAdminProps> = ({
                           </div>
                         </div>
                       ) : null}
-
-                      {/* Harapan 1 & 2 */}
-                      {(p.harapan1 || p.harapan2) && (
-                        <div className="pt-2 px-1 text-xs text-slate-600 border-t border-slate-100 flex flex-wrap gap-x-4 gap-y-1.5">
-                          {p.harapan1 && (
-                            <div>
-                              <span className="font-semibold text-slate-700">Harapan I:</span>{' '}
-                              <strong>{p.harapan1.nama}</strong> (Rayon {p.harapan1.kemantren}){' '}
-                              &bull; <span className="font-mono text-slate-500">{p.harapan1.totalNilai}</span>
-                            </div>
-                          )}
-                          {p.harapan2 && (
-                            <div>
-                              <span className="font-semibold text-slate-700">Harapan II:</span>{' '}
-                              <strong>{p.harapan2.nama}</strong> (Rayon {p.harapan2.kemantren}){' '}
-                              &bull; <span className="font-mono text-slate-500">{p.harapan2.totalNilai}</span>
-                            </div>
-                          )}
-                        </div>
-                      )}
                     </div>
                   ) : (
                     <div className="py-10 text-center px-4">
