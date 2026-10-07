@@ -65,7 +65,7 @@ function getCategoryMeta(categoryType: string) {
         roleLabel: 'Divisi / Seksi Kepanitiaan',
         color: [6, 78, 59], // emerald-900
         signatoryRightRole: 'Sekretaris',
-        signatoryRightDefault: 'Viko Saputra',
+        signatoryRightDefault: 'Muhammad Padma Fatwa Alam',
       };
     default:
       return {
