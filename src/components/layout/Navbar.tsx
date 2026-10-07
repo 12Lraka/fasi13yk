@@ -6,8 +6,8 @@
  * Navbar Komponen
  */
 
-import React from 'react';
-import { Award, Calculator, Calendar, MapPin, Users, ShieldCheck, LogIn, LogOut, LayoutDashboard, Printer } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Award, Calculator, Calendar, MapPin, Users, ShieldCheck, LogIn, LogOut, LayoutDashboard, Printer, QrCode, ChevronDown, X } from 'lucide-react';
 import { UserSession, AppSettings } from '../../types/fasi';
 import { AppRoute } from '../../utils/router';
 import { getThemeConfig } from '../../utils/theme';
@@ -20,6 +20,7 @@ interface NavbarProps {
   onOpenLogin: () => void;
   onLogout: () => void;
   onOpenAgeCalc: () => void;
+  onOpenPresensi: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -30,8 +31,21 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenLogin,
   onLogout,
   onOpenAgeCalc,
+  onOpenPresensi,
 }) => {
   const theme = getThemeConfig(settings?.themeColor);
+  const [isFeaturesOpen, setIsFeaturesOpen] = useState(false);
+  const featuresRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (featuresRef.current && !featuresRef.current.contains(event.target as Node)) {
+        setIsFeaturesOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   return (
     <header className={`sticky top-0 z-40 text-white shadow-md border-b ${theme.navbarBg} ${theme.navbarBorder}`}>
@@ -144,8 +158,19 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
           </nav>
 
-          {/* User / RBAC Controls */}
+          {/* User / RBAC Controls & Presensi QR */}
           <div className="flex items-center gap-2">
+            <button
+              id="nav-btn-presensi"
+              onClick={onOpenPresensi}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-950 bg-amber-400 hover:bg-amber-300 transition-all shadow-sm active:scale-95 cursor-pointer"
+              title="Buka QR Scanner Presensi Check-in Hari-H"
+            >
+              <QrCode className="w-3.5 h-3.5 text-slate-950" />
+              <span className="hidden sm:inline">Presensi QR</span>
+              <span className="sm:hidden">Presensi</span>
+            </button>
+
             {session ? (
               <div className="flex items-center gap-2">
                 <button
@@ -174,7 +199,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button
                 id="nav-btn-login"
                 onClick={onOpenLogin}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-sm transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold bg-white/15 hover:bg-white/25 text-white border border-white/20 shadow-sm transition-colors"
               >
                 <LogIn className="w-3.5 h-3.5" />
                 <span>Masuk Admin</span>
@@ -184,9 +209,12 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         {/* Mobile Sub Navigation */}
-        <div className={`flex lg:hidden overflow-x-auto py-2 border-t ${theme.navbarBorder} gap-1 text-xs no-scrollbar`}>
+        <div className={`flex lg:hidden items-center overflow-x-auto py-2 border-t ${theme.navbarBorder} gap-1.5 text-xs no-scrollbar`}>
           <button
-            onClick={() => setActiveTab('beranda')}
+            onClick={() => {
+              setActiveTab('beranda');
+              setIsFeaturesOpen(false);
+            }}
             className={`px-2.5 py-1.5 rounded whitespace-nowrap ${
               activeTab === 'beranda' ? `${theme.navActiveBtn} font-semibold` : 'text-slate-200'
             }`}
@@ -194,14 +222,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             Beranda
           </button>
           <button
-            onClick={onOpenAgeCalc}
-            className="px-2.5 py-1.5 rounded whitespace-nowrap bg-amber-500/20 text-amber-300 font-semibold flex items-center gap-1"
-          >
-            <Calculator className="w-3.5 h-3.5" />
-            Cek Usia
-          </button>
-          <button
-            onClick={() => setActiveTab('peserta')}
+            onClick={() => {
+              setActiveTab('peserta');
+              setIsFeaturesOpen(false);
+            }}
             className={`px-2.5 py-1.5 rounded whitespace-nowrap ${
               activeTab === 'peserta' ? `${theme.navActiveBtn} font-semibold` : 'text-slate-200'
             }`}
@@ -209,7 +233,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             Direktori Peserta
           </button>
           <button
-            onClick={() => setActiveTab('klasemen')}
+            onClick={() => {
+              setActiveTab('klasemen');
+              setIsFeaturesOpen(false);
+            }}
             className={`px-2.5 py-1.5 rounded whitespace-nowrap ${
               activeTab === 'klasemen' ? `${theme.navActiveBtn} font-semibold` : 'text-slate-200'
             }`}
@@ -217,24 +244,96 @@ export const Navbar: React.FC<NavbarProps> = ({
             Live Score
           </button>
           <button
-            onClick={() => setActiveTab('lokasi')}
+            onClick={() => {
+              setActiveTab('lokasi');
+              setIsFeaturesOpen(false);
+            }}
             className={`px-2.5 py-1.5 rounded whitespace-nowrap ${
               activeTab === 'lokasi' ? `${theme.navActiveBtn} font-semibold` : 'text-slate-200'
             }`}
           >
             Lokasi Lomba
           </button>
+
+          {/* Tombol Toggle Fitur Mobile */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsFeaturesOpen((prev) => !prev);
+            }}
+            className={`px-2.5 py-1.5 rounded whitespace-nowrap flex items-center gap-1 font-semibold transition-colors cursor-pointer shrink-0 ${
+              isFeaturesOpen
+                ? 'bg-amber-400 text-slate-950 shadow-xs'
+                : 'bg-white/15 text-amber-300 hover:bg-white/25 border border-white/10'
+            }`}
+          >
+            <span>Fitur</span>
+            <ChevronDown
+              className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                isFeaturesOpen ? 'rotate-180 text-slate-950' : 'text-amber-300'
+              }`}
+            />
+          </button>
+
           {session && (
             <button
-              onClick={() => setActiveTab('admin')}
+              onClick={() => {
+                setActiveTab('admin');
+                setIsFeaturesOpen(false);
+              }}
               className={`px-2.5 py-1.5 rounded whitespace-nowrap ${
-                activeTab.startsWith('admin') || activeTab === 'pengaturan' || activeTab === 'log' ? 'bg-amber-500 text-slate-950 font-semibold' : 'bg-white/20 text-white'
+                activeTab.startsWith('admin') || activeTab === 'pengaturan' || activeTab === 'log'
+                  ? 'bg-amber-500 text-slate-950 font-semibold'
+                  : 'bg-white/20 text-white'
               }`}
             >
               Backoffice
             </button>
           )}
         </div>
+
+        {/* Panel Menu Fitur Mobile (Diletakkan di luar overflow-x-auto agar tidak pernah terpotong) */}
+        {isFeaturesOpen && (
+          <div
+            ref={featuresRef}
+            className="lg:hidden bg-slate-950/98 border-t border-slate-800 py-2 px-3.5 flex items-center justify-between gap-2 shadow-2xl animate-in slide-in-from-top-1 duration-150"
+          >
+            <span className="text-[11px] font-bold text-amber-300 tracking-wider uppercase pl-0.5">
+              Menu Fitur:
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsFeaturesOpen(false);
+                  onOpenPresensi();
+                }}
+                className="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-950 bg-amber-400 hover:bg-amber-300 active:scale-95 transition-all shadow-xs cursor-pointer"
+              >
+                Presensi QR
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsFeaturesOpen(false);
+                  onOpenAgeCalc();
+                }}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-100 bg-slate-800 hover:bg-slate-700 border border-slate-700 active:scale-95 transition-all cursor-pointer"
+              >
+                Cek Usia
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsFeaturesOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-white rounded-md hover:bg-white/10 cursor-pointer"
+                title="Tutup Menu"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </header>
   );

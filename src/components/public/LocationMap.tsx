@@ -56,14 +56,14 @@ export const LocationMap: React.FC = () => {
               <Building2 className="w-4 h-4" />
               <span>Panggung & Ruang Lomba</span>
             </div>
-            <p className="font-semibold text-slate-900 text-sm">18 Ruang Kelas & Aula Utama</p>
+            <p className="font-semibold text-slate-900 text-sm">Ruang Kelas & Aula Utama</p>
             <p className="text-slate-500 text-[11px]">Disertai QR Check-in di setiap panggung</p>
           </div>
 
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-1">
             <div className="flex items-center gap-2 text-emerald-800 font-bold">
               <Phone className="w-4 h-4" />
-              <span>Sekretariat BADKO Kota</span>
+              <span>Sekretariat</span>
             </div>
             <p className="font-semibold text-slate-900 text-sm">Panitia Pelaksana FASI XIII</p>
             <p className="text-slate-500 text-[11px]">Helpdesk: 0812-XXXX-XXXX (WhatsApp)</p>
@@ -88,37 +88,37 @@ export const LocationMap: React.FC = () => {
 
           <div className="relative">
             <div className="absolute -left-[31px] top-0.5 w-3.5 h-3.5 rounded-full bg-emerald-600 border-2 border-white"></div>
-            <div className="font-bold text-slate-900">07.30 - 08.30 WIB</div>
+            <div className="font-bold text-slate-900">07.30 - 08.35 WIB</div>
             <div className="text-slate-700 font-semibold">Upacara Pembukaan & Defile Kontingen</div>
-            <p className="text-slate-500 text-[11px]">Sambutan Ketua Umum BADKO TKA-TPA Kota Yogyakarta & Walikota Yogyakarta.</p>
+            <p className="text-slate-500 text-[11px]">Sambutan Walikota Yogyakarta & Ketua Umum Badko TPA D.I. Yogyakarta.</p>
           </div>
 
           <div className="relative">
             <div className="absolute -left-[31px] top-0.5 w-3.5 h-3.5 rounded-full bg-amber-500 border-2 border-white"></div>
-            <div className="font-bold text-amber-900 font-mono">08.30 - 11.45 WIB</div>
+            <div className="font-bold text-amber-900 font-mono">08.30 - 11.30 WIB</div>
             <div className="text-slate-900 font-semibold">Pelaksanaan 18 Cabang Lomba (TKA, TPA, TQA)</div>
             <p className="text-slate-500 text-[11px]">Sesuai nomor urut undian tampil di masing-masing panggung dan ruang penjurian.</p>
           </div>
 
           <div className="relative">
             <div className="absolute -left-[31px] top-0.5 w-3.5 h-3.5 rounded-full bg-emerald-600 border-2 border-white"></div>
-            <div className="font-bold text-slate-900">11.45 - 13.00 WIB</div>
+            <div className="font-bold text-slate-900">11.30 - 12.30 WIB</div>
             <div className="text-slate-700 font-semibold">Ishoma (Istirahat, Sholat Dzuhur Berjamaah, & Makan Siang)</div>
             <p className="text-slate-500 text-[11px]">Masjid SMP Negeri 1 Yogyakarta.</p>
           </div>
 
           <div className="relative">
             <div className="absolute -left-[31px] top-0.5 w-3.5 h-3.5 rounded-full bg-emerald-600 border-2 border-white"></div>
-            <div className="font-bold text-slate-900">13.00 - 15.00 WIB</div>
+            <div className="font-bold text-slate-900">12.30 - 14.15 WIB</div>
             <div className="text-slate-700 font-semibold">Lanjutan Lomba & Rekapitulasi Nilai Dewan Hakim</div>
             <p className="text-slate-500 text-[11px]">Input digital nilai 3 juri & penentuan Juara 1, 2, 3 per cabang.</p>
           </div>
 
           <div className="relative">
             <div className="absolute -left-[31px] top-0.5 w-3.5 h-3.5 rounded-full bg-amber-500 border-2 border-white"></div>
-            <div className="font-bold text-amber-900 font-mono">15.30 - 17.00 WIB</div>
+            <div className="font-bold text-amber-900 font-mono">14.15 - 15.00 WIB</div>
             <div className="text-slate-900 font-semibold">Pengumuman Pemenang, Penyerahan Piala & Juara Umum FASI XIII</div>
-            <p className="text-slate-500 text-[11px]">Penetapan Kontingen Kemantren Juara Umum Kota Yogyakarta.</p>
+            <p className="text-slate-500 text-[11px]">Penetapan Juara Umum FASI XIII Kota Yogyakarta.</p>
           </div>
         </div>
       </div>

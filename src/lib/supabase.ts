@@ -384,6 +384,37 @@ export async function upsertParticipantToSupabase(participant: Participant): Pro
 }
 
 /**
+ * Memperbarui status kehadiran peserta secara atomik per-baris (khusus scan QR hari-H)
+ * Berjalan langsung di tingkat baris ID sehingga pemindaian beruntun rombongan santri
+ * dijamin 100% tersimpan per peserta tanpa pernah menimpa peserta sebelumnya.
+ */
+export async function updateParticipantAttendanceInSupabase(
+  participantId: string,
+  attendance: 'hadir' | 'belum_hadir'
+): Promise<{ success: boolean; error?: string }> {
+  const client = getSupabaseClient();
+  if (!client) {
+    return { success: false, error: 'Supabase URL & Anon Key belum terpasang di environment' };
+  }
+
+  try {
+    const { error } = await client
+      .from('participants')
+      .update({
+        attendance,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', participantId);
+
+    if (error) throw error;
+    return { success: true };
+  } catch (error: any) {
+    console.error('Gagal update kehadiran peserta di Supabase:', error);
+    return { success: false, error: error?.message || 'Gagal update kehadiran di Supabase' };
+  }
+}
+
+/**
  * Menghapus peserta dari Supabase
  */
 export async function deleteParticipantFromSupabase(participantId: string): Promise<boolean> {
@@ -554,29 +585,51 @@ export async function getRemoteParticipantCounts(): Promise<{ total: number; dum
 
 /**
  * Langganan Realtime Postgres Changes untuk Tabel Participants
+ * Mendukung pembaruan seketika per-baris (onSingleUpdate) agar saat scan 10 peserta beruntun,
+ * setiap peserta langsung terupdate instan di layar tanpa menunggu refetch massal.
  */
 export function subscribeToParticipantsRealtime(
-  onUpdate: (participants: Participant[]) => void
+  onUpdate: (participants: Participant[]) => void,
+  onSingleUpdate?: (updatedParticipant: Participant) => void
 ): (() => void) | null {
   const client = getSupabaseClient();
   if (!client) return null;
 
   try {
+    let debounceTimer: any = null;
+
     const channel = client
       .channel('realtime_participants_changes')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'participants' },
-        async () => {
-          const freshData = await fetchParticipantsFromSupabase();
-          if (freshData !== null) {
-            onUpdate(freshData);
+        async (payload: any) => {
+          // Jika event adalah UPDATE baris tunggal (seperti scan kehadiran / nomor undian)
+          if (payload.eventType === 'UPDATE' && payload.new && onSingleUpdate) {
+            try {
+              const singleMapped = mapDbToParticipant(payload.new);
+              onSingleUpdate(singleMapped);
+              return;
+            } catch (err) {
+              console.warn('Gagal map single update peserta:', err);
+            }
           }
+
+          // Untuk INSERT/DELETE atau jika onSingleUpdate tidak didefinisikan:
+          // Debounce fetch 400ms agar tidak saling tumpang-tindih jika ada pembaruan beruntun
+          if (debounceTimer) clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(async () => {
+            const freshData = await fetchParticipantsFromSupabase();
+            if (freshData !== null) {
+              onUpdate(freshData);
+            }
+          }, 400);
         }
       )
       .subscribe();
 
     return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
       client.removeChannel(channel);
     };
   } catch (error) {

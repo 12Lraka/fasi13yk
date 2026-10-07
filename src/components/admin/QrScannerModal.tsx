@@ -31,7 +31,11 @@ import { Participant, UserSession } from '../../types/fasi';
 import { CATEGORIES_LIST, KEMANTREN_LIST } from '../../data/fasiMasterData';
 import { logAuditEvent, logErrorEvent } from '../../utils/storage';
 import { showToast } from '../../utils/sweetalert';
-import { upsertParticipantToSupabase, isSupabaseConfigured } from '../../lib/supabase';
+import {
+  upsertParticipantToSupabase,
+  updateParticipantAttendanceInSupabase,
+  isSupabaseConfigured,
+} from '../../lib/supabase';
 
 // Helper audio tone untuk feedback instan scanner super pintar
 const playAudioTone = (type: 'success' | 'warning' | 'already_checked') => {
@@ -100,6 +104,7 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
   const [cameraFacingMode, setCameraFacingMode] = useState<'environment' | 'user'>('environment');
   const [cameraPermissionError, setCameraPermissionError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [recentSessionScans, setRecentSessionScans] = useState<Participant[]>([]);
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const qrRegionId = 'html5qr-code-full-region';
@@ -252,14 +257,21 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
     onCheckInSuccess(updated);
     setScannedResult(updated);
 
+    // Rekam ke riwayat sesi aktif pemindai agar petugas melihat bukti ke-10 kartu berhasil discan
+    if (attendanceType === 'hadir') {
+      setRecentSessionScans((prev) => [updated, ...prev.filter((p) => p.id !== updated.id)]);
+    } else {
+      setRecentSessionScans((prev) => prev.filter((p) => p.id !== updated.id));
+    }
+
     // Langsung mutasi ref scanner lokal seketika agar pembacaan kartu berikutnya tidak tertimpa/bentrok
     participantsRef.current = participantsRef.current.map((p) =>
       p.id === updated.id ? updated : p
     );
 
-    // 2. Simpan seketika ke database Supabase
+    // 2. Simpan seketika secara atomik per baris ke Supabase (tidak pernah menimpa santri lain)
     if (isSupabaseConfigured()) {
-      upsertParticipantToSupabase(updated).catch((err) =>
+      updateParticipantAttendanceInSupabase(updated.id, attendanceType).catch((err) =>
         console.warn('Gagal update kehadiran santri ke Supabase:', err)
       );
     }
@@ -632,6 +644,47 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
                   <UserCheck className="w-4 h-4 text-slate-500" />
                   <span>{scannedResult.attendance === 'hadir' ? 'Batalkan / Reset' : 'Belum Hadir'}</span>
                 </button>
+              </div>
+            </div>
+          )}
+
+          {/* Riwayat Check-In Sesi Aktif (Multi-Scan Rombongan) */}
+          {recentSessionScans.length > 0 && (
+            <div className="rounded-2xl p-3.5 bg-slate-900 text-white border border-slate-800 space-y-2 animate-in fade-in">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span className="text-xs font-bold text-emerald-300">
+                    Santri Hadir Sesi Ini: {recentSessionScans.length} Santri
+                  </span>
+                </div>
+                <span className="text-[10px] text-slate-400">Tersimpan Otomatis ke Cloud</span>
+              </div>
+              <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1 text-xs">
+                {recentSessionScans.map((p, idx) => (
+                  <div
+                    key={p.id}
+                    className="flex items-center justify-between p-2 rounded-xl bg-slate-800/80 border border-slate-700/60"
+                  >
+                    <div className="flex items-center gap-2 overflow-hidden">
+                      <span className="w-5 h-5 rounded-md bg-emerald-500/20 text-emerald-400 font-mono font-bold text-[11px] flex items-center justify-center shrink-0">
+                        {idx + 1}
+                      </span>
+                      <div className="truncate">
+                        <strong className="text-slate-100 block truncate">{p.fullName}</strong>
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          {p.registrationNumber} • {p.tpaUnitName}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0 ml-2">
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-800">
+                        <CheckCheck className="w-3 h-3" />
+                        <span>{p.checkInTime || 'Hadir'}</span>
+                      </span>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           )}

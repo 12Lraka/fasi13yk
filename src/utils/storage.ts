@@ -70,7 +70,28 @@ export const DEFAULT_SETTINGS: AppSettings = {
   registrationDeadlineTime: '12:00',
   registrationAutoClose: false,
   registrationClosedMessage: 'Pendaftaran santri baru resmi ditutup pada 5 Oktober 2026 pukul 12.00 WIB. Saat ini hanya tahap perbaikan/penyesuaian data santri yang sudah terdaftar menjelang Technical Meeting (TM).',
+  presensiPin: 'fasi132026',
 };
+
+const PRESENSI_AUTH_KEY = 'fasi13_presensi_authorized';
+
+export function isPresensiAuthorized(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return sessionStorage.getItem(PRESENSI_AUTH_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+export function setPresensiAuthorized(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    sessionStorage.setItem(PRESENSI_AUTH_KEY, 'true');
+  } catch {
+    // ignore
+  }
+}
 
 /**
  * Mendapatkan status pendaftaran aktif (memperhitungkan waktu deadline otomatis jika diaktifkan)

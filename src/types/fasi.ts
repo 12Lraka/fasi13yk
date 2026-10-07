@@ -98,6 +98,7 @@ export interface AppSettings {
   registrationDeadlineTime?: string;
   registrationAutoClose?: boolean;
   registrationClosedMessage?: string;
+  presensiPin?: string;
 }
 
 export interface CompetitionCategory {

@@ -21,6 +21,7 @@ import { LotteryDrawModal } from './components/admin/LotteryDrawModal';
 import { UndianNomorTampil } from './components/admin/UndianNomorTampil';
 import { JudgingModal } from './components/admin/JudgingModal';
 import { QrScannerModal } from './components/admin/QrScannerModal';
+import { PresensiPinModal } from './components/public/PresensiPinModal';
 import { AuditLogModal } from './components/admin/AuditLogModal';
 import { IdCardPrintView } from './components/print/IdCardPrintView';
 import { RecapPrintView } from './components/print/RecapPrintView';
@@ -38,6 +39,7 @@ import {
   saveKemantren,
   getStoredKemantren,
   bulkPersistMasterTpa,
+  isPresensiAuthorized,
 } from './utils/storage';
 import {
   isSupabaseConfigured,
@@ -50,6 +52,7 @@ import {
   subscribeToKemantrenRealtime,
   syncKemantrenToSupabase,
   upsertParticipantToSupabase,
+  updateParticipantAttendanceInSupabase,
   bulkSyncParticipantsToSupabase,
   fetchSettingsFromSupabase,
   subscribeToSettingsRealtime,
@@ -74,7 +77,21 @@ export default function App() {
   const [isJudgingModalOpen, setIsJudgingModalOpen] = useState<boolean>(false);
   const [judgingParticipant, setJudgingParticipant] = useState<Participant | null>(null);
   const [isQrScannerOpen, setIsQrScannerOpen] = useState<boolean>(false);
+  const [isPresensiPinOpen, setIsPresensiPinOpen] = useState<boolean>(false);
   const [isAuditLogOpen, setIsAuditLogOpen] = useState<boolean>(false);
+
+  // Handler Buka Presensi QR (Bypass PIN fasi132026 untuk Petugas Lapangan)
+  const handleOpenPresensi = () => {
+    if (session && session.role === 'super_admin') {
+      setIsQrScannerOpen(true);
+      return;
+    }
+    if (isPresensiAuthorized()) {
+      setIsQrScannerOpen(true);
+      return;
+    }
+    setIsPresensiPinOpen(true);
+  };
 
   // Print Queue
   const [printQueue, setPrintQueue] = useState<Participant[]>([]);
@@ -107,13 +124,7 @@ export default function App() {
     }
 
     if (route === 'presensi') {
-      if (session) {
-        setIsQrScannerOpen(true);
-        setActiveTab('admin-data-peserta');
-      } else {
-        setIsLoginOpen(true);
-        setActiveTab('beranda');
-      }
+      handleOpenPresensi();
       return;
     }
 
@@ -245,10 +256,21 @@ export default function App() {
       });
 
       // Pasang Realtime Subscription agar perubahan dari device lain langsung sinkron seketika
-      unsubscribeParticipants = subscribeToParticipantsRealtime((updatedList) => {
-        setParticipants(updatedList);
-        localStorage.setItem('fasi_participants', JSON.stringify(updatedList));
-      });
+      unsubscribeParticipants = subscribeToParticipantsRealtime(
+        (updatedList) => {
+          setParticipants(updatedList);
+          saveParticipants(updatedList);
+        },
+        (singleParticipant) => {
+          setParticipants((prev) => {
+            const nextList = prev.map((p) =>
+              p.id === singleParticipant.id ? { ...p, ...singleParticipant } : p
+            );
+            saveParticipants(nextList);
+            return nextList;
+          });
+        }
+      );
 
       unsubscribeBeritaAcara = subscribeToBeritaAcaraRealtime((updatedBA) => {
         saveBeritaAcaraList(updatedBA);
@@ -417,16 +439,12 @@ export default function App() {
   const handleCheckInSuccess = useCallback((updated: Participant) => {
     setParticipants((prev) => {
       const nextList = prev.map((p) => (p.id === updated.id ? updated : p));
-      try {
-        localStorage.setItem('fasi13_participants_data', JSON.stringify(nextList));
-      } catch (err) {
-        console.error('Gagal menyimpan data peserta:', err);
-      }
+      saveParticipants(nextList);
       return nextList;
     });
 
     if (isSupabaseConfigured()) {
-      upsertParticipantToSupabase(updated).catch((err) =>
+      updateParticipantAttendanceInSupabase(updated.id, updated.attendance || 'hadir').catch((err) =>
         console.warn('Gagal update kehadiran santri ke Supabase:', err)
       );
     }
@@ -461,6 +479,7 @@ export default function App() {
         onOpenLogin={() => handleNavigate('login')}
         onLogout={handleLogout}
         onOpenAgeCalc={() => handleNavigate('kalkulator')}
+        onOpenPresensi={handleOpenPresensi}
       />
 
       {/* Main Container */}
@@ -579,6 +598,34 @@ export default function App() {
         onLoginSuccess={handleLoginSuccess}
       />
 
+      {/* Modal Autentikasi Cepat PIN Petugas Presensi Hari-H */}
+      <PresensiPinModal
+        isOpen={isPresensiPinOpen}
+        onClose={() => setIsPresensiPinOpen(false)}
+        onSuccess={() => {
+          setIsPresensiPinOpen(false);
+          setIsQrScannerOpen(true);
+        }}
+        expectedPin={settings?.presensiPin || 'fasi132026'}
+      />
+
+      {/* Modal Scanner QR Check-in Hari-H (Bisa diakses Superadmin & Petugas ber-PIN) */}
+      <QrScannerModal
+        isOpen={isQrScannerOpen}
+        onClose={() => setIsQrScannerOpen(false)}
+        participants={participants}
+        onCheckInSuccess={handleCheckInSuccess}
+        session={
+          session || {
+            role: 'super_admin',
+            name: 'Petugas Presensi Hari-H',
+            token: 'pin_presensi_token',
+            loginTime: new Date().toISOString(),
+            expiresAt: Date.now() + 86400000,
+          }
+        }
+      />
+
       {session && (
         <>
           {session.role === 'super_admin' && (
@@ -588,14 +635,6 @@ export default function App() {
                 onClose={() => setIsLotteryModalOpen(false)}
                 participants={participants}
                 onUpdateParticipants={handleUpdateParticipants}
-                session={session}
-              />
-
-              <QrScannerModal
-                isOpen={isQrScannerOpen}
-                onClose={() => setIsQrScannerOpen(false)}
-                participants={participants}
-                onCheckInSuccess={handleCheckInSuccess}
                 session={session}
               />
 
