@@ -429,7 +429,7 @@ export async function renderAttendanceToPdfPage({
   };
 
   // 3. TABEL DATA DAFTAR HADIR
-  // Kolom: No, Undian, No Registrasi, Nama Lengkap, L/P, Rayon & Unit TPA, Status QR, Paraf / Tanda Tangan
+  // Kolom: No, Undian, No Registrasi, Nama Lengkap, L/P, Rayon & Unit TPA, Paraf / Tanda Tangan
   const tableHeaders = [
     'No',
     'Undian',
@@ -437,21 +437,17 @@ export async function renderAttendanceToPdfPage({
     'Nama Lengkap',
     'L/P',
     'Rayon & Unit TPA',
-    'Status QR',
     'Paraf / Tanda Tangan',
   ];
 
   const tableBody = inCat.length === 0
-    ? [['-', '-', '-', 'Belum ada santri terdaftar pada cabang lomba ini.', '-', '-', '-', '-']]
+    ? [['-', '-', '-', 'Belum ada santri terdaftar pada cabang lomba ini.', '-', '-', '-']]
     : inCat.map((p, index) => {
         const kemName = getKemName(p.kemantrenId);
         const rayonAndTpa = p.tpaUnitName
-          ? `Kem. ${kemName}\n${p.tpaUnitName}`
-          : `Kem. ${kemName}`;
+          ? `Rayon ${kemName}\n${p.tpaUnitName}`
+          : `Rayon ${kemName}`;
 
-        const isPresent = p.attendance === 'hadir';
-        const qrStatus = isPresent ? '[ v ] HADIR' : '[   ] Belum';
-        
         // Alternating numbering format for classic Indonesian attendance signature cell
         const signCell = (index % 2 === 0)
           ? `${index + 1}. .........`
@@ -464,7 +460,6 @@ export async function renderAttendanceToPdfPage({
           p.fullName || '-',
           p.gender || '-',
           rayonAndTpa,
-          qrStatus,
           signCell,
         ];
       });
@@ -498,18 +493,17 @@ export async function renderAttendanceToPdfPage({
       0: { halign: 'center', cellWidth: 8 },  // No
       1: { halign: 'center', cellWidth: 14, fontStyle: 'bold' }, // Undian
       2: { halign: 'center', cellWidth: 26, fontStyle: 'bold' }, // No Registrasi
-      3: { halign: 'left', cellWidth: 46, fontStyle: 'bold' },   // Nama Lengkap
+      3: { halign: 'left', cellWidth: 52, fontStyle: 'bold' },   // Nama Lengkap
       4: { halign: 'center', cellWidth: 10 }, // L/P
-      5: { halign: 'left', cellWidth: 42 },   // Rayon & Unit TPA
-      6: { halign: 'center', cellWidth: 18, fontStyle: 'bold' }, // Status QR
-      7: { halign: 'left', cellWidth: 22, fontStyle: 'normal' },  // Paraf / TTD
+      5: { halign: 'left', cellWidth: 48 },   // Rayon & Unit TPA
+      6: { halign: 'left', cellWidth: 32, fontStyle: 'normal' },  // Paraf / TTD
     },
     alternateRowStyles: {
       fillColor: [248, 250, 252], // slate-50
     },
   });
 
-  // 4. BLOK TANDA TANGAN RESMI PRESENSI (2 Kolom: Koordinator Lomba & Panitera Panggung)
+  // 4. BLOK TANDA TANGAN RESMI PRESENSI (1 Tanda Tangan: Panitera di Sisi Kanan)
   const lastTableY = (pdfDoc as any).lastAutoTable?.finalY || startTableY + 40;
   const pageHeight = 297;
   let signatureY = lastTableY + 8;
@@ -519,33 +513,29 @@ export async function renderAttendanceToPdfPage({
     signatureY = 20;
   }
 
-  const colWidth = contentWidth / 2;
-  const col1X = marginX + (colWidth * 0.5);
-  const col2X = marginX + (colWidth * 1.5);
+  // Tanda tangan Panitera di sisi kanan lembar
+  const signX = marginX + contentWidth - 36;
 
   pdfDoc.setFont('helvetica', 'bold');
   pdfDoc.setFontSize(9);
   pdfDoc.setTextColor(15, 23, 42);
 
   // Label Header TTD
-  pdfDoc.text('Koordinator Cabang Lomba', col1X, signatureY, { align: 'center' });
-  pdfDoc.text('Panitera / Petugas Panggung', col2X, signatureY, { align: 'center' });
+  pdfDoc.text('Panitera', signX, signatureY, { align: 'center' });
 
   // Garis tempat tanda tangan dan nama manual
   const lineSignY = signatureY + 22;
-  const lineWidth = 48;
+  const lineWidth = 52;
 
   pdfDoc.setLineWidth(0.3);
   pdfDoc.setDrawColor(15, 23, 42);
-  pdfDoc.line(col1X - (lineWidth / 2), lineSignY, col1X + (lineWidth / 2), lineSignY);
-  pdfDoc.line(col2X - (lineWidth / 2), lineSignY, col2X + (lineWidth / 2), lineSignY);
+  pdfDoc.line(signX - (lineWidth / 2), lineSignY, signX + (lineWidth / 2), lineSignY);
 
   // Petunjuk halus di bawah garis
   pdfDoc.setFont('helvetica', 'italic');
   pdfDoc.setFontSize(7.5);
   pdfDoc.setTextColor(100, 116, 139);
-  pdfDoc.text('( Nama Terang & TTD )', col1X, lineSignY + 4, { align: 'center' });
-  pdfDoc.text('( Nama Terang & TTD )', col2X, lineSignY + 4, { align: 'center' });
+  pdfDoc.text('( Nama Terang & TTD )', signX, lineSignY + 4, { align: 'center' });
 
   return pdfDoc;
 }

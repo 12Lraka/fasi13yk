@@ -74,7 +74,7 @@ function getCategoryMeta(categoryType: string) {
         roleLabel: 'Jabatan / Penugasan',
         color: [15, 23, 42], // slate-900
         signatoryRightRole: 'Sekretaris',
-        signatoryRightDefault: 'Viko Saputra',
+        signatoryRightDefault: 'Muhammad Padma Fatwa Alam',
       };
   }
 }

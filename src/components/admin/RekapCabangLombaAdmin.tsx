@@ -651,7 +651,7 @@ export const RekapCabangLombaAdmin: React.FC<RekapCabangLombaAdminProps> = ({
             </table>
           </div>
         ) : (
-          /* TABEL 2: FORMAT LEMBAR PRESENSI / DAFTAR HADIR FISIK & STATUS QR */
+          /* TABEL 2: FORMAT LEMBAR PRESENSI / DAFTAR HADIR FISIK */
           <div className="overflow-x-auto mt-4">
             <table className="w-full text-left text-xs border-collapse border border-slate-300">
               <thead>
@@ -662,21 +662,19 @@ export const RekapCabangLombaAdmin: React.FC<RekapCabangLombaAdminProps> = ({
                   <th className="py-2.5 px-3 border border-slate-300">Nama Lengkap</th>
                   <th className="py-2.5 px-1.5 border border-slate-300 text-center w-10">L/P</th>
                   <th className="py-2.5 px-3 border border-slate-300">Rayon & Unit TPA</th>
-                  <th className="py-2.5 px-2 border border-slate-300 text-center w-28">Status QR Gate</th>
                   <th className="py-2.5 px-3 border border-slate-300 text-center w-36">Paraf / TTD Peserta</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
                 {filteredParticipants.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-8 text-center text-slate-400 italic">
+                    <td colSpan={7} className="py-8 text-center text-slate-400 italic">
                       Belum ada santri terdaftar pada cabang lomba ini.
                     </td>
                   </tr>
                 ) : (
                   filteredParticipants.map((p, idx) => {
                     const kem = getKem(p.kemantrenId);
-                    const isPresent = p.attendance === 'hadir';
 
                     return (
                       <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
@@ -711,22 +709,6 @@ export const RekapCabangLombaAdmin: React.FC<RekapCabangLombaAdminProps> = ({
                           <div className="font-bold text-slate-900">Rayon {kem?.name || p.kemantrenId}</div>
                           {p.tpaUnitName && (
                             <div className="text-[10px] text-slate-600 font-medium">{p.tpaUnitName}</div>
-                          )}
-                        </td>
-                        <td className="py-2.5 px-2 border border-slate-300 text-center">
-                          {isPresent ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-900 border border-emerald-300 rounded font-black text-[10px]">
-                              <span>[✓] HADIR</span>
-                              {p.checkInTime && (
-                                <span className="font-mono text-[9px] text-emerald-700">
-                                  ({p.checkInTime.slice(11, 16)})
-                                </span>
-                              )}
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center px-2 py-0.5 bg-slate-100 text-slate-600 border border-slate-200 rounded font-medium text-[10px]">
-                              [ &nbsp; ] Belum Hadir
-                            </span>
                           )}
                         </td>
                         <td className="py-2.5 px-3 border border-slate-300 font-mono text-[11px] text-slate-700">
@@ -785,24 +767,14 @@ export const RekapCabangLombaAdmin: React.FC<RekapCabangLombaAdminProps> = ({
             </div>
           </div>
         ) : (
-          /* Tanda Tangan Format Presensi (2 Kolom: Koordinator Cabang Lomba & Panitera Panggung) */
-          <div className="mt-10 pt-4 grid grid-cols-2 gap-8 text-center text-xs break-inside-avoid max-w-2xl mx-auto">
-            {/* Kolom 1: Koordinator Cabang Lomba */}
+          /* Tanda Tangan Format Presensi (1 Tanda Tangan Tunggal: Panitera di sebelah kanan) */
+          <div className="mt-10 pt-4 flex justify-end text-center text-xs break-inside-avoid pr-4 sm:pr-8">
+            {/* Tanda tangan tunggal: Panitera */}
             <div className="flex flex-col items-center justify-between min-h-[120px]">
               <div>
-                <p className="font-bold text-slate-900">Koordinator Cabang Lomba</p>
+                <p className="font-bold text-slate-900">Panitera</p>
               </div>
-              <div className="mt-16 w-44 sm:w-56 border-b border-slate-900 pb-1">
-                <p className="text-[10px] text-slate-400 italic">( Nama Terang & TTD )</p>
-              </div>
-            </div>
-
-            {/* Kolom 2: Panitera / Petugas Panggung */}
-            <div className="flex flex-col items-center justify-between min-h-[120px]">
-              <div>
-                <p className="font-bold text-slate-900">Panitera / Petugas Panggung</p>
-              </div>
-              <div className="mt-16 w-44 sm:w-56 border-b border-slate-900 pb-1">
+              <div className="mt-16 w-48 sm:w-56 border-b border-slate-900 pb-1">
                 <p className="text-[10px] text-slate-400 italic">( Nama Terang & TTD )</p>
               </div>
             </div>
