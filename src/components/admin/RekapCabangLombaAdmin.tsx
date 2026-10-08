@@ -26,10 +26,19 @@ import {
   FileSpreadsheet,
   Loader2,
   ShieldAlert,
+  ClipboardCheck,
+  UserCheck,
+  QrCode,
+  FileText,
 } from 'lucide-react';
 import { Participant, UserSession, CompetitionCategory } from '../../types/fasi';
 import { getStoredKemantren, getStoredCategories } from '../../utils/storage';
-import { downloadSingleBranchPdf, downloadAllBranchesPdf } from '../../utils/branchPdfGenerator';
+import {
+  downloadSingleBranchPdf,
+  downloadAllBranchesPdf,
+  downloadSingleBranchAttendancePdf,
+  downloadAllBranchesAttendancePdf,
+} from '../../utils/branchPdfGenerator';
 import { exportBranchToExcel } from '../../utils/branchExcelExport';
 
 const LOGO_BADKO_URL = 'https://gigluvvkswjaiwxpnqet.supabase.co/storage/v1/object/public/public-assets/logobadko.png';
@@ -73,10 +82,18 @@ export const RekapCabangLombaAdmin: React.FC<RekapCabangLombaAdminProps> = ({
   const [selectedCategoryCode, setSelectedCategoryCode] = useState<string>('cat-tpa-1');
   const [searchTerm, setSearchTerm] = useState<string>('');
 
-  // Loading States for PDF Download
+  // Mode View: Format Penilaian Juri vs Lembar Presensi / Daftar Hadir Peserta
+  const [viewMode, setViewMode] = useState<'judging' | 'attendance'>('judging');
+
+  // Loading States for PDF Download (Penilaian)
   const [isExportingSingle, setIsExportingSingle] = useState<boolean>(false);
   const [isExportingAll, setIsExportingAll] = useState<boolean>(false);
   const [exportProgress, setExportProgress] = useState<{ current: number; total: number } | null>(null);
+
+  // Loading States for PDF Download (Presensi)
+  const [isExportingAttendanceSingle, setIsExportingAttendanceSingle] = useState<boolean>(false);
+  const [isExportingAttendanceAll, setIsExportingAttendanceAll] = useState<boolean>(false);
+  const [exportAttendanceProgress, setExportAttendanceProgress] = useState<{ current: number; total: number } | null>(null);
 
   // Available categories based on selectedLevel
   const levelCategories = useMemo(() => {
@@ -105,6 +122,11 @@ export const RekapCabangLombaAdmin: React.FC<RekapCabangLombaAdminProps> = ({
       return a.registrationNumber.localeCompare(b.registrationNumber);
     });
   }, [participants, activeCategory, isSuperAdmin, session.kemantrenId]);
+
+  // Count participants who have checked in (attendance = 'hadir')
+  const attendedCount = useMemo(() => {
+    return branchParticipants.filter((p) => p.attendance === 'hadir').length;
+  }, [branchParticipants]);
 
   // Filtered by Search
   const filteredParticipants = useMemo(() => {
@@ -175,6 +197,38 @@ export const RekapCabangLombaAdmin: React.FC<RekapCabangLombaAdminProps> = ({
     }
   };
 
+  const handleDownloadAttendanceSinglePdf = async () => {
+    try {
+      setIsExportingAttendanceSingle(true);
+      await downloadSingleBranchAttendancePdf(activeCategory, participants, kemantrenList);
+    } catch (err) {
+      console.error('Error exporting single branch attendance PDF:', err);
+    } finally {
+      setIsExportingAttendanceSingle(false);
+    }
+  };
+
+  const handleDownloadAttendanceAllPdf = async () => {
+    try {
+      setIsExportingAttendanceAll(true);
+      const targetCategories = selectedLevel === 'ALL'
+        ? categoriesList
+        : categoriesList.filter((c) => c.level === selectedLevel);
+
+      await downloadAllBranchesAttendancePdf({
+        categories: targetCategories,
+        participants,
+        kemantrenList,
+        onProgress: (current, total) => setExportAttendanceProgress({ current, total }),
+      });
+    } catch (err) {
+      console.error('Error exporting all branches attendance PDF:', err);
+    } finally {
+      setIsExportingAttendanceAll(false);
+      setExportAttendanceProgress(null);
+    }
+  };
+
   const handleExportExcel = () => {
     exportBranchToExcel({
       category: activeCategory,
@@ -205,57 +259,100 @@ export const RekapCabangLombaAdmin: React.FC<RekapCabangLombaAdminProps> = ({
               Rekapitulasi Peserta Cabang Lomba FASI XIII
             </h2>
             <p className="text-xs text-slate-600 mt-0.5">
-              Pratinjau nomor undian, nama santri, asal TPA, form penilaian dewan hakim, dan unduh berkas PDF resmi A4 / Excel (.xlsx).
+              Kelola nomor undian, penilaian juri, serta lembar presensi fisik / scan QR per cabang lomba.
             </p>
           </div>
 
-          {/* Action Buttons */}
+          {/* Action Buttons (Berubah sesuai Mode Tab) */}
           <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
-            {/* Download Excel (.xlsx) */}
-            <button
-              onClick={handleExportExcel}
-              className="flex-1 md:flex-initial px-4 py-2.5 bg-emerald-800 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer whitespace-nowrap"
-            >
-              <FileSpreadsheet className="w-4 h-4 text-amber-300" />
-              <span>Download Excel (.xlsx)</span>
-            </button>
+            {viewMode === 'judging' ? (
+              <>
+                {/* Download Excel (.xlsx) */}
+                <button
+                  onClick={handleExportExcel}
+                  className="flex-1 md:flex-initial px-4 py-2.5 bg-emerald-800 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer whitespace-nowrap"
+                >
+                  <FileSpreadsheet className="w-4 h-4 text-amber-300" />
+                  <span>Download Excel (.xlsx)</span>
+                </button>
 
-            {/* Download 1 Cabang PDF */}
-            <button
-              onClick={handleDownloadSinglePdf}
-              disabled={isExportingSingle || isExportingAll}
-              className="flex-1 md:flex-initial px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer disabled:opacity-50 whitespace-nowrap"
-            >
-              {isExportingSingle ? (
-                <Loader2 className="w-4 h-4 text-amber-300 animate-spin" />
-              ) : (
-                <FileDown className="w-4 h-4 text-amber-300" />
-              )}
-              <span>Download PDF (Cabang Ini)</span>
-            </button>
+                {/* Download 1 Cabang PDF */}
+                <button
+                  onClick={handleDownloadSinglePdf}
+                  disabled={isExportingSingle || isExportingAll}
+                  className="flex-1 md:flex-initial px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer disabled:opacity-50 whitespace-nowrap"
+                >
+                  {isExportingSingle ? (
+                    <Loader2 className="w-4 h-4 text-amber-300 animate-spin" />
+                  ) : (
+                    <FileDown className="w-4 h-4 text-amber-300" />
+                  )}
+                  <span>Download PDF (Penilaian)</span>
+                </button>
 
-            {/* Download Semua Cabang PDF */}
-            <button
-              onClick={handleDownloadAllPdf}
-              disabled={isExportingSingle || isExportingAll}
-              className="flex-1 md:flex-initial px-4 py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer disabled:opacity-50 whitespace-nowrap"
-            >
-              {isExportingAll ? (
-                <>
-                  <Loader2 className="w-4 h-4 text-white animate-spin" />
-                  <span>
-                    Proses ({exportProgress ? `${exportProgress.current}/${exportProgress.total}` : '...'})
-                  </span>
-                </>
-              ) : (
-                <>
-                  <Download className="w-4 h-4 text-white" />
-                  <span>
-                    Download Semua PDF {selectedLevel !== 'ALL' ? `(${selectedLevel})` : '(Semua)'}
-                  </span>
-                </>
-              )}
-            </button>
+                {/* Download Semua Cabang PDF */}
+                <button
+                  onClick={handleDownloadAllPdf}
+                  disabled={isExportingSingle || isExportingAll}
+                  className="flex-1 md:flex-initial px-4 py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer disabled:opacity-50 whitespace-nowrap"
+                >
+                  {isExportingAll ? (
+                    <>
+                      <Loader2 className="w-4 h-4 text-white animate-spin" />
+                      <span>
+                        Proses ({exportProgress ? `${exportProgress.current}/${exportProgress.total}` : '...'})
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4 text-white" />
+                      <span>
+                        Download Semua PDF {selectedLevel !== 'ALL' ? `(${selectedLevel})` : '(Semua)'}
+                      </span>
+                    </>
+                  )}
+                </button>
+              </>
+            ) : (
+              <>
+                {/* Download 1 Cabang Presensi PDF */}
+                <button
+                  onClick={handleDownloadAttendanceSinglePdf}
+                  disabled={isExportingAttendanceSingle || isExportingAttendanceAll}
+                  className="flex-1 md:flex-initial px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer disabled:opacity-50 whitespace-nowrap"
+                >
+                  {isExportingAttendanceSingle ? (
+                    <Loader2 className="w-4 h-4 text-amber-300 animate-spin" />
+                  ) : (
+                    <ClipboardCheck className="w-4 h-4 text-emerald-400" />
+                  )}
+                  <span>Download PDF Presensi (Cabang Ini)</span>
+                </button>
+
+                {/* Download Semua Cabang Presensi PDF */}
+                <button
+                  onClick={handleDownloadAttendanceAllPdf}
+                  disabled={isExportingAttendanceSingle || isExportingAttendanceAll}
+                  className="flex-1 md:flex-initial px-4 py-2.5 bg-emerald-800 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer disabled:opacity-50 whitespace-nowrap"
+                >
+                  {isExportingAttendanceAll ? (
+                    <>
+                      <Loader2 className="w-4 h-4 text-white animate-spin" />
+                      <span>
+                        Proses ({exportAttendanceProgress ? `${exportAttendanceProgress.current}/${exportAttendanceProgress.total}` : '...'})
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4 text-white" />
+                      <span>
+                        Download Semua Presensi {selectedLevel !== 'ALL' ? `(${selectedLevel})` : '(34 Cabang)'}
+                      </span>
+                    </>
+                  )}
+                </button>
+              </>
+            )}
 
             {/* Cetak Browser */}
             <button
@@ -267,6 +364,40 @@ export const RekapCabangLombaAdmin: React.FC<RekapCabangLombaAdminProps> = ({
               <span>Cetak</span>
             </button>
           </div>
+        </div>
+
+        {/* Tab Switcher: Format Penilaian Juri VS Lembar Presensi / Daftar Hadir */}
+        <div className="flex flex-wrap items-center gap-2 p-1.5 bg-slate-100 rounded-2xl border border-slate-200 w-fit">
+          <button
+            onClick={() => setViewMode('judging')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              viewMode === 'judging'
+                ? 'bg-white text-emerald-950 shadow-sm border border-slate-200'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Award className="w-4 h-4 text-emerald-700" />
+            <span>Format Penilaian Juri</span>
+          </button>
+
+          <button
+            onClick={() => setViewMode('attendance')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              viewMode === 'attendance'
+                ? 'bg-white text-emerald-950 shadow-sm border border-slate-200'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <ClipboardCheck className="w-4 h-4 text-emerald-700" />
+            <span>Lembar Presensi / Daftar Hadir Fisik</span>
+            <span
+              className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+                attendedCount > 0 ? 'bg-emerald-100 text-emerald-900' : 'bg-slate-200 text-slate-700'
+              }`}
+            >
+              {attendedCount} / {branchParticipants.length} Hadir
+            </span>
+          </button>
         </div>
 
         {/* Level Tabs */}
@@ -352,7 +483,7 @@ export const RekapCabangLombaAdmin: React.FC<RekapCabangLombaAdminProps> = ({
             </h3>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-3 shrink-0 flex-wrap">
             <div className="bg-white px-3.5 py-2 rounded-xl border border-emerald-200 text-center">
               <span className="text-[10px] font-bold text-slate-400 uppercase block">Partisipasi</span>
               <span className="text-sm font-black text-emerald-950">
@@ -363,6 +494,12 @@ export const RekapCabangLombaAdmin: React.FC<RekapCabangLombaAdminProps> = ({
               <span className="text-[10px] font-bold text-slate-400 uppercase block">Total Peserta</span>
               <span className="text-sm font-black text-amber-600">
                 {branchParticipants.length} Santri
+              </span>
+            </div>
+            <div className="bg-white px-3.5 py-2 rounded-xl border border-emerald-200 text-center">
+              <span className="text-[10px] font-bold text-slate-400 uppercase block">Presensi Hadir</span>
+              <span className={`text-sm font-black ${attendedCount > 0 ? 'text-emerald-700' : 'text-slate-500'}`}>
+                {attendedCount} / {branchParticipants.length}
               </span>
             </div>
           </div>
@@ -419,130 +556,258 @@ export const RekapCabangLombaAdmin: React.FC<RekapCabangLombaAdminProps> = ({
         {/* JUDUL DOKUMEN & NAMA CABANG LOMBA */}
         <div className="text-center my-4 space-y-1">
           <h4 className="font-black text-sm sm:text-base text-slate-900 uppercase tracking-wide underline">
-            REKAPITULASI PESERTA CABANG LOMBA
+            {viewMode === 'judging'
+              ? 'REKAPITULASI PESERTA CABANG LOMBA'
+              : 'DAFTAR HADIR / PRESENSI PESERTA CABANG LOMBA'}
           </h4>
           <p className="text-xs sm:text-sm font-black text-emerald-950 uppercase tracking-wider">
             CABANG: [{activeCategory.code}] {activeCategory.name} — TINGKAT {activeCategory.level}
           </p>
         </div>
 
-        {/* TABEL DATA REKAPITULASI CABANG LOMBA */}
-        {/* Kolom: No, Undian, No Registrasi, Nama Lengkap, L/P, Rayon & Unit TPA, Juri I, Juri II, Total Nilai */}
-        <div className="overflow-x-auto mt-4">
-          <table className="w-full text-left text-xs border-collapse border border-slate-300">
-            <thead>
-              <tr className="bg-slate-100 text-slate-900 font-bold border-b border-slate-300">
-                <th className="py-2.5 px-2 border border-slate-300 text-center w-8">No</th>
-                <th className="py-2.5 px-2 border border-slate-300 text-center w-14">Undian</th>
-                <th className="py-2.5 px-2 border border-slate-300 text-center w-28">No Registrasi</th>
-                <th className="py-2.5 px-3 border border-slate-300">Nama Lengkap</th>
-                <th className="py-2.5 px-1.5 border border-slate-300 text-center w-10">L/P</th>
-                <th className="py-2.5 px-3 border border-slate-300">Rayon & Unit TPA</th>
-                <th className="py-2.5 px-2 border border-slate-300 text-center w-14">Juri I</th>
-                <th className="py-2.5 px-2 border border-slate-300 text-center w-14">Juri II</th>
-                <th className="py-2.5 px-2 border border-slate-300 text-center w-16">Total Nilai</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200">
-              {filteredParticipants.length === 0 ? (
-                <tr>
-                  <td colSpan={9} className="py-8 text-center text-slate-400 italic">
-                    Belum ada santri terdaftar pada cabang lomba ini.
-                  </td>
+        {/* TABEL DATA (MODE PENILAIAN JURI ATAU MODE LEMBAR PRESENSI) */}
+        {viewMode === 'judging' ? (
+          /* TABEL 1: FORMAT PENILAIAN JURI */
+          <div className="overflow-x-auto mt-4">
+            <table className="w-full text-left text-xs border-collapse border border-slate-300">
+              <thead>
+                <tr className="bg-slate-100 text-slate-900 font-bold border-b border-slate-300">
+                  <th className="py-2.5 px-2 border border-slate-300 text-center w-8">No</th>
+                  <th className="py-2.5 px-2 border border-slate-300 text-center w-14">Undian</th>
+                  <th className="py-2.5 px-2 border border-slate-300 text-center w-28">No Registrasi</th>
+                  <th className="py-2.5 px-3 border border-slate-300">Nama Lengkap</th>
+                  <th className="py-2.5 px-1.5 border border-slate-300 text-center w-10">L/P</th>
+                  <th className="py-2.5 px-3 border border-slate-300">Rayon & Unit TPA</th>
+                  <th className="py-2.5 px-2 border border-slate-300 text-center w-14">Juri I</th>
+                  <th className="py-2.5 px-2 border border-slate-300 text-center w-14">Juri II</th>
+                  <th className="py-2.5 px-2 border border-slate-300 text-center w-16">Total Nilai</th>
                 </tr>
-              ) : (
-                filteredParticipants.map((p, idx) => {
-                  const kem = getKem(p.kemantrenId);
-                  const totalNilai = p.averageScore != null
-                    ? p.averageScore.toFixed(2)
-                    : ((p.scoreJury1 || 0) + (p.scoreJury2 || 0)) > 0
-                    ? String((p.scoreJury1 || 0) + (p.scoreJury2 || 0))
-                    : '';
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {filteredParticipants.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="py-8 text-center text-slate-400 italic">
+                      Belum ada santri terdaftar pada cabang lomba ini.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredParticipants.map((p, idx) => {
+                    const kem = getKem(p.kemantrenId);
+                    const totalNilai = p.averageScore != null
+                      ? p.averageScore.toFixed(2)
+                      : ((p.scoreJury1 || 0) + (p.scoreJury2 || 0)) > 0
+                      ? String((p.scoreJury1 || 0) + (p.scoreJury2 || 0))
+                      : '';
 
-                  return (
-                    <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="py-2 px-2 border border-slate-300 text-center font-mono text-[11px] text-slate-600">
-                        {idx + 1}
-                      </td>
-                      <td className="py-2 px-2 border border-slate-300 text-center">
-                        {p.lotteryNumber ? (
-                          <span className="px-1.5 py-0.5 bg-amber-400 text-emerald-950 font-black rounded text-[11px] shadow-2xs">
-                            {String(p.lotteryNumber).padStart(2, '0')}
+                    return (
+                      <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-2 px-2 border border-slate-300 text-center font-mono text-[11px] text-slate-600">
+                          {idx + 1}
+                        </td>
+                        <td className="py-2 px-2 border border-slate-300 text-center">
+                          {p.lotteryNumber ? (
+                            <span className="px-1.5 py-0.5 bg-amber-400 text-emerald-950 font-black rounded text-[11px] shadow-2xs">
+                              {String(p.lotteryNumber).padStart(2, '0')}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 text-[10px]">-</span>
+                          )}
+                        </td>
+                        <td className="py-2 px-2 border border-slate-300 font-mono font-bold text-[11px] text-emerald-950 text-center whitespace-nowrap">
+                          {p.registrationNumber}
+                        </td>
+                        <td className="py-2 px-3 border border-slate-300 font-bold text-slate-950">
+                          {p.fullName}
+                        </td>
+                        <td className="py-2 px-1.5 border border-slate-300 text-center font-bold text-[10px]">
+                          <span
+                            className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                              p.gender === 'L' ? 'bg-blue-100 text-blue-800' : 'bg-pink-100 text-pink-800'
+                            }`}
+                          >
+                            {p.gender}
                           </span>
-                        ) : (
-                          <span className="text-slate-400 text-[10px]">-</span>
-                        )}
-                      </td>
-                      <td className="py-2 px-2 border border-slate-300 font-mono font-bold text-[11px] text-emerald-950 text-center whitespace-nowrap">
-                        {p.registrationNumber}
-                      </td>
-                      <td className="py-2 px-3 border border-slate-300 font-bold text-slate-950">
-                        {p.fullName}
-                      </td>
-                      <td className="py-2 px-1.5 border border-slate-300 text-center font-bold text-[10px]">
-                        <span
-                          className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
-                            p.gender === 'L' ? 'bg-blue-100 text-blue-800' : 'bg-pink-100 text-pink-800'
-                          }`}
-                        >
-                          {p.gender}
-                        </span>
-                      </td>
-                      <td className="py-2 px-3 border border-slate-300 text-slate-800">
-                        <div className="font-bold text-slate-900">Rayon {kem?.name || p.kemantrenId}</div>
-                        {p.tpaUnitName && (
-                          <div className="text-[10px] text-slate-600 font-medium">{p.tpaUnitName}</div>
-                        )}
-                      </td>
-                      <td className="py-2 px-2 border border-slate-300 text-center font-mono text-[11px] text-slate-700">
-                        {p.scoreJury1 != null ? p.scoreJury1 : ''}
-                      </td>
-                      <td className="py-2 px-2 border border-slate-300 text-center font-mono text-[11px] text-slate-700">
-                        {p.scoreJury2 != null ? p.scoreJury2 : ''}
-                      </td>
-                      <td className="py-2 px-2 border border-slate-300 text-center font-mono font-bold text-[11px] text-emerald-950">
-                        {totalNilai}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                        </td>
+                        <td className="py-2 px-3 border border-slate-300 text-slate-800">
+                          <div className="font-bold text-slate-900">Rayon {kem?.name || p.kemantrenId}</div>
+                          {p.tpaUnitName && (
+                            <div className="text-[10px] text-slate-600 font-medium">{p.tpaUnitName}</div>
+                          )}
+                        </td>
+                        <td className="py-2 px-2 border border-slate-300 text-center font-mono text-[11px] text-slate-700">
+                          {p.scoreJury1 != null ? p.scoreJury1 : ''}
+                        </td>
+                        <td className="py-2 px-2 border border-slate-300 text-center font-mono text-[11px] text-slate-700">
+                          {p.scoreJury2 != null ? p.scoreJury2 : ''}
+                        </td>
+                        <td className="py-2 px-2 border border-slate-300 text-center font-mono font-bold text-[11px] text-emerald-950">
+                          {totalNilai}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          /* TABEL 2: FORMAT LEMBAR PRESENSI / DAFTAR HADIR FISIK & STATUS QR */
+          <div className="overflow-x-auto mt-4">
+            <table className="w-full text-left text-xs border-collapse border border-slate-300">
+              <thead>
+                <tr className="bg-slate-100 text-slate-900 font-bold border-b border-slate-300">
+                  <th className="py-2.5 px-2 border border-slate-300 text-center w-8">No</th>
+                  <th className="py-2.5 px-2 border border-slate-300 text-center w-14">Undian</th>
+                  <th className="py-2.5 px-2 border border-slate-300 text-center w-28">No Registrasi</th>
+                  <th className="py-2.5 px-3 border border-slate-300">Nama Lengkap</th>
+                  <th className="py-2.5 px-1.5 border border-slate-300 text-center w-10">L/P</th>
+                  <th className="py-2.5 px-3 border border-slate-300">Rayon & Unit TPA</th>
+                  <th className="py-2.5 px-2 border border-slate-300 text-center w-28">Status QR Gate</th>
+                  <th className="py-2.5 px-3 border border-slate-300 text-center w-36">Paraf / TTD Peserta</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {filteredParticipants.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="py-8 text-center text-slate-400 italic">
+                      Belum ada santri terdaftar pada cabang lomba ini.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredParticipants.map((p, idx) => {
+                    const kem = getKem(p.kemantrenId);
+                    const isPresent = p.attendance === 'hadir';
 
-        {/* BLOK TANDA TANGAN RESMI DI BAGIAN BAWAH DOKUMEN (3 Kolom: Panitera, Juri I, Juri II) */}
-        <div className="mt-10 pt-4 grid grid-cols-3 gap-6 text-center text-xs break-inside-avoid">
-          {/* Kolom 1: Panitera */}
-          <div className="flex flex-col items-center justify-between min-h-[120px]">
-            <div>
-              <p className="font-bold text-slate-900">Panitera</p>
+                    return (
+                      <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-2.5 px-2 border border-slate-300 text-center font-mono text-[11px] text-slate-600">
+                          {idx + 1}
+                        </td>
+                        <td className="py-2.5 px-2 border border-slate-300 text-center">
+                          {p.lotteryNumber ? (
+                            <span className="px-1.5 py-0.5 bg-amber-400 text-emerald-950 font-black rounded text-[11px] shadow-2xs">
+                              {String(p.lotteryNumber).padStart(2, '0')}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 text-[10px]">-</span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-2 border border-slate-300 font-mono font-bold text-[11px] text-emerald-950 text-center whitespace-nowrap">
+                          {p.registrationNumber}
+                        </td>
+                        <td className="py-2.5 px-3 border border-slate-300 font-bold text-slate-950">
+                          {p.fullName}
+                        </td>
+                        <td className="py-2.5 px-1.5 border border-slate-300 text-center font-bold text-[10px]">
+                          <span
+                            className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                              p.gender === 'L' ? 'bg-blue-100 text-blue-800' : 'bg-pink-100 text-pink-800'
+                            }`}
+                          >
+                            {p.gender}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 border border-slate-300 text-slate-800">
+                          <div className="font-bold text-slate-900">Rayon {kem?.name || p.kemantrenId}</div>
+                          {p.tpaUnitName && (
+                            <div className="text-[10px] text-slate-600 font-medium">{p.tpaUnitName}</div>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-2 border border-slate-300 text-center">
+                          {isPresent ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-900 border border-emerald-300 rounded font-black text-[10px]">
+                              <span>[✓] HADIR</span>
+                              {p.checkInTime && (
+                                <span className="font-mono text-[9px] text-emerald-700">
+                                  ({p.checkInTime.slice(11, 16)})
+                                </span>
+                              )}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-0.5 bg-slate-100 text-slate-600 border border-slate-200 rounded font-medium text-[10px]">
+                              [ &nbsp; ] Belum Hadir
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 border border-slate-300 font-mono text-[11px] text-slate-700">
+                          {/* Pola selang-seling khas Lembar Hadir Resmi agar tanda tangan tidak bertumpuk */}
+                          <div
+                            className={`min-h-[28px] flex items-center ${
+                              idx % 2 === 0 ? 'justify-start pl-2' : 'justify-end pr-2'
+                            }`}
+                          >
+                            <span className="text-slate-400 font-medium">
+                              {idx + 1}. <span className="border-b border-dotted border-slate-400 inline-block w-20 ml-1"></span>
+                            </span>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* BLOK TANDA TANGAN RESMI DI BAGIAN BAWAH DOKUMEN */}
+        {viewMode === 'judging' ? (
+          /* Tanda Tangan Format Penilaian (3 Kolom: Panitera, Juri I, Juri II) */
+          <div className="mt-10 pt-4 grid grid-cols-3 gap-6 text-center text-xs break-inside-avoid">
+            {/* Kolom 1: Panitera */}
+            <div className="flex flex-col items-center justify-between min-h-[120px]">
+              <div>
+                <p className="font-bold text-slate-900">Panitera</p>
+              </div>
+              <div className="mt-16 w-36 sm:w-44 border-b border-slate-900 pb-1">
+                <p className="text-[10px] text-slate-400 italic">( Nama Terang & TTD )</p>
+              </div>
             </div>
-            <div className="mt-16 w-36 sm:w-44 border-b border-slate-900 pb-1">
-              <p className="text-[10px] text-slate-400 italic">( Nama Terang & TTD )</p>
+
+            {/* Kolom 2: Juri I */}
+            <div className="flex flex-col items-center justify-between min-h-[120px]">
+              <div>
+                <p className="font-bold text-slate-900">Juri I</p>
+              </div>
+              <div className="mt-16 w-36 sm:w-44 border-b border-slate-900 pb-1">
+                <p className="text-[10px] text-slate-400 italic">( Nama Terang & TTD )</p>
+              </div>
+            </div>
+
+            {/* Kolom 3: Juri II */}
+            <div className="flex flex-col items-center justify-between min-h-[120px]">
+              <div>
+                <p className="font-bold text-slate-900">Juri II</p>
+              </div>
+              <div className="mt-16 w-36 sm:w-44 border-b border-slate-900 pb-1">
+                <p className="text-[10px] text-slate-400 italic">( Nama Terang & TTD )</p>
+              </div>
             </div>
           </div>
-
-          {/* Kolom 2: Juri I */}
-          <div className="flex flex-col items-center justify-between min-h-[120px]">
-            <div>
-              <p className="font-bold text-slate-900">Juri I</p>
+        ) : (
+          /* Tanda Tangan Format Presensi (2 Kolom: Koordinator Cabang Lomba & Panitera Panggung) */
+          <div className="mt-10 pt-4 grid grid-cols-2 gap-8 text-center text-xs break-inside-avoid max-w-2xl mx-auto">
+            {/* Kolom 1: Koordinator Cabang Lomba */}
+            <div className="flex flex-col items-center justify-between min-h-[120px]">
+              <div>
+                <p className="font-bold text-slate-900">Koordinator Cabang Lomba</p>
+              </div>
+              <div className="mt-16 w-44 sm:w-56 border-b border-slate-900 pb-1">
+                <p className="text-[10px] text-slate-400 italic">( Nama Terang & TTD )</p>
+              </div>
             </div>
-            <div className="mt-16 w-36 sm:w-44 border-b border-slate-900 pb-1">
-              <p className="text-[10px] text-slate-400 italic">( Nama Terang & TTD )</p>
+
+            {/* Kolom 2: Panitera / Petugas Panggung */}
+            <div className="flex flex-col items-center justify-between min-h-[120px]">
+              <div>
+                <p className="font-bold text-slate-900">Panitera / Petugas Panggung</p>
+              </div>
+              <div className="mt-16 w-44 sm:w-56 border-b border-slate-900 pb-1">
+                <p className="text-[10px] text-slate-400 italic">( Nama Terang & TTD )</p>
+              </div>
             </div>
           </div>
-
-          {/* Kolom 3: Juri II */}
-          <div className="flex flex-col items-center justify-between min-h-[120px]">
-            <div>
-              <p className="font-bold text-slate-900">Juri II</p>
-            </div>
-            <div className="mt-16 w-36 sm:w-44 border-b border-slate-900 pb-1">
-              <p className="text-[10px] text-slate-400 italic">( Nama Terang & TTD )</p>
-            </div>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

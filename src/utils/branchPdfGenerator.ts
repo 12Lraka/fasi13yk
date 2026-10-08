@@ -318,3 +318,294 @@ export async function downloadAllBranchesPdf({
   const dateStr = new Date().toISOString().slice(0, 10);
   doc.save(`Rekapitulasi_Semua_Cabang_Lomba_FASI_XIII_${dateStr}.pdf`);
 }
+
+/**
+ * Render satu cabang lomba ke halaman dokumen jsPDF Lembar Daftar Hadir / Presensi Peserta
+ */
+export async function renderAttendanceToPdfPage({
+  category,
+  participants,
+  kemantrenList,
+  doc,
+  isFirstPage = true,
+}: ExportBranchPdfOptions): Promise<jsPDF> {
+  const pdfDoc = doc || new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+    compress: true,
+  });
+
+  if (!isFirstPage) {
+    pdfDoc.addPage('a4', 'portrait');
+  }
+
+  const pageWidth = 210;
+  const marginX = 12;
+  const contentWidth = pageWidth - (marginX * 2);
+
+  // Load logo images as Base64
+  let logoBadkoBase64 = '';
+  let logoFasiBase64 = '';
+  try {
+    logoBadkoBase64 = await fetchImageAsBase64(LOGO_BADKO_URL);
+    logoFasiBase64 = await fetchImageAsBase64(LOGO_FASI_URL);
+  } catch {
+    // ignore
+  }
+
+  // 1. KOP SURAT RESMI
+  const topY = 12;
+  const logoSize = 16;
+
+  if (logoBadkoBase64 && logoBadkoBase64.startsWith('data:')) {
+    try {
+      pdfDoc.addImage(logoBadkoBase64, 'PNG', marginX + 2, topY, logoSize, logoSize);
+    } catch {}
+  }
+
+  if (logoFasiBase64 && logoFasiBase64.startsWith('data:')) {
+    try {
+      pdfDoc.addImage(logoFasiBase64, 'PNG', pageWidth - marginX - logoSize - 2, topY, logoSize, logoSize);
+    } catch {}
+  }
+
+  pdfDoc.setFont('helvetica', 'bold');
+  pdfDoc.setFontSize(11);
+  pdfDoc.setTextColor(15, 23, 42); // slate-900
+  pdfDoc.text('FESTIVAL ANAK SHOLEH INDONESIA XIII', pageWidth / 2, topY + 4, { align: 'center' });
+
+  pdfDoc.setFontSize(12);
+  pdfDoc.setTextColor(6, 78, 59); // emerald-900
+  pdfDoc.text('BADKO TKA-TPA KOTA YOGYAKARTA', pageWidth / 2, topY + 9, { align: 'center' });
+
+  pdfDoc.setFont('helvetica', 'normal');
+  pdfDoc.setFontSize(7.5);
+  pdfDoc.setTextColor(71, 85, 105); // slate-600
+  pdfDoc.text(
+    'Sekretariat : Jln. Kenari No. 56 Muja Muju, Umbulharjo, Kota Yogyakarta | Telp. 085179928551 / 085647392525',
+    pageWidth / 2,
+    topY + 14,
+    { align: 'center' }
+  );
+
+  // Garis Kop Surat
+  const lineY = topY + 18;
+  pdfDoc.setDrawColor(15, 23, 42);
+  pdfDoc.setLineWidth(0.8);
+  pdfDoc.line(marginX, lineY, pageWidth - marginX, lineY);
+  pdfDoc.setLineWidth(0.2);
+  pdfDoc.line(marginX, lineY + 0.8, pageWidth - marginX, lineY + 0.8);
+
+  // 2. JUDUL DOKUMEN & NAMA CABANG LOMBA
+  const titleY = lineY + 7;
+  pdfDoc.setFont('helvetica', 'bold');
+  pdfDoc.setFontSize(11);
+  pdfDoc.setTextColor(15, 23, 42);
+  pdfDoc.text('DAFTAR HADIR / PRESENSI PESERTA LOMBA', pageWidth / 2, titleY, { align: 'center' });
+
+  pdfDoc.setFontSize(10);
+  pdfDoc.setTextColor(4, 120, 87); // emerald-700
+  pdfDoc.text(
+    `CABANG: [${category.code}] ${category.name.toUpperCase()} — TINGKAT ${category.level}`,
+    pageWidth / 2,
+    titleY + 5,
+    { align: 'center' }
+  );
+
+  // Filter and sort participants for this category
+  const inCat = participants
+    .filter((p) => p.categoryId === category.id)
+    .sort((a, b) => {
+      if (a.lotteryNumber && b.lotteryNumber) return a.lotteryNumber - b.lotteryNumber;
+      if (a.lotteryNumber) return -1;
+      if (b.lotteryNumber) return 1;
+      return a.registrationNumber.localeCompare(b.registrationNumber);
+    });
+
+  const getKemName = (id: string) => {
+    const k = kemantrenList.find((item) => item.id === id);
+    return k ? k.name : id;
+  };
+
+  // 3. TABEL DATA DAFTAR HADIR
+  // Kolom: No, Undian, No Registrasi, Nama Lengkap, L/P, Rayon & Unit TPA, Status QR, Paraf / Tanda Tangan
+  const tableHeaders = [
+    'No',
+    'Undian',
+    'No Registrasi',
+    'Nama Lengkap',
+    'L/P',
+    'Rayon & Unit TPA',
+    'Status QR',
+    'Paraf / Tanda Tangan',
+  ];
+
+  const tableBody = inCat.length === 0
+    ? [['-', '-', '-', 'Belum ada santri terdaftar pada cabang lomba ini.', '-', '-', '-', '-']]
+    : inCat.map((p, index) => {
+        const kemName = getKemName(p.kemantrenId);
+        const rayonAndTpa = p.tpaUnitName
+          ? `Kem. ${kemName}\n${p.tpaUnitName}`
+          : `Kem. ${kemName}`;
+
+        const isPresent = p.attendance === 'hadir';
+        const qrStatus = isPresent ? '[ v ] HADIR' : '[   ] Belum';
+        
+        // Alternating numbering format for classic Indonesian attendance signature cell
+        const signCell = (index % 2 === 0)
+          ? `${index + 1}. .........`
+          : `       ${index + 1}. .........`;
+
+        return [
+          String(index + 1),
+          p.lotteryNumber ? String(p.lotteryNumber).padStart(2, '0') : '-',
+          p.registrationNumber || '-',
+          p.fullName || '-',
+          p.gender || '-',
+          rayonAndTpa,
+          qrStatus,
+          signCell,
+        ];
+      });
+
+  const startTableY = titleY + 8;
+
+  autoTable(pdfDoc, {
+    startY: startTableY,
+    head: [tableHeaders],
+    body: tableBody,
+    margin: { left: marginX, right: marginX, bottom: 45 },
+    theme: 'grid',
+    headStyles: {
+      fillColor: [241, 245, 249], // slate-100
+      textColor: [15, 23, 42], // slate-900
+      fontStyle: 'bold',
+      fontSize: 8.5,
+      halign: 'center',
+      valign: 'middle',
+      lineWidth: 0.2,
+      lineColor: [148, 163, 184], // slate-400
+    },
+    bodyStyles: {
+      textColor: [15, 23, 42],
+      fontSize: 8,
+      lineWidth: 0.15,
+      lineColor: [203, 213, 225], // slate-300
+      valign: 'middle',
+    },
+    columnStyles: {
+      0: { halign: 'center', cellWidth: 8 },  // No
+      1: { halign: 'center', cellWidth: 14, fontStyle: 'bold' }, // Undian
+      2: { halign: 'center', cellWidth: 26, fontStyle: 'bold' }, // No Registrasi
+      3: { halign: 'left', cellWidth: 46, fontStyle: 'bold' },   // Nama Lengkap
+      4: { halign: 'center', cellWidth: 10 }, // L/P
+      5: { halign: 'left', cellWidth: 42 },   // Rayon & Unit TPA
+      6: { halign: 'center', cellWidth: 18, fontStyle: 'bold' }, // Status QR
+      7: { halign: 'left', cellWidth: 22, fontStyle: 'normal' },  // Paraf / TTD
+    },
+    alternateRowStyles: {
+      fillColor: [248, 250, 252], // slate-50
+    },
+  });
+
+  // 4. BLOK TANDA TANGAN RESMI PRESENSI (2 Kolom: Koordinator Lomba & Panitera Panggung)
+  const lastTableY = (pdfDoc as any).lastAutoTable?.finalY || startTableY + 40;
+  const pageHeight = 297;
+  let signatureY = lastTableY + 8;
+
+  if (signatureY + 35 > pageHeight) {
+    pdfDoc.addPage('a4', 'portrait');
+    signatureY = 20;
+  }
+
+  const colWidth = contentWidth / 2;
+  const col1X = marginX + (colWidth * 0.5);
+  const col2X = marginX + (colWidth * 1.5);
+
+  pdfDoc.setFont('helvetica', 'bold');
+  pdfDoc.setFontSize(9);
+  pdfDoc.setTextColor(15, 23, 42);
+
+  // Label Header TTD
+  pdfDoc.text('Koordinator Cabang Lomba', col1X, signatureY, { align: 'center' });
+  pdfDoc.text('Panitera / Petugas Panggung', col2X, signatureY, { align: 'center' });
+
+  // Garis tempat tanda tangan dan nama manual
+  const lineSignY = signatureY + 22;
+  const lineWidth = 48;
+
+  pdfDoc.setLineWidth(0.3);
+  pdfDoc.setDrawColor(15, 23, 42);
+  pdfDoc.line(col1X - (lineWidth / 2), lineSignY, col1X + (lineWidth / 2), lineSignY);
+  pdfDoc.line(col2X - (lineWidth / 2), lineSignY, col2X + (lineWidth / 2), lineSignY);
+
+  // Petunjuk halus di bawah garis
+  pdfDoc.setFont('helvetica', 'italic');
+  pdfDoc.setFontSize(7.5);
+  pdfDoc.setTextColor(100, 116, 139);
+  pdfDoc.text('( Nama Terang & TTD )', col1X, lineSignY + 4, { align: 'center' });
+  pdfDoc.text('( Nama Terang & TTD )', col2X, lineSignY + 4, { align: 'center' });
+
+  return pdfDoc;
+}
+
+/**
+ * Unduh Lembar Daftar Hadir 1 Cabang Lomba sebagai PDF Resmi
+ */
+export async function downloadSingleBranchAttendancePdf(
+  category: CompetitionCategory,
+  participants: Participant[],
+  kemantrenList: Kemantren[]
+): Promise<void> {
+  const doc = await renderAttendanceToPdfPage({
+    category,
+    participants,
+    kemantrenList,
+    isFirstPage: true,
+  });
+
+  const safeCatName = category.name.replace(/[/\\?%*:|"<>]/g, '_');
+  doc.save(`Daftar_Hadir_Cabang_${category.code}_${safeCatName}.pdf`);
+}
+
+/**
+ * Unduh Lembar Daftar Hadir SEMUA Cabang Lomba dalam 1 Dokumen PDF Lengkap (A4 Multi-page)
+ */
+export async function downloadAllBranchesAttendancePdf({
+  categories,
+  participants,
+  kemantrenList,
+  onProgress,
+}: {
+  categories: CompetitionCategory[];
+  participants: Participant[];
+  kemantrenList: Kemantren[];
+  onProgress?: (current: number, total: number) => void;
+}): Promise<void> {
+  if (!categories.length) return;
+
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+    compress: true,
+  });
+
+  const total = categories.length;
+  for (let i = 0; i < total; i++) {
+    if (onProgress) onProgress(i + 1, total);
+    const cat = categories[i];
+    await renderAttendanceToPdfPage({
+      category: cat,
+      participants,
+      kemantrenList,
+      doc,
+      isFirstPage: i === 0,
+    });
+  }
+
+  const dateStr = new Date().toISOString().slice(0, 10);
+  doc.save(`Daftar_Hadir_Semua_Cabang_Lomba_FASI_XIII_${dateStr}.pdf`);
+}
+
