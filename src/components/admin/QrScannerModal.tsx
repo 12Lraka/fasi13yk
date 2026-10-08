@@ -25,6 +25,9 @@ import {
   RefreshCw,
   Info,
   Zap,
+  ZoomIn,
+  ZoomOut,
+  Flashlight,
 } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { Participant, UserSession } from '../../types/fasi';
@@ -106,6 +109,14 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [recentSessionScans, setRecentSessionScans] = useState<Participant[]>([]);
 
+  // Kamera lanjutan: Multi-lensa, Zoom optik/digital, dan Senter untuk Samsung, iPhone & Infinix
+  const [availableCameras, setAvailableCameras] = useState<Array<{ id: string; label: string }>>([]);
+  const [selectedCameraId, setSelectedCameraId] = useState<string>('');
+  const [zoomRange, setZoomRange] = useState<{ min: number; max: number; step: number } | null>(null);
+  const [zoomLevel, setZoomLevel] = useState<number>(1);
+  const [isTorchSupported, setIsTorchSupported] = useState<boolean>(false);
+  const [isTorchOn, setIsTorchOn] = useState<boolean>(false);
+
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const qrRegionId = 'html5qr-code-full-region';
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -132,10 +143,11 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
       scannerRef.current = null;
     }
     setIsCameraActive(false);
+    setIsTorchOn(false);
   };
 
-  // Start camera helper
-  const startCamera = async (facing: 'environment' | 'user') => {
+  // Start camera helper dengan dukungan BarcodeDetector hardware & dynamic viewport
+  const startCamera = async (facing: 'environment' | 'user', specificCameraId?: string) => {
     setCameraPermissionError(null);
     setErrorMessage('');
     setWarningStatus('');
@@ -147,17 +159,38 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
       const element = document.getElementById(qrRegionId);
       if (!element) return;
 
-      const html5QrCode = new Html5Qrcode(qrRegionId);
+      // Inisialisasi Html5Qrcode dengan BarcodeDetector bawaan OS (Krusial untuk Samsung & Infinix di Chrome)
+      const html5QrCode = new Html5Qrcode(qrRegionId, {
+        verbose: false,
+        experimentalFeatures: {
+          useBarCodeDetectorIfSupported: true,
+        },
+      });
       scannerRef.current = html5QrCode;
 
+      // Dynamic qrbox: 75% dari dimensi viewfinder agar tidak terpotong sempit di sensor resolusi tinggi
       const config = {
-        fps: 10,
-        qrbox: { width: 220, height: 220 },
+        fps: 15,
+        qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
+          const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+          const size = Math.max(180, Math.floor(minEdge * 0.75));
+          return { width: size, height: size };
+        },
         aspectRatio: 1.0,
       };
 
+      // Tentukan target kamera (device ID spesifik atau constraints facingMode)
+      const targetId = specificCameraId !== undefined ? specificCameraId : selectedCameraId;
+      const cameraTarget: any = targetId
+        ? targetId
+        : {
+            facingMode: { ideal: facing },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          };
+
       await html5QrCode.start(
-        { facingMode: facing },
+        cameraTarget,
         config,
         (decodedText) => {
           // Debounce scan 2 detik agar tidak spamming jika kamera diam di depan QR
@@ -175,6 +208,49 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
       );
 
       setIsCameraActive(true);
+
+      // Ambil daftar kamera fisik (misal Samsung memiliki kamera Wide, Ultra-Wide, Telephoto)
+      try {
+        const devices = await Html5Qrcode.getCameras();
+        if (devices && devices.length > 0) {
+          setAvailableCameras(
+            devices.map((d, i) => ({
+              id: d.id,
+              label: d.label || `Kamera ${i + 1}`,
+            }))
+          );
+        }
+      } catch {
+        // Abaikan jika tidak diizinkan membaca device list
+      }
+
+      // Deteksi kapabilitas Zoom dan Senter (Torch)
+      try {
+        const caps = html5QrCode.getRunningTrackCameraCapabilities();
+        const zoom = caps.zoomFeature();
+        if (zoom && zoom.isSupported()) {
+          setZoomRange({
+            min: zoom.min(),
+            max: zoom.max(),
+            step: zoom.step(),
+          });
+          setZoomLevel(zoom.value() ?? 1);
+        } else {
+          setZoomRange(null);
+        }
+
+        const torch = caps.torchFeature();
+        if (torch && torch.isSupported()) {
+          setIsTorchSupported(true);
+          setIsTorchOn(torch.value() ?? false);
+        } else {
+          setIsTorchSupported(false);
+          setIsTorchOn(false);
+        }
+      } catch {
+        setZoomRange(null);
+        setIsTorchSupported(false);
+      }
     } catch (err: any) {
       console.error('Gagal mengakses kamera:', err);
       const msg =
@@ -189,12 +265,53 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
     }
   };
 
+  // Zoom control
+  const handleSetZoom = async (newZoom: number) => {
+    if (!scannerRef.current) return;
+    try {
+      const caps = scannerRef.current.getRunningTrackCameraCapabilities();
+      const zoomFeature = caps.zoomFeature();
+      if (zoomFeature && zoomFeature.isSupported()) {
+        const clamped = Math.min(Math.max(newZoom, zoomRange?.min || 1), zoomRange?.max || 5);
+        await zoomFeature.apply(clamped);
+        setZoomLevel(clamped);
+      }
+    } catch (err) {
+      console.warn('Zoom failed:', err);
+    }
+  };
+
+  // Torch control
+  const handleToggleTorch = async () => {
+    if (!scannerRef.current) return;
+    try {
+      const caps = scannerRef.current.getRunningTrackCameraCapabilities();
+      const torchFeature = caps.torchFeature();
+      if (torchFeature && torchFeature.isSupported()) {
+        const nextState = !isTorchOn;
+        await torchFeature.apply(nextState);
+        setIsTorchOn(nextState);
+      }
+    } catch (err) {
+      console.warn('Torch failed:', err);
+    }
+  };
+
   // Switch between back/front camera
   const toggleCameraFacing = async () => {
     const nextFacing = cameraFacingMode === 'environment' ? 'user' : 'environment';
     setCameraFacingMode(nextFacing);
+    setSelectedCameraId('');
     if (isCameraActive) {
-      await startCamera(nextFacing);
+      await startCamera(nextFacing, '');
+    }
+  };
+
+  // Pilih lensa kamera spesifik
+  const handleSelectCamera = async (cameraId: string) => {
+    setSelectedCameraId(cameraId);
+    if (isCameraActive) {
+      await startCamera(cameraFacingMode, cameraId);
     }
   };
 
@@ -440,8 +557,8 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
             </div>
 
             {/* Control buttons under camera */}
-            <div className="flex items-center justify-between gap-2 mt-3 pt-2 border-t border-slate-800 text-xs">
-              <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 mt-3 pt-2 border-t border-slate-800 text-xs">
+              <div className="flex flex-wrap items-center gap-2">
                 {isCameraActive ? (
                   <button
                     type="button"
@@ -492,6 +609,83 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
                   <span>Upload Foto QR</span>
                 </button>
               </div>
+            </div>
+
+            {/* Quick Zoom & Senter (Flashlight) saat kamera aktif */}
+            {isCameraActive && (
+              <div className="mt-2.5 pt-2 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-xs">
+                {/* Zoom Buttons untuk Samsung/iPhone/Infinix */}
+                <div className="flex items-center gap-1 text-[11px]">
+                  <span className="text-slate-400 font-semibold flex items-center gap-1 mr-1">
+                    <ZoomIn className="w-3.5 h-3.5 text-emerald-400" />
+                    Zoom:
+                  </span>
+                  {[1, 1.5, 2].map((lvl) => {
+                    const isDisabled = zoomRange ? lvl > zoomRange.max || lvl < zoomRange.min : false;
+                    const isActive = Math.abs(zoomLevel - lvl) < 0.15;
+                    return (
+                      <button
+                        key={lvl}
+                        type="button"
+                        disabled={isDisabled}
+                        onClick={() => handleSetZoom(lvl)}
+                        className={`px-2 py-0.5 rounded text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                          isActive
+                            ? 'bg-emerald-500 text-slate-950 shadow-xs'
+                            : isDisabled
+                            ? 'bg-slate-800/40 text-slate-600 cursor-not-allowed'
+                            : 'bg-slate-800 hover:bg-slate-700 text-slate-200'
+                        }`}
+                        title={`Perbesar ${lvl}x`}
+                      >
+                        {lvl}x
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Senter / Flashlight */}
+                {isTorchSupported && (
+                  <button
+                    type="button"
+                    onClick={handleToggleTorch}
+                    className={`px-2.5 py-1 rounded text-[11px] font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                      isTorchOn
+                        ? 'bg-amber-400 text-slate-950 font-bold shadow-xs'
+                        : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                    }`}
+                    title="Nyalakan/matikan lampu kilat senter"
+                  >
+                    <Flashlight className="w-3.5 h-3.5" />
+                    <span>{isTorchOn ? 'Senter: ON' : 'Senter'}</span>
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Pemilihan Lensa Fisik Spesifik (Samsung & Infinix dengan multi-lensa) */}
+            {availableCameras.length > 1 && isCameraActive && (
+              <div className="mt-2 flex items-center justify-between gap-2 text-[11px] bg-slate-950/60 px-2.5 py-1.5 rounded-lg border border-slate-800">
+                <span className="text-slate-400 shrink-0">Pilih Lensa:</span>
+                <select
+                  value={selectedCameraId}
+                  onChange={(e) => handleSelectCamera(e.target.value)}
+                  className="bg-slate-900 text-slate-200 text-[11px] border border-slate-700 rounded px-2 py-0.5 truncate flex-1 focus:outline-none focus:border-emerald-500"
+                >
+                  <option value="">Otomatis ({cameraFacingMode === 'environment' ? 'Belakang' : 'Depan'})</option>
+                  {availableCameras.map((c, i) => (
+                    <option key={c.id} value={c.id}>
+                      {c.label || `Kamera ${i + 1}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Petunjuk Jarak Fokus untuk Samsung, iPhone, dan Infinix */}
+            <div className="mt-2 text-[11px] text-slate-400 flex items-center justify-center gap-1.5 bg-slate-950/50 py-1.5 px-2.5 rounded-lg border border-slate-800/60">
+              <span className="text-amber-400 font-bold">💡 Tips:</span>
+              <span>Pegang HP berjarak <strong className="text-slate-200">15–20 cm</strong> dari kartu. Gunakan <strong className="text-emerald-300">Zoom 1.5x / 2x</strong> bila kamera buram.</span>
             </div>
           </div>
 
