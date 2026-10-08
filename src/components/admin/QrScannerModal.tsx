@@ -180,14 +180,11 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
       };
 
       // Tentukan target kamera (device ID spesifik atau constraints facingMode)
-      const targetId = specificCameraId !== undefined ? specificCameraId : selectedCameraId;
-      const cameraTarget: any = targetId
+      // Catatan: Html5Qrcode mewajibkan objek cameraIdOrConfig hanya memiliki tepat 1 key ('facingMode' atau 'deviceId')
+      const targetId = (specificCameraId !== undefined ? specificCameraId : selectedCameraId)?.trim();
+      const cameraTarget: string | { facingMode: 'environment' | 'user' } = targetId
         ? targetId
-        : {
-            facingMode: { ideal: facing },
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-          };
+        : { facingMode: facing };
 
       await html5QrCode.start(
         cameraTarget,
