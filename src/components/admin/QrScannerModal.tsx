@@ -18,16 +18,14 @@ import {
   CheckCheck,
   AlertCircle,
   AlertTriangle,
-  Sparkles,
-  UserCheck,
   Search,
   Upload,
-  RefreshCw,
   Info,
   Zap,
   ZoomIn,
-  ZoomOut,
   Flashlight,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { Participant, UserSession } from '../../types/fasi';
@@ -100,14 +98,18 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
 }) => {
   const [manualCode, setManualCode] = useState<string>('');
   const [scannedResult, setScannedResult] = useState<Participant | null>(null);
+  const [scanFeedback, setScanFeedback] = useState<{
+    type: 'success' | 'already_checked';
+    participant: Participant;
+    time: string;
+  } | null>(null);
   const [errorMessage, setErrorMessage] = useState<string>('');
-  const [warningStatus, setWarningStatus] = useState<string>('');
-  const [successStatus, setSuccessStatus] = useState<string>('');
   const [isCameraActive, setIsCameraActive] = useState<boolean>(false);
   const [cameraFacingMode, setCameraFacingMode] = useState<'environment' | 'user'>('environment');
   const [cameraPermissionError, setCameraPermissionError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [recentSessionScans, setRecentSessionScans] = useState<Participant[]>([]);
+  const [showHistoryList, setShowHistoryList] = useState<boolean>(false);
 
   // Kamera lanjutan: Multi-lensa, Zoom optik/digital, dan Senter untuk Samsung, iPhone & Infinix
   const [availableCameras, setAvailableCameras] = useState<Array<{ id: string; label: string }>>([]);
@@ -150,7 +152,6 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
   const startCamera = async (facing: 'environment' | 'user', specificCameraId?: string) => {
     setCameraPermissionError(null);
     setErrorMessage('');
-    setWarningStatus('');
 
     try {
       await stopCamera();
@@ -320,12 +321,12 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
     try {
       setIsProcessing(true);
       setErrorMessage('');
-      setWarningStatus('');
       const html5QrCode = scannerRef.current || new Html5Qrcode(qrRegionId);
       const decodedText = await html5QrCode.scanFile(file, true);
       handleProcessCode(decodedText, true);
     } catch (err) {
       setErrorMessage('Tidak menemukan QR Code yang jelas pada foto tersebut.');
+      setScanFeedback(null);
       playAudioTone('warning');
     } finally {
       setIsProcessing(false);
@@ -345,10 +346,12 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
       };
     } else {
       stopCamera();
+      setScanFeedback(null);
+      setErrorMessage('');
     }
   }, [isOpen]);
 
-  // Eksekusi kehadiran ke State, Supabase, dan Audit Log
+  // Eksekusi kehadiran ke State, Supabase, dan Audit Log (Zero-Click Otomatis)
   const executeAttendance = async (
     target: Participant,
     attendanceType: 'hadir' | 'belum_hadir',
@@ -357,21 +360,26 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
     const timeString = new Date().toLocaleTimeString('id-ID', {
       hour: '2-digit',
       minute: '2-digit',
-      second: '2-digit',
     });
+    const formattedTime = `${timeString} WIB`;
 
     const updated: Participant = {
       ...target,
       attendance: attendanceType,
-      checkInTime: attendanceType === 'hadir' ? (target.checkInTime || timeString) : undefined,
+      checkInTime: attendanceType === 'hadir' ? (target.checkInTime || formattedTime) : undefined,
       updatedAt: new Date().toISOString(),
     };
 
     // 1. Update state di parent React (dan LocalStorage)
     onCheckInSuccess(updated);
     setScannedResult(updated);
+    setScanFeedback({
+      type: 'success',
+      participant: updated,
+      time: updated.checkInTime || formattedTime,
+    });
 
-    // Rekam ke riwayat sesi aktif pemindai agar petugas melihat bukti ke-10 kartu berhasil discan
+    // Rekam ke riwayat sesi aktif pemindai agar petugas melihat counter kartu berhasil discan
     if (attendanceType === 'hadir') {
       setRecentSessionScans((prev) => [updated, ...prev.filter((p) => p.id !== updated.id)]);
     } else {
@@ -394,34 +402,22 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
     logAuditEvent(
       session.name,
       'CHECK_IN_QR',
-      `Presensi santri ${updated.fullName} [${updated.registrationNumber}] status: ${attendanceType === 'hadir' ? 'Hadir' : 'Belum Hadir'}${attendanceType === 'hadir' ? ` (${updated.checkInTime || timeString} WIB)` : ''}.`
+      `Presensi santri ${updated.fullName} [${updated.registrationNumber}] status: ${attendanceType === 'hadir' ? 'Hadir' : 'Belum Hadir'}${attendanceType === 'hadir' ? ` (${updated.checkInTime || formattedTime})` : ''}.`
     );
 
     // 4. Feedback Suara & Notifikasi Visual
     if (attendanceType === 'hadir') {
       playAudioTone('success');
-      setWarningStatus('');
       setErrorMessage('');
-      setSuccessStatus(
-        isAuto
-          ? `⚡ CHECK-IN OTOMATIS BERHASIL! ${updated.fullName} langsung tercatat HADIR (pukul ${updated.checkInTime || timeString} WIB) dan tersimpan ke Supabase.`
-          : `Berhasil check-in kehadiran ${updated.fullName} (Hadir) pukul ${updated.checkInTime || timeString} WIB.`
-      );
-      showToast('success', `✅ Hadir: ${updated.fullName} (${updated.checkInTime || timeString} WIB)`);
+      showToast('success', `✅ Hadir: ${updated.fullName} (${updated.checkInTime || formattedTime})`);
     } else {
-      setSuccessStatus(`Status kehadiran ${updated.fullName} diatur kembali menjadi (Belum Hadir).`);
-      setWarningStatus('');
       showToast('info', `Status presensi ${updated.fullName} diatur ke Belum Hadir.`);
     }
   };
 
-  // Proses scan atau pencarian santri
+  // Proses scan atau pencarian santri (Cepat, Akurat, Zero-Click)
   const handleProcessCode = (code: string, isAutoScan = false) => {
     setErrorMessage('');
-    setSuccessStatus('');
-    setWarningStatus('');
-    setScannedResult(null);
-
     const clean = code.trim();
     if (!clean) return;
 
@@ -457,30 +453,30 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
 
     if (!found) {
       setErrorMessage(`Data santri dengan kode/nama "${searchReg}" tidak ditemukan dalam sistem FASI XIII.`);
+      setScanFeedback(null);
       playAudioTone('warning');
       return;
     }
 
     // 3. Evaluasi Status Kehadiran:
     if (found.attendance === 'hadir') {
-      // SUDAH HADIR: Tampilkan status sudah hadir & kunci tombol tandai hadir
+      // SUDAH HADIR: Tampilkan status sudah hadir dengan HUD ringkas
+      const existingTime = found.checkInTime
+        ? (found.checkInTime.includes('WIB') ? found.checkInTime : `${found.checkInTime} WIB`)
+        : 'Tercatat';
       setScannedResult(found);
-      setWarningStatus(
-        `⚠️ Santri ${found.fullName} SUDAH TERCATAT HADIR sebelumnya ${found.checkInTime ? `(pukul ${found.checkInTime} WIB)` : ''}. Data kehadiran sudah tersimpan aman.`
-      );
+      setScanFeedback({
+        type: 'already_checked',
+        participant: found,
+        time: existingTime,
+      });
       playAudioTone('already_checked');
       showToast('info', `${found.fullName} sudah berstatus HADIR.`);
       return;
     }
 
-    // BELUM HADIR:
-    if (isAutoScan) {
-      // FITUR SUPER PINTAR: Kamera otomatis langsung mengubah status ke Hadir & simpan ke Supabase!
-      executeAttendance(found, 'hadir', true);
-    } else {
-      // Pencarian manual via text box: tampilkan hasil santri
-      setScannedResult(found);
-    }
+    // BELUM HADIR: Langsung simpan HADIR ke Supabase & Data Peserta (Zero-Click)
+    executeAttendance(found, 'hadir', isAutoScan);
   };
 
   if (!isOpen) return null;
@@ -489,17 +485,17 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
   const getKem = (kemId: string) => KEMANTREN_LIST.find((k) => k.id === kemId);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-xl w-full border border-slate-200 overflow-hidden my-6 animate-in fade-in zoom-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full border border-slate-200 overflow-hidden my-auto max-h-[94vh] flex flex-col animate-in fade-in zoom-in duration-200">
         {/* Header */}
-        <div className="bg-gradient-to-r from-emerald-900 to-emerald-950 px-6 py-4 text-white flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-400/20 border border-amber-400/40 flex items-center justify-center text-amber-300">
+        <div className="bg-gradient-to-r from-emerald-900 to-emerald-950 px-5 py-3.5 text-white flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-amber-400/20 border border-amber-400/40 flex items-center justify-center text-amber-300">
               <QrCode className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-bold text-base">QR Scanner Check-in Hari-H</h3>
-              <p className="text-xs text-emerald-300">Validasi Kehadiran Panggung & Registrasi</p>
+              <h3 className="font-bold text-sm sm:text-base leading-tight">QR Scanner Presensi FASI XIII</h3>
+              <p className="text-[11px] text-emerald-300">Scan Cepat Antrean • Tersimpan Otomatis</p>
             </div>
           </div>
           <button
@@ -514,7 +510,7 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-4">
+        <div className="flex-1 overflow-y-auto p-3.5 sm:p-4 space-y-2.5">
           {/* Scanner Viewport */}
           <div className="relative rounded-2xl bg-slate-900 border-2 border-emerald-500/40 p-3 text-center text-white overflow-hidden">
             {/* Auto Check-in Badge Header */}
@@ -686,10 +682,75 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
             </div>
           </div>
 
-          {/* Quick Input Bar */}
-          <div className="space-y-2">
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-              Atau Input / Tempel Kode Barcode / No. Registrasi:
+          {/* Hasil Scan Ringkas HUD Banner (Otomatis & Tanpa Tombol yang Membingungkan) */}
+          {scanFeedback && (
+            <div
+              className={`p-3 rounded-xl border text-left shadow-xs transition-all duration-200 animate-in fade-in slide-in-from-top-1 ${
+                scanFeedback.type === 'success'
+                  ? 'bg-emerald-50/90 border-emerald-500 text-emerald-950'
+                  : 'bg-amber-50/90 border-amber-500 text-amber-950'
+              }`}
+            >
+              {/* Baris 1: Status (HADIR / SUDAH HADIR) + Jam + Nama Lengkap Santri + No. Undian */}
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span
+                    className={`shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-black uppercase tracking-wide text-white shadow-xs ${
+                      scanFeedback.type === 'success' ? 'bg-emerald-600' : 'bg-amber-600'
+                    }`}
+                  >
+                    {scanFeedback.type === 'success' ? (
+                      <>
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>HADIR ({scanFeedback.time})</span>
+                      </>
+                    ) : (
+                      <>
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        <span>SUDAH HADIR ({scanFeedback.time})</span>
+                      </>
+                    )}
+                  </span>
+                  <span className="font-bold text-xs sm:text-sm truncate text-slate-900">
+                    • {scanFeedback.participant.fullName}
+                  </span>
+                </div>
+                {scanFeedback.participant.lotteryNumber && (
+                  <span className="shrink-0 text-xs font-mono font-black px-2 py-0.5 rounded bg-slate-900 text-amber-300 border border-slate-700">
+                    No. {String(scanFeedback.participant.lotteryNumber).padStart(2, '0')}
+                  </span>
+                )}
+              </div>
+
+              {/* Baris 2: [No. Registrasi] Cabang Lomba Lengkap (Kategori) • Unit TPA */}
+              <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-700">
+                <span className="font-mono font-bold text-slate-900 bg-white/90 px-1.5 py-0.5 rounded border border-slate-300 text-[11px]">
+                  {scanFeedback.participant.registrationNumber}
+                </span>
+                <span className="font-semibold text-emerald-950">
+                  {getCat(scanFeedback.participant.categoryId)?.name || scanFeedback.participant.categoryId}
+                </span>
+                {scanFeedback.participant.tpaUnitName && (
+                  <span className="text-slate-600 text-[11px]">
+                    • {scanFeedback.participant.tpaUnitName}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Error Feedback */}
+          {errorMessage && (
+            <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-300 text-rose-800 text-xs flex items-center gap-2 animate-in fade-in">
+              <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+              <span className="font-semibold">{errorMessage}</span>
+            </div>
+          )}
+
+          {/* Quick Input Bar (Untuk input manual jika barcode rusak/tidak terbaca) */}
+          <div className="space-y-1">
+            <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+              Atau Input / Tempel No. Registrasi:
             </label>
             <div className="flex gap-2">
               <input
@@ -697,202 +758,84 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
                 value={manualCode}
                 onChange={(e) => setManualCode(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleProcessCode(manualCode, false);
+                  if (e.key === 'Enter') {
+                    handleProcessCode(manualCode, false);
+                    setManualCode('');
+                  }
                 }}
                 placeholder="Contoh: KG-TPA-01-01 atau nama santri..."
-                className="flex-1 px-3.5 py-2 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:bg-white font-mono"
+                className="flex-1 px-3 py-1.5 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:bg-white font-mono"
               />
               <button
                 type="button"
-                onClick={() => handleProcessCode(manualCode, false)}
-                className="px-4 py-2 bg-emerald-800 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+                onClick={() => {
+                  handleProcessCode(manualCode, false);
+                  setManualCode('');
+                }}
+                className="px-3.5 py-1.5 bg-emerald-800 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
               >
-                <Search className="w-4 h-4" />
+                <Search className="w-3.5 h-3.5" />
                 <span>Validasi</span>
               </button>
             </div>
           </div>
 
-          {/* Warning / Already Checked-In Feedback */}
-          {warningStatus && (
-            <div className="p-3 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-xs flex items-center gap-2.5 font-medium animate-in fade-in">
-              <AlertTriangle className="w-5 h-5 shrink-0 text-amber-600" />
-              <div>
-                <strong className="block font-bold text-amber-950">PERINGATAN: SANTRI SUDAH HADIR</strong>
-                <span>{warningStatus}</span>
-              </div>
-            </div>
-          )}
-
-          {/* Error Feedback */}
-          {errorMessage && (
-            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2 animate-in fade-in">
-              <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
-              <span>{errorMessage}</span>
-            </div>
-          )}
-
-          {/* Success Status */}
-          {successStatus && (
-            <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-950 text-xs flex items-center gap-2.5 font-medium animate-in fade-in">
-              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-              <div>
-                <strong className="block font-bold text-emerald-900">SISTEM PRESENSI REAL-TIME</strong>
-                <span>{successStatus}</span>
-              </div>
-            </div>
-          )}
-
-          {/* Found Participant Card */}
-          {scannedResult && (
-            <div className={`rounded-2xl p-4 border space-y-3 animate-in fade-in ${
-              scannedResult.attendance === 'hadir'
-                ? 'bg-emerald-50/70 border-emerald-200'
-                : 'bg-slate-50 border-slate-200'
-            }`}>
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded">
-                      {scannedResult.registrationNumber}
-                    </span>
-                    {scannedResult.attendance === 'hadir' && (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase bg-emerald-600 text-white px-2 py-0.5 rounded-full shadow-xs">
-                        <CheckCheck className="w-3 h-3" />
-                        <span>Hadir</span>
-                      </span>
-                    )}
-                  </div>
-                  <h4 className="font-bold text-base text-slate-900 mt-1.5">{scannedResult.fullName}</h4>
-                  <p className="text-xs text-slate-500">
-                    Kemantren {getKem(scannedResult.kemantrenId)?.name} • {scannedResult.tpaUnitName}
-                  </p>
-                </div>
-                {scannedResult.lotteryNumber && (
-                  <div className="text-center bg-amber-100 border border-amber-300 px-3 py-1.5 rounded-xl">
-                    <span className="text-[10px] text-amber-800 block uppercase font-bold">No. Tampil</span>
-                    <strong className="text-base font-black font-mono text-amber-950">
-                      {String(scannedResult.lotteryNumber).padStart(2, '0')}
-                    </strong>
-                  </div>
-                )}
-              </div>
-
-              <div className="pt-2 border-t border-slate-200/80 text-xs grid grid-cols-2 gap-2">
-                <div>
-                  <span className="text-slate-400 block text-[11px]">Cabang Lomba:</span>
-                  <strong className="text-slate-800 font-semibold">{getCat(scannedResult.categoryId)?.name}</strong>
-                </div>
-                <div>
-                  <span className="text-slate-400 block text-[11px]">Status Kehadiran Saat Ini:</span>
-                  {scannedResult.attendance === 'hadir' ? (
-                    <strong className="text-emerald-800 font-bold inline-flex items-center gap-1">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Hadir {scannedResult.checkInTime ? `(${scannedResult.checkInTime} WIB)` : ''}</span>
-                    </strong>
-                  ) : (
-                    <strong className="text-rose-600 font-semibold">
-                      ❌ Belum Hadir
-                    </strong>
-                  )}
-                </div>
-              </div>
-
-              {/* Check-in Actions */}
-              <div className="grid grid-cols-2 gap-2 pt-2">
-                {scannedResult.attendance === 'hadir' ? (
-                  <button
-                    type="button"
-                    disabled={true}
-                    className="py-2.5 px-3 bg-emerald-100/90 border border-emerald-300 text-emerald-900 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 cursor-not-allowed opacity-90 shadow-none"
-                    title="Santri sudah tercatat hadir. Tidak dapat ditandai hadir ulang."
-                  >
-                    <CheckCheck className="w-4 h-4 text-emerald-700" />
-                    <span>Sudah Hadir ✅</span>
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => executeAttendance(scannedResult, 'hadir', false)}
-                    className="py-2.5 px-3 bg-emerald-800 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-sm transition-colors cursor-pointer"
-                  >
-                    <CheckCircle2 className="w-4 h-4 text-emerald-300" />
-                    <span>Tandai Hadir</span>
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => executeAttendance(scannedResult, 'belum_hadir', false)}
-                  disabled={scannedResult.attendance !== 'hadir'}
-                  className={`py-2.5 px-3 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors ${
-                    scannedResult.attendance === 'hadir'
-                      ? 'bg-slate-200 hover:bg-rose-100 hover:text-rose-800 text-slate-700 cursor-pointer shadow-sm'
-                      : 'bg-slate-100 text-slate-400 cursor-not-allowed opacity-50'
-                  }`}
-                  title={scannedResult.attendance === 'hadir' ? 'Klik untuk membatalkan jika terjadi kekeliruan scan' : 'Santri belum hadir'}
-                >
-                  <UserCheck className="w-4 h-4 text-slate-500" />
-                  <span>{scannedResult.attendance === 'hadir' ? 'Batalkan / Reset' : 'Belum Hadir'}</span>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Riwayat Check-In Sesi Aktif (Multi-Scan Rombongan) */}
+          {/* Riwayat Check-In Sesi Aktif (Ringkas, Hemat Tempat di Layar HP) */}
           {recentSessionScans.length > 0 && (
-            <div className="rounded-2xl p-3.5 bg-slate-900 text-white border border-slate-800 space-y-2 animate-in fade-in">
+            <div className="rounded-xl p-2.5 bg-slate-900 text-white border border-slate-800 text-xs animate-in fade-in">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                  <span className="text-xs font-bold text-emerald-300">
-                    Santri Hadir Sesi Ini: {recentSessionScans.length} Santri
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span className="font-semibold text-emerald-300 text-[11px]">
+                    Sesi Ini: {recentSessionScans.length} Santri Hadir
                   </span>
                 </div>
-                <span className="text-[10px] text-slate-400">Tersimpan Otomatis ke Cloud</span>
+                <button
+                  type="button"
+                  onClick={() => setShowHistoryList(!showHistoryList)}
+                  className="text-[11px] text-slate-300 hover:text-white flex items-center gap-1 underline underline-offset-2 cursor-pointer"
+                >
+                  {showHistoryList ? 'Sembunyikan' : 'Lihat Riwayat'}
+                  {showHistoryList ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                </button>
               </div>
-              <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1 text-xs">
-                {recentSessionScans.map((p, idx) => (
-                  <div
-                    key={p.id}
-                    className="flex items-center justify-between p-2 rounded-xl bg-slate-800/80 border border-slate-700/60"
-                  >
-                    <div className="flex items-center gap-2 overflow-hidden">
-                      <span className="w-5 h-5 rounded-md bg-emerald-500/20 text-emerald-400 font-mono font-bold text-[11px] flex items-center justify-center shrink-0">
-                        {idx + 1}
-                      </span>
-                      <div className="truncate">
-                        <strong className="text-slate-100 block truncate">{p.fullName}</strong>
-                        <span className="text-[10px] text-slate-400 font-mono">
-                          {p.registrationNumber} • {p.tpaUnitName}
+
+              {showHistoryList && (
+                <div className="mt-2 pt-2 border-t border-slate-800 max-h-32 overflow-y-auto space-y-1 pr-1 text-[11px]">
+                  {recentSessionScans.map((p, idx) => (
+                    <div
+                      key={p.id}
+                      className="flex items-center justify-between p-1.5 rounded-lg bg-slate-800/70 border border-slate-700/50"
+                    >
+                      <div className="flex items-center gap-1.5 overflow-hidden">
+                        <span className="w-4 h-4 rounded bg-emerald-500/20 text-emerald-400 font-mono font-bold text-[10px] flex items-center justify-center shrink-0">
+                          {idx + 1}
                         </span>
+                        <span className="truncate text-slate-200 font-medium">{p.fullName}</span>
                       </div>
-                    </div>
-                    <div className="text-right shrink-0 ml-2">
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-800">
-                        <CheckCheck className="w-3 h-3" />
-                        <span>{p.checkInTime || 'Hadir'}</span>
+                      <span className="font-mono text-emerald-400 text-[10px] shrink-0 ml-2">
+                        {p.checkInTime || 'Hadir'}
                       </span>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="bg-slate-50 px-6 py-3.5 border-t border-slate-200 flex items-center justify-between">
+        <div className="bg-slate-50 px-4 py-2.5 sm:px-6 sm:py-3 border-t border-slate-200 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
             <Info className="w-3.5 h-3.5 text-emerald-700" />
-            <span>Arahkan kamera ke QR Code pada ID Card santri</span>
+            <span>Kamera siap scan berulang untuk antrean</span>
           </div>
           <button
             onClick={() => {
               stopCamera();
               onClose();
             }}
-            className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg text-xs font-semibold cursor-pointer"
+            className="px-3.5 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg text-xs font-semibold cursor-pointer"
           >
             Tutup Scanner
           </button>
