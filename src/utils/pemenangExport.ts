@@ -22,17 +22,20 @@ export interface WinnerRow {
   jenjang: string;
   kategoriGender: string;
   isCabangUtama: boolean;
-  peringkat: string; // Juara I, II, III, Harapan I, Harapan II
+  peringkat: string; // Juara I, II, III
   namaPemenang: string;
   rayon: string;
   unitTpa: string;
   totalNilai: number | string;
-  statusPengesahan: string;
   tanggalPenetapan: string;
 }
 
 /**
  * Ekstraksi baris datar pemenang dari daftar Berita Acara
+ * Diurutkan berdasarkan:
+ * 1. Jenjang (TKA -> TPA -> TQA)
+ * 2. Kode Cabang Lomba secara urut (TKA-01, TKA-02, ..., TPA-01, dst. sesuai Juknis)
+ * 3. Peringkat Juara (Juara I -> Juara II -> Juara III)
  */
 export function extractWinnerRows(
   categories: CompetitionCategory[],
@@ -42,7 +45,24 @@ export function extractWinnerRows(
   const rows: WinnerRow[] = [];
   let no = 1;
 
-  categories.forEach((cat) => {
+  const LEVEL_ORDER: Record<string, number> = {
+    TKA: 1,
+    TPA: 2,
+    TQA: 3,
+  };
+
+  // Urutkan kategori berdasarkan Jenjang lalu Kode Cabang Lomba
+  const sortedCategories = [...categories].sort((a, b) => {
+    const levelRankA = a.level ? (LEVEL_ORDER[a.level] || 99) : 99;
+    const levelRankB = b.level ? (LEVEL_ORDER[b.level] || 99) : 99;
+    if (levelRankA !== levelRankB) {
+      return levelRankA - levelRankB;
+    }
+    // Urutkan kode cabang (misal TKA-01, TKA-02, dst.)
+    return (a.code || '').localeCompare(b.code || '', 'id', { numeric: true });
+  });
+
+  sortedCategories.forEach((cat) => {
     const ba = beritaAcaraMap.get(cat.id);
     if (onlyDisahkan && ba?.status !== 'Disahkan') return;
 
@@ -58,7 +78,6 @@ export function extractWinnerRows(
       ? 'Putri'
       : 'Campuran/Beregu';
 
-    const statusText = ba?.status === 'Disahkan' ? 'Resmi Disahkan' : 'Menunggu Juri / Draft';
     const tgl = ba?.tanggalPenetapan || '-';
 
     const checkAndAdd = (peringkat: string, slot?: WinnerSlot) => {
@@ -72,15 +91,15 @@ export function extractWinnerRows(
           isCabangUtama: isUtama,
           peringkat,
           namaPemenang: slot.nama || '-',
-          rayon: slot.kemantren ? `Kem. ${slot.kemantren}` : '-',
+          rayon: slot.kemantren ? `Rayon ${slot.kemantren}` : '-',
           unitTpa: slot.unitTpa || '-',
           totalNilai: slot.totalNilai || 0,
-          statusPengesahan: statusText,
           tanggalPenetapan: tgl,
         });
       }
     };
 
+    // Peringkat diproses berurutan: Juara I -> Juara II -> Juara III
     if (ba?.pemenang) {
       checkAndAdd('Juara I', ba.pemenang.juara1);
       checkAndAdd('Juara II', ba.pemenang.juara2);
@@ -128,7 +147,6 @@ export function exportPemenangToExcel(
     'Wilayah Rayon / Kontingen',
     'Asal Unit TKA / TPA',
     'Total Skor / Nilai',
-    'Status Pengesahan',
     'Tanggal Penetapan',
     'Keterangan Bobot',
   ];
@@ -144,7 +162,6 @@ export function exportPemenangToExcel(
     r.rayon,
     r.unitTpa,
     r.totalNilai,
-    r.statusPengesahan,
     r.tanggalPenetapan,
     r.isCabangUtama ? 'Cabang Utama (7-5-3)' : 'Cabang Reguler (5-3-1)',
   ]);
@@ -164,7 +181,6 @@ export function exportPemenangToExcel(
     { wch: 22 }, // Rayon
     { wch: 28 }, // Unit TPA
     { wch: 14 }, // Total Nilai
-    { wch: 18 }, // Status
     { wch: 18 }, // Tanggal
     { wch: 22 }, // Bobot
   ];
@@ -278,14 +294,13 @@ export async function exportPemenangToPdf(
     'Jenjang',
     'Peringkat',
     'Nama Pemenang',
-    'Rayon / Kemantren',
+    'Rayon / Kontingen',
     'Unit TKA/TPA',
     'Nilai',
-    'Status',
   ];
 
   const tableBody = winnerRows.length === 0
-    ? [['-', '-', 'Belum ada data pemenang yang disahkan.', '-', '-', '-', '-', '-', '-', '-']]
+    ? [['-', '-', 'Belum ada data pemenang yang disahkan.', '-', '-', '-', '-', '-', '-']]
     : winnerRows.map((r) => [
         r.no,
         r.cabangKode,
@@ -296,7 +311,6 @@ export async function exportPemenangToPdf(
         r.rayon,
         r.unitTpa,
         r.totalNilai,
-        r.statusPengesahan,
       ]);
 
   autoTable(doc, {
@@ -305,8 +319,8 @@ export async function exportPemenangToPdf(
     startY: titleY + 8,
     margin: { left: marginX, right: marginX, bottom: 18 },
     styles: {
-      fontSize: 7.5,
-      cellPadding: 2,
+      fontSize: 8,
+      cellPadding: 2.2,
       lineColor: [226, 232, 240],
       lineWidth: 0.1,
       textColor: [15, 23, 42],
@@ -315,20 +329,19 @@ export async function exportPemenangToPdf(
       fillColor: [6, 78, 59], // emerald-900
       textColor: [255, 255, 255],
       fontStyle: 'bold',
-      fontSize: 7.5,
+      fontSize: 8,
       halign: 'center',
     },
     columnStyles: {
       0: { halign: 'center', cellWidth: 10 },
-      1: { halign: 'center', cellWidth: 14 },
-      2: { cellWidth: 48 },
+      1: { halign: 'center', cellWidth: 16, fontStyle: 'bold' },
+      2: { cellWidth: 54 },
       3: { halign: 'center', cellWidth: 16 },
-      4: { halign: 'center', cellWidth: 22, fontStyle: 'bold' },
-      5: { cellWidth: 50, fontStyle: 'bold' },
-      6: { cellWidth: 32 },
-      7: { cellWidth: 42 },
-      8: { halign: 'center', cellWidth: 16, fontStyle: 'bold' },
-      9: { halign: 'center', cellWidth: 19 },
+      4: { halign: 'center', cellWidth: 24, fontStyle: 'bold' },
+      5: { cellWidth: 58, fontStyle: 'bold' },
+      6: { cellWidth: 36 },
+      7: { cellWidth: 40 },
+      8: { halign: 'center', cellWidth: 15, fontStyle: 'bold' },
     },
     alternateRowStyles: {
       fillColor: [248, 250, 252],
