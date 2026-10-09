@@ -113,7 +113,7 @@ export const RecapPrintView: React.FC<RecapPrintViewProps> = ({
 
     // 2. Multi-level Sorting:
     // a. Jenjang: TKA -> TPA -> TQA
-    // b. Nama Cabang Lomba secara abjad (A - Z)
+    // b. Kode Cabang Lomba secara urut (TKA-01, TKA-02, ..., TPA-01, dst. sesuai Juknis)
     // c. Nomor Undian / Kelompok Grup
     // d. Nama Peserta (jika nomor undian sama / beregu)
     return list.sort((a, b) => {
@@ -127,12 +127,12 @@ export const RecapPrintView: React.FC<RecapPrintViewProps> = ({
         return levelRankA - levelRankB;
       }
 
-      // Alphabetical Category Name Comparison
-      const catNameA = catA?.name || '';
-      const catNameB = catB?.name || '';
-      const catComp = catNameA.localeCompare(catNameB, 'id', { sensitivity: 'base' });
-      if (catComp !== 0) {
-        return catComp;
+      // Kode Cabang Lomba Comparison (misal TKA-01, TKA-02, dst.)
+      const codeA = catA?.code || '';
+      const codeB = catB?.code || '';
+      const codeComp = codeA.localeCompare(codeB, 'id', { numeric: true });
+      if (codeComp !== 0) {
+        return codeComp;
       }
 
       // If categories are the same, sort by lotteryNumber / group
@@ -586,32 +586,32 @@ export const RecapPrintView: React.FC<RecapPrintViewProps> = ({
           </table>
         </div>
 
-        {/* BLOK TANDA TANGAN RESMI DI BAGIAN BAWAH DOKUMEN */}
+        {/* BLOK TANDA TANGAN RESMI DI BAGIAN BAWAH DOKUMEN (OPSI A: 2 Pihak yang Memverifikasi) */}
         <div className="mt-10 pt-4 grid grid-cols-2 gap-8 text-center text-xs break-inside-avoid">
-          {/* Sisi Kiri: Ketua Umum BADKO TKA-TPA Kota */}
-          <div className="flex flex-col items-center justify-between min-h-[100px]">
+          {/* Sisi Kiri: Koordinator Sie Lomba */}
+          <div className="flex flex-col items-center justify-between min-h-[105px]">
             <div>
               <p className="text-slate-600 font-medium">Mengetahui,</p>
-              <p className="font-bold text-slate-900 mt-0.5">Ketua Umum BADKO TKA-TPA Kota</p>
+              <p className="font-bold text-slate-900 mt-0.5">Koordinator Sie Lomba</p>
             </div>
             <div className="mt-14">
-              <p className="font-extrabold text-slate-950 underline tracking-wide text-xs sm:text-sm">
-                Dicky Artanto, S.Pd., M.Pd.
+              <p className="font-semibold text-slate-800 tracking-wide text-xs">
+                ( .................................................. )
               </p>
             </div>
           </div>
 
-          {/* Sisi Kanan: Ketua Panitia FASI XIII */}
-          <div className="flex flex-col items-center justify-between min-h-[100px]">
+          {/* Sisi Kanan: Koordinator Kesekretariatan */}
+          <div className="flex flex-col items-center justify-between min-h-[105px]">
             <div>
               <p className="text-slate-600 font-medium">
                 Yogyakarta, 11 Oktober 2026
               </p>
-              <p className="font-bold text-slate-900 mt-0.5">Ketua Panitia FASI XIII</p>
+              <p className="font-bold text-slate-900 mt-0.5">Koordinator Kesekretariatan</p>
             </div>
             <div className="mt-14">
-              <p className="font-extrabold text-slate-950 underline tracking-wide text-xs sm:text-sm">
-                Andry Sunny, S.E.
+              <p className="font-semibold text-slate-800 tracking-wide text-xs">
+                ( .................................................. )
               </p>
             </div>
           </div>

@@ -317,34 +317,28 @@ export async function renderRecapToPdfPage({
     pdfDoc.text('( .................................................. )', colLeftX, lineSignY, { align: 'center' });
     pdfDoc.text('( .................................................. )', colRightX, lineSignY, { align: 'center' });
   } else {
-    // Kiri: Mengetahui, Ketua Umum BADKO TKA-TPA Kota
+    // OPSI A: 2 Pihak yang Memverifikasi Data (Sie Lomba & Kesekretariatan)
+    // Kiri: Mengetahui, Koordinator Sie Lomba
     pdfDoc.text('Mengetahui,', colLeftX, signatureY, { align: 'center' });
     pdfDoc.setFont('helvetica', 'bold');
     pdfDoc.setTextColor(15, 23, 42);
-    pdfDoc.text('Ketua Umum BADKO TKA-TPA Kota', colLeftX, signatureY + 4.5, { align: 'center' });
+    pdfDoc.text('Koordinator Sie Lomba', colLeftX, signatureY + 4.5, { align: 'center' });
 
-    // Kanan: Tanggal & Ketua Panitia FASI XIII
+    // Kanan: Tanggal & Koordinator Kesekretariatan
     pdfDoc.setFont('helvetica', 'normal');
     pdfDoc.setTextColor(71, 85, 105);
     pdfDoc.text(dateStr, colRightX, signatureY, { align: 'center' });
     pdfDoc.setFont('helvetica', 'bold');
     pdfDoc.setTextColor(15, 23, 42);
-    pdfDoc.text('Ketua Panitia FASI XIII', colRightX, signatureY + 4.5, { align: 'center' });
+    pdfDoc.text('Koordinator Kesekretariatan', colRightX, signatureY + 4.5, { align: 'center' });
 
-    // Nama Pejabat Bertandatangan
+    // Garis tanda tangan / nama
     const lineSignY = signatureY + 24;
-    pdfDoc.setFont('helvetica', 'bold');
-    pdfDoc.setFontSize(9.5);
-    pdfDoc.text('Dicky Artanto, S.Pd., M.Pd.', colLeftX, lineSignY, { align: 'center' });
-    pdfDoc.text('Andry Sunny, S.E.', colRightX, lineSignY, { align: 'center' });
-
-    // Garis bawah nama
-    pdfDoc.setLineWidth(0.3);
-    pdfDoc.setDrawColor(15, 23, 42);
-    const leftTextWidth = pdfDoc.getTextWidth('Dicky Artanto, S.Pd., M.Pd.');
-    const rightTextWidth = pdfDoc.getTextWidth('Andry Sunny, S.E.');
-    pdfDoc.line(colLeftX - (leftTextWidth / 2), lineSignY + 0.8, colLeftX + (leftTextWidth / 2), lineSignY + 0.8);
-    pdfDoc.line(colRightX - (rightTextWidth / 2), lineSignY + 0.8, colRightX + (rightTextWidth / 2), lineSignY + 0.8);
+    pdfDoc.setFont('helvetica', 'normal');
+    pdfDoc.setFontSize(8.5);
+    pdfDoc.setTextColor(71, 85, 105);
+    pdfDoc.text('( .................................................. )', colLeftX, lineSignY, { align: 'center' });
+    pdfDoc.text('( .................................................. )', colRightX, lineSignY, { align: 'center' });
   }
 
   return pdfDoc;
