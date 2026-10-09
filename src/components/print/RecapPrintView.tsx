@@ -516,7 +516,7 @@ export const RecapPrintView: React.FC<RecapPrintViewProps> = ({
                 <th className="border border-slate-300 py-2 px-2 text-center w-28">No. Registrasi</th>
                 <th className="border border-slate-300 py-2 px-2.5">Nama Lengkap Santri</th>
                 <th className="border border-slate-300 py-2 px-2 text-center w-10">L/P</th>
-                <th className="border border-slate-300 py-2 px-2 text-center">Usia</th>
+                <th className="border border-slate-300 py-2 px-2 text-center">Tgl Lahir / Usia</th>
                 <th className="border border-slate-300 py-2 px-2.5">Rayon & Unit TPA</th>
                 <th className="border border-slate-300 py-2 px-2.5">Cabang Lomba</th>
                 <th className="border border-slate-300 py-2 px-2 text-center w-16">No. Undian</th>
@@ -555,6 +555,7 @@ export const RecapPrintView: React.FC<RecapPrintViewProps> = ({
                         </span>
                       </td>
                       <td className="border border-slate-300 py-1.5 px-2 text-center text-[11px] text-slate-700">
+                        <div>{p.birthDate || '-'}</div>
                         <div className="text-[10px] text-slate-500 font-medium">
                           ({p.ageOnCutoff.years}th {p.ageOnCutoff.months}bln)
                         </div>
