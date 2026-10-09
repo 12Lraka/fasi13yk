@@ -69,10 +69,17 @@ export const RecapPrintView: React.FC<RecapPrintViewProps> = ({
     return categoriesList.filter((c) => c.level === selectedLevelFilter);
   }, [categoriesList, selectedLevelFilter]);
 
-  // Filtered participants
+  // Filtered and Sorted participants
   const filteredParticipants = useMemo(() => {
-    return participants.filter((p) => {
-      // 1. Filter Kemantren
+    // 1. Level order map: TKA (1) -> TPA (2) -> TQA (3)
+    const LEVEL_ORDER: Record<string, number> = {
+      TKA: 1,
+      TPA: 2,
+      TQA: 3,
+    };
+
+    const list = participants.filter((p) => {
+      // Filter Kemantren / Rayon
       if (isKemantrenAdmin && session.kemantrenId) {
         if (p.kemantrenId !== session.kemantrenId) return false;
       } else if (selectedKemantrenFilter !== 'ALL') {
@@ -82,19 +89,18 @@ export const RecapPrintView: React.FC<RecapPrintViewProps> = ({
       // Cari cabang lomba
       const cat = categoriesList.find((c) => c.id === p.categoryId);
 
-      // 2. Filter Jenjang
+      // Filter Jenjang
       if (selectedLevelFilter !== 'ALL' && cat?.level !== selectedLevelFilter) {
         return false;
       }
 
-      // 3. Filter Cabang Lomba
+      // Filter Cabang Lomba
       if (selectedCategoryFilter !== 'ALL' && p.categoryId !== selectedCategoryFilter) {
         return false;
       }
 
-      // 4. Filter Jenis Kelamin & Grup
+      // Filter Jenis Kelamin & Grup
       if (selectedGenderFilter === 'GROUP') {
-        // Hanya cabang lomba beregu / grup
         if (!cat?.isGroup) return false;
       } else if (selectedGenderFilter === 'L') {
         if (p.gender !== 'L') return false;
@@ -103,6 +109,50 @@ export const RecapPrintView: React.FC<RecapPrintViewProps> = ({
       }
 
       return true;
+    });
+
+    // 2. Multi-level Sorting:
+    // a. Jenjang: TKA -> TPA -> TQA
+    // b. Nama Cabang Lomba secara abjad (A - Z)
+    // c. Nomor Undian / Kelompok Grup
+    // d. Nama Peserta (jika nomor undian sama / beregu)
+    return list.sort((a, b) => {
+      const catA = categoriesList.find((c) => c.id === a.categoryId);
+      const catB = categoriesList.find((c) => c.id === b.categoryId);
+
+      // Level Comparison
+      const levelRankA = catA?.level ? (LEVEL_ORDER[catA.level] || 99) : 99;
+      const levelRankB = catB?.level ? (LEVEL_ORDER[catB.level] || 99) : 99;
+      if (levelRankA !== levelRankB) {
+        return levelRankA - levelRankB;
+      }
+
+      // Alphabetical Category Name Comparison
+      const catNameA = catA?.name || '';
+      const catNameB = catB?.name || '';
+      const catComp = catNameA.localeCompare(catNameB, 'id', { sensitivity: 'base' });
+      if (catComp !== 0) {
+        return catComp;
+      }
+
+      // If categories are the same, sort by lotteryNumber / group
+      // Valid lottery numbers (1, 2, 3...) come first, missing / 0 come last
+      const lotteryA = a.lotteryNumber != null && a.lotteryNumber > 0 ? a.lotteryNumber : 999999;
+      const lotteryB = b.lotteryNumber != null && b.lotteryNumber > 0 ? b.lotteryNumber : 999999;
+      if (lotteryA !== lotteryB) {
+        return lotteryA - lotteryB;
+      }
+
+      // If lottery number is identical (e.g. members of the same group/regu or unset), sort by unit TPA then full name
+      const groupA = `${a.tpaUnitName || ''}_${a.fullName || ''}`;
+      const groupB = `${b.tpaUnitName || ''}_${b.fullName || ''}`;
+      const groupComp = groupA.localeCompare(groupB, 'id', { sensitivity: 'base' });
+      if (groupComp !== 0) {
+        return groupComp;
+      }
+
+      // Final fallback to registration number
+      return (a.registrationNumber || '').localeCompare(b.registrationNumber || '', 'id');
     });
   }, [
     participants,
@@ -175,6 +225,8 @@ export const RecapPrintView: React.FC<RecapPrintViewProps> = ({
         categoriesList,
         kemantrenList,
         fileName: `Rekapitulasi_FASI_XIII_${selectedKemantrenFilter !== 'ALL' ? selectedKemName : 'Kota_Yogyakarta'}`,
+        docType: 'nominasi',
+        orientation: 'landscape',
       });
     } catch (err) {
       console.error('Error exporting recap PDF:', err);
@@ -190,6 +242,7 @@ export const RecapPrintView: React.FC<RecapPrintViewProps> = ({
         kemantrenList,
         participants,
         categoriesList,
+        orientation: 'landscape',
         onProgress: (current, total) => setExportProgress({ current, total }),
       });
     } catch (err) {
@@ -435,8 +488,8 @@ export const RecapPrintView: React.FC<RecapPrintViewProps> = ({
           </h4>
           <p className="text-xs font-bold text-slate-800 uppercase">
             {selectedKemantrenFilter !== 'ALL'
-              ? `KONTINGEN KEMANTREN ${kemantrenList.find((k) => k.id === selectedKemantrenFilter)?.name.toUpperCase()}`
-              : 'SEMUA KONTINGEN 14 KEMANTREN KOTA YOGYAKARTA'}
+              ? `KONTINGEN RAYON ${kemantrenList.find((k) => k.id === selectedKemantrenFilter)?.name.toUpperCase()}`
+              : 'SEMUA KONTINGEN 14 RAYON KOTA YOGYAKARTA'}
           </p>
           {(selectedLevelFilter !== 'ALL' || selectedCategoryFilter !== 'ALL' || selectedGenderFilter !== 'ALL') && (
             <p className="text-[11px] text-slate-600 font-medium">
@@ -463,7 +516,7 @@ export const RecapPrintView: React.FC<RecapPrintViewProps> = ({
                 <th className="border border-slate-300 py-2 px-2 text-center w-28">No. Registrasi</th>
                 <th className="border border-slate-300 py-2 px-2.5">Nama Lengkap Santri</th>
                 <th className="border border-slate-300 py-2 px-2 text-center w-10">L/P</th>
-                <th className="border border-slate-300 py-2 px-2 text-center">Tgl Lahir / Usia</th>
+                <th className="border border-slate-300 py-2 px-2 text-center">Usia</th>
                 <th className="border border-slate-300 py-2 px-2.5">Rayon & Unit TPA</th>
                 <th className="border border-slate-300 py-2 px-2.5">Cabang Lomba</th>
                 <th className="border border-slate-300 py-2 px-2 text-center w-16">No. Undian</th>
@@ -502,7 +555,6 @@ export const RecapPrintView: React.FC<RecapPrintViewProps> = ({
                         </span>
                       </td>
                       <td className="border border-slate-300 py-1.5 px-2 text-center text-[11px] text-slate-700">
-                        <div>{p.birthDate || '-'}</div>
                         <div className="text-[10px] text-slate-500 font-medium">
                           ({p.ageOnCutoff.years}th {p.ageOnCutoff.months}bln)
                         </div>

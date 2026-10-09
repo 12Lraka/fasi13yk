@@ -27,10 +27,11 @@ interface ExportRecapPdfOptions {
   doc?: jsPDF;
   isFirstPage?: boolean;
   docType?: 'daftar_hadir' | 'nominasi';
+  orientation?: 'landscape' | 'portrait';
 }
 
 /**
- * Render satu lembar / kontingen rekapitulasi ke dokumen jsPDF A4 Portrait
+ * Render satu lembar / kontingen rekapitulasi ke dokumen jsPDF A4 (Landscape / Portrait)
  */
 export async function renderRecapToPdfPage({
   titleSubtitle,
@@ -39,20 +40,22 @@ export async function renderRecapToPdfPage({
   kemantrenList,
   doc,
   isFirstPage = true,
-  docType = 'daftar_hadir',
+  docType = 'nominasi',
+  orientation = 'landscape',
 }: ExportRecapPdfOptions): Promise<jsPDF> {
   const pdfDoc = doc || new jsPDF({
-    orientation: 'portrait',
+    orientation: orientation,
     unit: 'mm',
     format: 'a4',
     compress: true,
   });
 
   if (!isFirstPage) {
-    pdfDoc.addPage('a4', 'portrait');
+    pdfDoc.addPage('a4', orientation);
   }
 
-  const pageWidth = 210;
+  const pageWidth = orientation === 'landscape' ? 297 : 210;
+  const pageHeight = orientation === 'landscape' ? 210 : 297;
   const marginX = 12;
   const contentWidth = pageWidth - (marginX * 2);
 
@@ -248,23 +251,23 @@ export async function renderRecapToPdfPage({
     },
     columnStyles: isDaftarHadir
       ? {
-          0: { halign: 'center', cellWidth: 8 },  // No
-          1: { halign: 'center', cellWidth: 26, fontStyle: 'bold' }, // No Registrasi
-          2: { halign: 'left', cellWidth: 46, fontStyle: 'bold' },   // Nama Lengkap
-          3: { halign: 'center', cellWidth: 10 }, // L/P
-          4: { halign: 'left', cellWidth: 38 },   // Rayon & Unit TPA
-          5: { halign: 'left', cellWidth: 28 },   // Cabang Lomba
-          6: { halign: 'center', cellWidth: 30 }, // Paraf / Tanda Tangan
+          0: { halign: 'center', cellWidth: 10 }, // No
+          1: { halign: 'center', cellWidth: 32, fontStyle: 'bold' }, // No Registrasi
+          2: { halign: 'left', cellWidth: orientation === 'landscape' ? 64 : 46, fontStyle: 'bold' }, // Nama Lengkap
+          3: { halign: 'center', cellWidth: 12 }, // L/P
+          4: { halign: 'left', cellWidth: orientation === 'landscape' ? 55 : 38 }, // Rayon & Unit TPA
+          5: { halign: 'left', cellWidth: orientation === 'landscape' ? 55 : 28 }, // Cabang Lomba
+          6: { halign: 'center', cellWidth: orientation === 'landscape' ? 45 : 30 }, // Paraf / Tanda Tangan
         }
       : {
-          0: { halign: 'center', cellWidth: 8 },  // No
-          1: { halign: 'center', cellWidth: 26, fontStyle: 'bold' }, // No Registrasi
-          2: { halign: 'left', cellWidth: 44, fontStyle: 'bold' },   // Nama Lengkap
-          3: { halign: 'center', cellWidth: 10 }, // L/P
-          4: { halign: 'center', cellWidth: 26 }, // Tgl Lahir / Usia
-          5: { halign: 'left', cellWidth: 36 },   // Rayon & Unit TPA
-          6: { halign: 'left', cellWidth: 24 },   // Cabang Lomba
-          7: { halign: 'center', cellWidth: 12, fontStyle: 'bold' }, // No Undian
+          0: { halign: 'center', cellWidth: 10 }, // No
+          1: { halign: 'center', cellWidth: 32, fontStyle: 'bold' }, // No Registrasi
+          2: { halign: 'left', cellWidth: orientation === 'landscape' ? 62 : 44, fontStyle: 'bold' }, // Nama Lengkap
+          3: { halign: 'center', cellWidth: 12 }, // L/P
+          4: { halign: 'center', cellWidth: orientation === 'landscape' ? 35 : 26 }, // Tgl Lahir / Usia
+          5: { halign: 'left', cellWidth: orientation === 'landscape' ? 55 : 36 }, // Rayon & Unit TPA
+          6: { halign: 'left', cellWidth: orientation === 'landscape' ? 48 : 24 }, // Cabang Lomba
+          7: { halign: 'center', cellWidth: orientation === 'landscape' ? 19 : 12, fontStyle: 'bold' }, // No Undian
         },
     alternateRowStyles: {
       fillColor: [248, 250, 252], // slate-50
@@ -273,12 +276,11 @@ export async function renderRecapToPdfPage({
 
   // 4. BLOK TANDA TANGAN RESMI
   const lastTableY = (pdfDoc as any).lastAutoTable?.finalY || startTableY + 40;
-  const pageHeight = 297;
   let signatureY = lastTableY + 8;
 
   // Jika tidak cukup ruang untuk tanda tangan (butuh minimal 35mm), buat halaman baru
   if (signatureY + 35 > pageHeight) {
-    pdfDoc.addPage('a4', 'portrait');
+    pdfDoc.addPage('a4', orientation);
     signatureY = 20;
   }
 
@@ -349,7 +351,7 @@ export async function renderRecapToPdfPage({
 }
 
 /**
- * Unduh Rekapitulasi Data Peserta Aktif (Single Filter / Kemantren) sebagai PDF A4 Resmi
+ * Unduh Rekapitulasi Data Peserta Aktif (Single Filter / Kemantren) sebagai PDF A4 Landscape Resmi
  */
 export async function downloadSingleRecapPdf({
   titleSubtitle,
@@ -357,7 +359,8 @@ export async function downloadSingleRecapPdf({
   categoriesList,
   kemantrenList,
   fileName = 'Rekapitulasi_Peserta_FASI_XIII',
-  docType = 'daftar_hadir',
+  docType = 'nominasi',
+  orientation = 'landscape',
 }: {
   titleSubtitle: {
     mainTitle?: string;
@@ -369,6 +372,7 @@ export async function downloadSingleRecapPdf({
   kemantrenList: Kemantren[];
   fileName?: string;
   docType?: 'daftar_hadir' | 'nominasi';
+  orientation?: 'landscape' | 'portrait';
 }): Promise<void> {
   const doc = await renderRecapToPdfPage({
     titleSubtitle,
@@ -377,6 +381,7 @@ export async function downloadSingleRecapPdf({
     kemantrenList,
     isFirstPage: true,
     docType,
+    orientation,
   });
 
   const dateIso = new Date().toISOString().slice(0, 10);
@@ -385,23 +390,25 @@ export async function downloadSingleRecapPdf({
 }
 
 /**
- * Unduh Semua 14 Kemantren dalam 1 Dokumen PDF Lengkap (A4 Multi-page)
+ * Unduh Semua 14 Kemantren dalam 1 Dokumen PDF Lengkap (A4 Landscape Multi-page)
  */
 export async function downloadAllKemantrenRecapPdf({
   kemantrenList,
   participants,
   categoriesList,
+  orientation = 'landscape',
   onProgress,
 }: {
   kemantrenList: Kemantren[];
   participants: Participant[];
   categoriesList: CompetitionCategory[];
+  orientation?: 'landscape' | 'portrait';
   onProgress?: (current: number, total: number) => void;
 }): Promise<void> {
   if (!kemantrenList.length) return;
 
   const doc = new jsPDF({
-    orientation: 'portrait',
+    orientation: orientation,
     unit: 'mm',
     format: 'a4',
     compress: true,
@@ -416,14 +423,16 @@ export async function downloadAllKemantrenRecapPdf({
     await renderRecapToPdfPage({
       titleSubtitle: {
         mainTitle: 'REKAPITULASI NOMINASI TETAP PESERTA LOMBA',
-        subTitle: `KONTINGEN KEMANTREN ${kem.name.toUpperCase()} (${kemParticipants.length} SANTRI)`,
-        filterInfo: `Kontingen Resmi FASI XIII — Kemantren ${kem.name}`,
+        subTitle: `KONTINGEN RAYON ${kem.name.toUpperCase()} (${kemParticipants.length} SANTRI)`,
+        filterInfo: `Kontingen Resmi FASI XIII — Rayon ${kem.name}`,
       },
       participants: kemParticipants,
       categoriesList,
       kemantrenList,
       doc,
       isFirstPage: i === 0,
+      docType: 'nominasi',
+      orientation,
     });
   }
 
