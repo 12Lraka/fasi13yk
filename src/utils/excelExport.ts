@@ -29,6 +29,50 @@ export function exportParticipantsToExcel(
     return categoriesList.find((item) => item.id === id);
   };
 
+  const LEVEL_ORDER: Record<string, number> = {
+    TKA: 1,
+    TPA: 2,
+    TQA: 3,
+  };
+
+  // Pastikan data yang diekspor selalu terurut: Jenjang -> Kode Cabang Lomba -> No Undian -> Unit TPA & Nama
+  const sortedParticipants = [...participants].sort((a, b) => {
+    const catA = categoriesList.find((c) => c.id === a.categoryId);
+    const catB = categoriesList.find((c) => c.id === b.categoryId);
+
+    // 1. Jenjang
+    const levelRankA = catA?.level ? (LEVEL_ORDER[catA.level] || 99) : 99;
+    const levelRankB = catB?.level ? (LEVEL_ORDER[catB.level] || 99) : 99;
+    if (levelRankA !== levelRankB) {
+      return levelRankA - levelRankB;
+    }
+
+    // 2. Kode Cabang Lomba (TKA-01, TKA-02, ..., TPA-01, dst.)
+    const codeA = catA?.code || '';
+    const codeB = catB?.code || '';
+    const codeComp = codeA.localeCompare(codeB, 'id', { numeric: true });
+    if (codeComp !== 0) {
+      return codeComp;
+    }
+
+    // 3. Nomor Undian
+    const lotteryA = a.lotteryNumber != null && a.lotteryNumber > 0 ? a.lotteryNumber : 999999;
+    const lotteryB = b.lotteryNumber != null && b.lotteryNumber > 0 ? b.lotteryNumber : 999999;
+    if (lotteryA !== lotteryB) {
+      return lotteryA - lotteryB;
+    }
+
+    // 4. Unit TPA & Nama
+    const groupA = `${a.tpaUnitName || ''}_${a.fullName || ''}`;
+    const groupB = `${b.tpaUnitName || ''}_${b.fullName || ''}`;
+    const groupComp = groupA.localeCompare(groupB, 'id', { sensitivity: 'base' });
+    if (groupComp !== 0) {
+      return groupComp;
+    }
+
+    return (a.registrationNumber || '').localeCompare(b.registrationNumber || '', 'id');
+  });
+
   // Title rows for official letterhead in Excel
   const titleRows = [
     ['FESTIVAL ANAK SHOLEH INDONESIA (FASI) XIII'],
@@ -36,7 +80,7 @@ export function exportParticipantsToExcel(
     ['Sekretariat : Jln. Kenari No. 56 Muja Muju, Umbulharjo, Kota Yogyakarta | Telp. 085179928551 / 085647392525'],
     [],
     ['REKAPITULASI NOMINASI TETAP PESERTA LOMBA'],
-    [`Tanggal Cetak: ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })} | Total Peserta: ${participants.length} Santri`],
+    [`Tanggal Cetak: ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })} | Total Peserta: ${sortedParticipants.length} Santri`],
     [],
   ];
 
@@ -61,7 +105,7 @@ export function exportParticipantsToExcel(
   ];
 
   // Rows Data
-  const dataRows = participants.map((p, index) => {
+  const dataRows = sortedParticipants.map((p, index) => {
     const cat = getCategory(p.categoryId);
     const kemName = getKemantrenName(p.kemantrenId);
 

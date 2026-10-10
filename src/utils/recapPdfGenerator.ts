@@ -185,8 +185,8 @@ export async function renderRecapToPdfPage({
         const kemName = getKemName(p.kemantrenId);
         const cat = getCategory(p.categoryId);
         const rayonAndTpa = p.tpaUnitName
-          ? `Kem. ${kemName}\n${p.tpaUnitName}`
-          : `Kem. ${kemName}`;
+          ? `Rayon ${kemName}\n${p.tpaUnitName}`
+          : `Rayon ${kemName}`;
 
         const branchName = cat
           ? `[${cat.level}] ${cat.name}${cat.isGroup ? ' (Grup)' : ''}`

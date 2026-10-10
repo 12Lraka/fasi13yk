@@ -84,9 +84,15 @@ export const RekapPesertaAdmin: React.FC<RekapPesertaAdminProps> = ({
     return participants;
   }, [participants, isKemantrenAdmin, session]);
 
-  // Filtered List
+  // Filtered and Sorted List
   const filteredParticipants = useMemo(() => {
-    return accessibleParticipants.filter((p) => {
+    const LEVEL_ORDER: Record<string, number> = {
+      TKA: 1,
+      TPA: 2,
+      TQA: 3,
+    };
+
+    const list = accessibleParticipants.filter((p) => {
       if (!isKemantrenAdmin && selectedKemantren !== 'ALL' && p.kemantrenId !== selectedKemantren) return false;
       if (selectedGender !== 'ALL' && p.gender !== selectedGender) return false;
       if (selectedStatus !== 'ALL' && p.status !== selectedStatus) return false;
@@ -115,6 +121,49 @@ export const RekapPesertaAdmin: React.FC<RekapPesertaAdminProps> = ({
       }
 
       return true;
+    });
+
+    // Multi-level sorting:
+    // 1. Jenjang (TKA -> TPA -> TQA)
+    // 2. Kode Cabang Lomba (TKA-01, TKA-02, ..., TPA-01, dst. sesuai Juknis)
+    // 3. Nomor Undian / Kelompok Grup
+    // 4. Unit TPA & Nama Santri
+    return list.sort((a, b) => {
+      const catA = categoriesList.find((c) => c.id === a.categoryId);
+      const catB = categoriesList.find((c) => c.id === b.categoryId);
+
+      // Level comparison
+      const levelRankA = catA?.level ? (LEVEL_ORDER[catA.level] || 99) : 99;
+      const levelRankB = catB?.level ? (LEVEL_ORDER[catB.level] || 99) : 99;
+      if (levelRankA !== levelRankB) {
+        return levelRankA - levelRankB;
+      }
+
+      // Kode Cabang Lomba comparison (misal TKA-01, TKA-02, dst.)
+      const codeA = catA?.code || '';
+      const codeB = catB?.code || '';
+      const codeComp = codeA.localeCompare(codeB, 'id', { numeric: true });
+      if (codeComp !== 0) {
+        return codeComp;
+      }
+
+      // Nomor Undian comparison
+      const lotteryA = a.lotteryNumber != null && a.lotteryNumber > 0 ? a.lotteryNumber : 999999;
+      const lotteryB = b.lotteryNumber != null && b.lotteryNumber > 0 ? b.lotteryNumber : 999999;
+      if (lotteryA !== lotteryB) {
+        return lotteryA - lotteryB;
+      }
+
+      // Unit TPA & Nama Santri comparison
+      const groupA = `${a.tpaUnitName || ''}_${a.fullName || ''}`;
+      const groupB = `${b.tpaUnitName || ''}_${b.fullName || ''}`;
+      const groupComp = groupA.localeCompare(groupB, 'id', { sensitivity: 'base' });
+      if (groupComp !== 0) {
+        return groupComp;
+      }
+
+      // Fallback: Registration Number
+      return (a.registrationNumber || '').localeCompare(b.registrationNumber || '', 'id');
     });
   }, [
     accessibleParticipants,
