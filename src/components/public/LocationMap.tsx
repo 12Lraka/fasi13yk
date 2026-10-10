@@ -82,20 +82,20 @@ export const LocationMap: React.FC = () => {
           <div className="relative">
             <div className="absolute -left-[31px] top-0.5 w-3.5 h-3.5 rounded-full bg-emerald-600 border-2 border-white"></div>
             <div className="font-bold text-slate-900">06.30 - 07.30 WIB</div>
-            <div className="text-slate-700 font-semibold">Registrasi Ulang & Check-in QR Kontingen 14 Rayon</div>
-            <p className="text-slate-500 text-[11px]">Verifikasi ID Card santri di meja panitia per wilayah rayon.</p>
+            <div className="text-slate-700 font-semibold">Registrasi Ulang, Check-in QR Kontingen 14 Rayon & PRA ACARA</div>
+            <p className="text-slate-500 text-[11px]">Verifikasi ID Card & PRA ACARA.</p>
           </div>
 
           <div className="relative">
             <div className="absolute -left-[31px] top-0.5 w-3.5 h-3.5 rounded-full bg-emerald-600 border-2 border-white"></div>
-            <div className="font-bold text-slate-900">07.30 - 08.35 WIB</div>
+            <div className="font-bold text-slate-900">07.30 - 08.50 WIB</div>
             <div className="text-slate-700 font-semibold">Upacara Pembukaan & Defile Kontingen</div>
             <p className="text-slate-500 text-[11px]">Sambutan Walikota Yogyakarta & Ketua Umum Badko TPA D.I. Yogyakarta.</p>
           </div>
 
           <div className="relative">
             <div className="absolute -left-[31px] top-0.5 w-3.5 h-3.5 rounded-full bg-amber-500 border-2 border-white"></div>
-            <div className="font-bold text-amber-900 font-mono">08.30 - 11.30 WIB</div>
+            <div className="font-bold text-amber-900 font-mono">08.50 - 11.30 WIB</div>
             <div className="text-slate-900 font-semibold">Pelaksanaan 18 Cabang Lomba (TKA, TPA, TQA)</div>
             <p className="text-slate-500 text-[11px]">Sesuai nomor urut undian tampil di masing-masing panggung dan ruang penjurian.</p>
           </div>
